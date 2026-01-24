@@ -94,41 +94,55 @@ app.post('/api/verify', upload.single('image'), async (req, res) => {
     }
 
     const imageData = fs.readFileSync(req.file.path);
-    const imageHash = req.body.hash;
+    
+    const allImages = await pool.query(
+      'SELECT * FROM images ORDER BY created_at DESC'
+    );
 
-    if (imageHash) {
-      const result = await pool.query(
-        'SELECT * FROM images WHERE image_hash = $1',
-        [imageHash]
+    let matchedRecord = null;
+    
+    for (const record of allImages.rows) {
+      const computedHash = pixelroot.generateImageHash(
+        imageData,
+        record.mac_address,
+        parseInt(record.timestamp),
+        parseFloat(record.latitude),
+        parseFloat(record.longitude)
       );
-
-      if (result.rows.length > 0) {
-        const record = result.rows[0];
-        await pool.query(
-          'INSERT INTO verifications (image_hash, verified, verifier_ip) VALUES ($1, $2, $3)',
-          [imageHash, true, req.ip]
-        );
-
-        fs.unlinkSync(req.file.path);
-
-        return res.json({
-          verified: true,
-          data: {
-            imageHash: record.image_hash,
-            macAddress: record.mac_address,
-            timestamp: parseInt(record.timestamp),
-            location: { lat: parseFloat(record.latitude), lng: parseFloat(record.longitude) },
-            blockchainTx: record.blockchain_tx,
-            registeredAt: record.created_at
-          }
-        });
+      
+      if (computedHash === record.image_hash) {
+        matchedRecord = record;
+        break;
       }
     }
 
     fs.unlinkSync(req.file.path);
-    res.json({ verified: false, message: 'Image not found in registry' });
+
+    if (matchedRecord) {
+      await pool.query(
+        'INSERT INTO verifications (image_hash, verified, verifier_ip) VALUES ($1, $2, $3)',
+        [matchedRecord.image_hash, true, req.ip]
+      );
+
+      return res.json({
+        verified: true,
+        data: {
+          imageHash: matchedRecord.image_hash,
+          macAddress: matchedRecord.mac_address,
+          timestamp: parseInt(matchedRecord.timestamp),
+          location: { lat: parseFloat(matchedRecord.latitude), lng: parseFloat(matchedRecord.longitude) },
+          blockchainTx: matchedRecord.blockchain_tx,
+          registeredAt: matchedRecord.created_at
+        }
+      });
+    }
+
+    res.json({ verified: false, message: 'Image not found in registry or has been modified' });
   } catch (error) {
     console.error('Verification error:', error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res.status(500).json({ error: 'Failed to verify image' });
   }
 });

@@ -300,7 +300,7 @@ function App() {
               <div style={{ marginTop: '1.5rem' }}>
                 <h4 style={{ marginBottom: '0.5rem' }}>Pixel Signature Positions (First 10)</h4>
                 <div className="pixel-visualization">
-                  {Array.from({ length: 150 }, (_, i) => {
+                  {Array.from({ length: 120 }, (_, i) => {
                     const isEncoded = i < 10;
                     const hue = isEncoded ? 180 : Math.random() * 360;
                     return (

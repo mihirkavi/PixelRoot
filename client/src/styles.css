@@ -459,7 +459,7 @@ nav {
 
 .pixel-visualization {
   display: grid;
-  grid-template-columns: repeat(15, 1fr);
+  grid-template-columns: repeat(12, 1fr);
   gap: 2px;
   background: var(--bg-tertiary);
   padding: 1rem;

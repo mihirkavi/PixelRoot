@@ -2,7 +2,7 @@ const crypto = require('crypto');
 
 class PixelRoot {
   constructor() {
-    this.EMBED_BITS = 150;
+    this.EMBED_BITS = 120;
     this.IMAGE_WIDTH = 1920;
     this.IMAGE_HEIGHT = 1080;
   }
@@ -100,7 +100,7 @@ class PixelRoot {
       }
     }
     
-    return bits.slice(0, this.EMBED_BITS);
+    return bits;
   }
 
   generatePixelSignature(mac, timestamp, lat, lng) {
