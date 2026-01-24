@@ -4,10 +4,23 @@
   "description": "PixelRoot is a hardware-anchored media authenticity framework that embeds cryptographic provenance directly into image pixels at the moment of capture. By coupling CMOS sensor–level pixel modulation with real-time blockchain logging, PixelRoot enables tamper-evident verification of images and videos without relying on mutable metadata.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node server/index.js",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "node server/index.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^9.2.1",
+    "cors": "^2.8.6",
+    "crypto-js": "^4.2.0",
+    "drizzle-orm": "^0.45.1",
+    "express": "^5.2.1",
+    "multer": "^2.0.2",
+    "pg": "^8.17.2",
+    "uuid": "^13.0.0"
+  }
 }

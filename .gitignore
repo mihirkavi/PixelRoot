@@ -1,5 +1,10 @@
 node_modules/
+client/node_modules/
+client/dist/
 npm-debug.log
 .DS_Store
 .env
 .env.local
+uploads/
+/tmp/
+*.log
