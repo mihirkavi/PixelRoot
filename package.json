@@ -1,0 +1,13 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "PixelRoot is a hardware-anchored media authenticity framework that embeds cryptographic provenance directly into image pixels at the moment of capture. By coupling CMOS sensor–level pixel modulation with real-time blockchain logging, PixelRoot enables tamper-evident verification of images and videos without relying on mutable metadata.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
