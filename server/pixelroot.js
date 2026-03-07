@@ -2,20 +2,24 @@ const crypto = require('crypto');
 
 class PixelRoot {
   constructor() {
-    this.EMBED_BITS = 120;
     this.IMAGE_WIDTH = 1920;
     this.IMAGE_HEIGHT = 1080;
+    this.DEFAULT_VERSION = 'v2';
+    this.VERSION_BITS = {
+      v1: 120,
+      v2: 128,
+    };
   }
 
   generateMACAddress() {
-    const hexDigits = '0123456789ABCDEF';
-    let mac = '';
-    for (let i = 0; i < 6; i++) {
-      if (i > 0) mac += ':';
-      mac += hexDigits[Math.floor(Math.random() * 16)];
-      mac += hexDigits[Math.floor(Math.random() * 16)];
-    }
-    return mac;
+    const bytes = crypto.randomBytes(6);
+
+    // Generate a locally administered unicast MAC for demo provenance records.
+    bytes[0] = (bytes[0] | 0x02) & 0xfe;
+
+    return [...bytes]
+      .map((value) => value.toString(16).padStart(2, '0').toUpperCase())
+      .join(':');
   }
 
   macToBytes(mac) {
@@ -28,7 +32,33 @@ class PixelRoot {
     return buf;
   }
 
-  locationToBytes(lat, lng) {
+  resolveVersion(version) {
+    return this.VERSION_BITS[version] ? version : this.DEFAULT_VERSION;
+  }
+
+  getEmbedBits(version = this.DEFAULT_VERSION) {
+    return this.VERSION_BITS[this.resolveVersion(version)];
+  }
+
+  normalizeCoordinates(lat, lng) {
+    const safeLat = Number.isFinite(lat) ? Math.max(-90, Math.min(90, lat)) : 0;
+    const safeLng = Number.isFinite(lng) ? Math.max(-180, Math.min(180, lng)) : 0;
+
+    return {
+      lat: Number(safeLat.toFixed(6)),
+      lng: Number(safeLng.toFixed(6)),
+    };
+  }
+
+  writeUInt24BE(value) {
+    const buf = Buffer.alloc(3);
+    buf[0] = (value >>> 16) & 0xff;
+    buf[1] = (value >>> 8) & 0xff;
+    buf[2] = value & 0xff;
+    return buf;
+  }
+
+  locationToBytesV1(lat, lng) {
     const buf = Buffer.alloc(5);
     const latInt = Math.floor((lat + 90) * 10000);
     const lngInt = Math.floor((lng + 180) * 10000);
@@ -38,10 +68,35 @@ class PixelRoot {
     return buf;
   }
 
-  generateSeed(mac, timestamp, lat, lng) {
+  locationToBytesV2(lat, lng) {
+    const normalized = this.normalizeCoordinates(lat, lng);
+    const latInt = Math.round((normalized.lat + 90) * 10000);
+    const lngInt = Math.round((normalized.lng + 180) * 10000);
+
+    return Buffer.concat([
+      this.writeUInt24BE(latInt),
+      this.writeUInt24BE(lngInt),
+    ]);
+  }
+
+  locationToBytes(lat, lng, version = this.DEFAULT_VERSION) {
+    return this.resolveVersion(version) === 'v1'
+      ? this.locationToBytesV1(lat, lng)
+      : this.locationToBytesV2(lat, lng);
+  }
+
+  buildMetadataBuffer(mac, timestamp, lat, lng, version = this.DEFAULT_VERSION) {
+    return Buffer.concat([
+      this.macToBytes(mac),
+      this.timestampToBytes(timestamp),
+      this.locationToBytes(lat, lng, version),
+    ]);
+  }
+
+  generateSeed(mac, timestamp, lat, lng, version = this.DEFAULT_VERSION) {
     const macBytes = this.macToBytes(mac);
     const timestampBytes = this.timestampToBytes(timestamp);
-    const locationBytes = this.locationToBytes(lat, lng);
+    const locationBytes = this.locationToBytes(lat, lng, version);
     
     const input = Buffer.concat([macBytes, timestampBytes, locationBytes]);
     const hash = crypto.createHash('sha256').update(input).digest();
@@ -57,12 +112,12 @@ class PixelRoot {
     };
   }
 
-  generatePixelPositions(seed) {
+  generatePixelPositions(seed, bitCount = this.getEmbedBits()) {
     const prng = this.seededRandom(seed);
     const positions = [];
     const used = new Set();
     
-    while (positions.length < this.EMBED_BITS) {
+    while (positions.length < bitCount) {
       const row = prng() % this.IMAGE_HEIGHT;
       const col = prng() % this.IMAGE_WIDTH;
       const key = `${row},${col}`;
@@ -76,39 +131,27 @@ class PixelRoot {
     return positions;
   }
 
-  encodeMetadata(mac, timestamp, lat, lng) {
+  encodeMetadata(mac, timestamp, lat, lng, version = this.DEFAULT_VERSION) {
     const bits = [];
-    
-    const macBytes = this.macToBytes(mac);
-    for (let i = 0; i < 6; i++) {
+
+    const metadataBytes = this.buildMetadataBuffer(mac, timestamp, lat, lng, version);
+    for (let i = 0; i < metadataBytes.length; i++) {
       for (let j = 7; j >= 0; j--) {
-        bits.push((macBytes[i] >> j) & 1);
-      }
-    }
-    
-    const timestampBytes = this.timestampToBytes(timestamp);
-    for (let i = 0; i < 4; i++) {
-      for (let j = 7; j >= 0; j--) {
-        bits.push((timestampBytes[i] >> j) & 1);
-      }
-    }
-    
-    const locationBytes = this.locationToBytes(lat, lng);
-    for (let i = 0; i < 5; i++) {
-      for (let j = 7; j >= 0; j--) {
-        bits.push((locationBytes[i] >> j) & 1);
+        bits.push((metadataBytes[i] >> j) & 1);
       }
     }
     
     return bits;
   }
 
-  generatePixelSignature(mac, timestamp, lat, lng) {
-    const seed = this.generateSeed(mac, timestamp, lat, lng);
-    const positions = this.generatePixelPositions(seed);
-    const bits = this.encodeMetadata(mac, timestamp, lat, lng);
+  generatePixelSignature(mac, timestamp, lat, lng, version = this.DEFAULT_VERSION) {
+    const resolvedVersion = this.resolveVersion(version);
+    const seed = this.generateSeed(mac, timestamp, lat, lng, resolvedVersion);
+    const bits = this.encodeMetadata(mac, timestamp, lat, lng, resolvedVersion);
+    const positions = this.generatePixelPositions(seed, bits.length);
     
     return {
+      version: resolvedVersion,
       seed,
       positions,
       bits,
@@ -116,13 +159,8 @@ class PixelRoot {
     };
   }
 
-  generateImageHash(imageData, mac, timestamp, lat, lng) {
-    const metadata = Buffer.concat([
-      this.macToBytes(mac),
-      this.timestampToBytes(timestamp),
-      this.locationToBytes(lat, lng)
-    ]);
-    
+  generateImageHash(imageData, mac, timestamp, lat, lng, version = this.DEFAULT_VERSION) {
+    const metadata = this.buildMetadataBuffer(mac, timestamp, lat, lng, version);
     const combined = Buffer.concat([
       Buffer.from(imageData),
       metadata
@@ -135,9 +173,18 @@ class PixelRoot {
     return '0x' + crypto.randomBytes(32).toString('hex');
   }
 
-  verifyImage(storedHash, imageData, mac, timestamp, lat, lng) {
-    const computedHash = this.generateImageHash(imageData, mac, timestamp, lat, lng);
+  verifyImage(storedHash, imageData, mac, timestamp, lat, lng, version = this.DEFAULT_VERSION) {
+    const computedHash = this.generateImageHash(imageData, mac, timestamp, lat, lng, version);
     return storedHash === computedHash;
+  }
+
+  describeVersion(version = this.DEFAULT_VERSION) {
+    const resolvedVersion = this.resolveVersion(version);
+    return {
+      version: resolvedVersion,
+      metadataBits: this.getEmbedBits(resolvedVersion),
+      coordinateEncoding: resolvedVersion === 'v1' ? 'legacy-packed-5-byte' : '24-bit-per-coordinate',
+    };
   }
 }
 

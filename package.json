@@ -8,7 +8,8 @@
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
     "build": "cd client && npm run build",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node --test server/*.test.js"
   },
   "keywords": [],
   "author": "",
@@ -19,8 +20,9 @@
     "crypto-js": "^4.2.0",
     "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
-    "multer": "^2.0.2",
+    "multer": "^2.1.1",
     "pg": "^8.17.2",
+    "qs": "^6.15.0",
     "uuid": "^13.0.0"
   }
 }

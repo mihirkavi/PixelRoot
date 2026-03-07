@@ -1,475 +1,941 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, Shield, Database, Cpu, Link, CheckCircle, XCircle, Image, Clock, MapPin, Hash } from 'lucide-react';
+import React, { startTransition, useEffect, useState } from 'react';
+import {
+  ArrowRight,
+  CheckCircle,
+  Clock,
+  Copy,
+  Cpu,
+  Database,
+  Hash,
+  Image,
+  Link,
+  MapPin,
+  Menu,
+  RefreshCcw,
+  Shield,
+  Upload,
+  X,
+  XCircle,
+} from 'lucide-react';
 
-function App() {
-  const [view, setView] = useState('home');
-  const [stats, setStats] = useState({ totalImages: 0, totalVerifications: 0 });
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
-  const [verifyResult, setVerifyResult] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
+const NAV_ITEMS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'register', label: 'Register' },
+  { id: 'verify', label: 'Verify' },
+  { id: 'registry', label: 'Registry' },
+];
 
-  useEffect(() => {
-    fetchStats();
-    fetchImages();
-  }, []);
+const FEATURE_PILLARS = [
+  {
+    title: 'Capture-bound provenance',
+    description:
+      'Every registry entry binds image bytes to device identity, capture time, and location state before it enters the feed.',
+    icon: Cpu,
+  },
+  {
+    title: 'Verification-first API',
+    description:
+      'The backend now exposes health, registry, and verification endpoints with explicit storage and algorithm metadata.',
+    icon: Shield,
+  },
+  {
+    title: 'Operator visibility',
+    description:
+      'The interface shows live registry counts, storage mode, and signature version so operators can trust the system state.',
+    icon: Database,
+  },
+  {
+    title: 'Ledger transparency',
+    description:
+      'This build clearly marks blockchain receipts as simulated until a real chain integration is connected.',
+    icon: Link,
+  },
+];
 
-  const fetchStats = async () => {
-    try {
-      const res = await fetch('/api/stats');
-      const data = await res.json();
-      setStats(data);
-    } catch (err) {
-      console.error('Failed to fetch stats:', err);
+const PIPELINE_STEPS = [
+  'Capture or upload an image to create a provenance record.',
+  'PixelRoot derives a deterministic signature from device, time, and location context.',
+  'The registry stores the image fingerprint, signature preview, and ledger receipt.',
+  'Verification recomputes the fingerprint and confirms whether the bytes still match the registry.',
+];
+
+const INITIAL_HEALTH = {
+  status: 'loading',
+  storage: { mode: 'file', ready: false },
+  algorithm: { version: 'v2', metadataBits: 128, coordinateEncoding: '24-bit-per-coordinate' },
+  uploadLimitBytes: 10 * 1024 * 1024,
+};
+
+function shortHash(value, head = 12, tail = 10) {
+  if (!value) {
+    return 'Unavailable';
+  }
+
+  if (value.length <= head + tail + 3) {
+    return value;
+  }
+
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return 'Unavailable';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes)) {
+    return 'Unknown size';
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatStorageMode(mode) {
+  if (mode === 'postgres') {
+    return 'PostgreSQL';
+  }
+
+  return 'Local file store';
+}
+
+function formatLocation(location) {
+  if (!location) {
+    return 'Unavailable';
+  }
+
+  if (location.source !== 'device') {
+    return 'Unavailable at capture. Neutral origin was used for the demo signature.';
+  }
+
+  return `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
+}
+
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, options);
+  const isJson = response.headers.get('content-type')?.includes('application/json');
+  const payload = isJson ? await response.json() : null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error || `Request failed with status ${response.status}`);
+  }
+
+  return payload;
+}
+
+function requestGeolocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
     }
-  };
 
-  const fetchImages = async () => {
-    try {
-      const res = await fetch('/api/images');
-      const data = await res.json();
-      setImages(data);
-    } catch (err) {
-      console.error('Failed to fetch images:', err);
-    }
-  };
-
-  const handleRegister = async (file) => {
-    setLoading(true);
-    setUploadResult(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            formData.append('latitude', pos.coords.latitude);
-            formData.append('longitude', pos.coords.longitude);
-          },
-          () => {}
-        );
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(null);
       }
+    }, 4000);
 
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const data = await res.json();
-      setUploadResult(data);
-      fetchStats();
-      fetchImages();
-    } catch (err) {
-      console.error('Registration failed:', err);
-      setUploadResult({ error: 'Failed to register image' });
-    } finally {
-      setLoading(false);
-    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (!settled) {
+          settled = true;
+          window.clearTimeout(timeoutId);
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        }
+      },
+      () => {
+        if (!settled) {
+          settled = true;
+          window.clearTimeout(timeoutId);
+          resolve(null);
+        }
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60000,
+        timeout: 3000,
+      }
+    );
+  });
+}
+
+function createDraft(file) {
+  return {
+    file,
+    name: file.name,
+    size: file.size,
+    previewUrl: URL.createObjectURL(file),
   };
+}
 
-  const handleVerify = async (file, hash = null) => {
-    setLoading(true);
-    setVerifyResult(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      if (hash) formData.append('hash', hash);
+function buildSignaturePreview(signaturePreview) {
+  const totalCells = 64;
+  const highlighted = new Set(
+    signaturePreview.map((item) => ((item.row % 8) * 8) + (item.col % 8))
+  );
 
-      const res = await fetch('/api/verify', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const data = await res.json();
-      setVerifyResult(data);
-      fetchStats();
-    } catch (err) {
-      console.error('Verification failed:', err);
-      setVerifyResult({ error: 'Failed to verify image' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  return Array.from({ length: totalCells }, (_, index) => highlighted.has(index));
+}
 
-  const handleDrop = useCallback((e, action) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      if (action === 'register') handleRegister(file);
-      else handleVerify(file);
-    }
-  }, []);
+function CopyButton({ value, label, onCopy }) {
+  return (
+    <button className="ghost-button" type="button" onClick={() => onCopy(value, label)}>
+      <Copy size={14} />
+      Copy
+    </button>
+  );
+}
 
-  const handleFileSelect = (e, action) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (action === 'register') handleRegister(file);
-      else handleVerify(file);
-    }
-  };
+function SectionHeader({ eyebrow, title, description, action }) {
+  return (
+    <div className="section-header">
+      <div>
+        {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
+        <h2>{title}</h2>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {action || null}
+    </div>
+  );
+}
 
-  const formatDate = (timestamp) => {
-    return new Date(parseInt(timestamp)).toLocaleString();
-  };
+function MetricCard({ label, value, caption }) {
+  return (
+    <div className="metric-card">
+      <span className="metric-label">{label}</span>
+      <strong className="metric-value">{value}</strong>
+      <span className="metric-caption">{caption}</span>
+    </div>
+  );
+}
 
-  const truncateHash = (hash) => {
-    if (!hash) return '';
-    return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
-  };
+function FeatureCard({ feature }) {
+  const Icon = feature.icon;
 
   return (
-    <div className="app">
-      <nav>
-        <div className="nav-content">
-          <div className="logo">PixelRoot</div>
-          <div className="nav-links">
-            <button className={`nav-link ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')}>Home</button>
-            <button className={`nav-link ${view === 'register' ? 'active' : ''}`} onClick={() => setView('register')}>Register</button>
-            <button className={`nav-link ${view === 'verify' ? 'active' : ''}`} onClick={() => setView('verify')}>Verify</button>
-            <button className={`nav-link ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>Dashboard</button>
+    <article className="feature-card">
+      <div className="feature-icon">
+        <Icon size={20} />
+      </div>
+      <h3>{feature.title}</h3>
+      <p>{feature.description}</p>
+    </article>
+  );
+}
+
+function StatusBadge({ healthy, label }) {
+  return (
+    <span className={`status-badge ${healthy ? 'ok' : 'warn'}`}>
+      <span className="status-dot" />
+      {label}
+    </span>
+  );
+}
+
+function FileDropzone({
+  id,
+  title,
+  description,
+  hint,
+  busy,
+  draft,
+  actionLabel,
+  onSelectFile,
+}) {
+  const [dragActive, setDragActive] = useState(false);
+
+  function pickFile(fileList) {
+    const file = fileList?.[0];
+    if (!file || !file.type.startsWith('image/')) {
+      return;
+    }
+    onSelectFile(file);
+  }
+
+  return (
+    <div className="panel upload-panel">
+      <div className="panel-header">
+        <div>
+          <h3>{title}</h3>
+          <p>{description}</p>
+        </div>
+      </div>
+
+      <label
+        className={`dropzone ${dragActive ? 'drag-active' : ''} ${busy ? 'busy' : ''}`}
+        htmlFor={id}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragActive(true);
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragActive(false);
+          pickFile(event.dataTransfer.files);
+        }}
+      >
+        <input
+          id={id}
+          type="file"
+          accept="image/*"
+          onChange={(event) => {
+            pickFile(event.target.files);
+            event.target.value = '';
+          }}
+        />
+        <div className="dropzone-icon">
+          <Upload size={24} />
+        </div>
+        <strong>{actionLabel}</strong>
+        <span>{hint}</span>
+      </label>
+
+      {draft ? (
+        <div className="draft-preview">
+          <img className="draft-image" src={draft.previewUrl} alt={draft.name} />
+          <div className="draft-meta">
+            <strong>{draft.name}</strong>
+            <span>{formatFileSize(draft.size)}</span>
           </div>
         </div>
-      </nav>
+      ) : null}
+    </div>
+  );
+}
 
-      {view === 'home' && (
-        <>
-          <section className="hero">
-            <div className="container">
-              <h1>PixelRoot</h1>
-              <p>
-                A hardware-anchored media authenticity framework that embeds cryptographic provenance 
-                directly into image pixels at the moment of capture. Combat deepfakes with 
-                tamper-evident blockchain verification.
-              </p>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                <button className="btn btn-primary" onClick={() => setView('register')}>Register Image</button>
-                <button className="btn btn-secondary" onClick={() => setView('verify')}>Verify Image</button>
-              </div>
-              <div className="hero-stats">
-                <div className="stat">
-                  <div className="stat-value">{stats.totalImages}</div>
-                  <div className="stat-label">Images Registered</div>
-                </div>
-                <div className="stat">
-                  <div className="stat-value">{stats.totalVerifications}</div>
-                  <div className="stat-label">Verifications</div>
-                </div>
-              </div>
-            </div>
-          </section>
+function DetailList({ rows, onCopy }) {
+  return (
+    <div className="detail-list">
+      {rows.map((row) => (
+        <div className="detail-row" key={row.label}>
+          <div>
+            <span className="detail-label">{row.label}</span>
+            <strong className="detail-value">{row.value}</strong>
+          </div>
+          {row.copyValue ? (
+            <CopyButton value={row.copyValue} label={row.label} onCopy={onCopy} />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
 
-          <section className="features">
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Cpu size={24} color="white" />
-              </div>
-              <h3>CMOS Integration</h3>
-              <p>Sensor-level pixel modulation embeds cryptographic data directly at capture time, making forgery extremely difficult.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Link size={24} color="white" />
-              </div>
-              <h3>Blockchain Logging</h3>
-              <p>Image hashes are immediately logged to blockchain, creating an immutable record of authentic media.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Shield size={24} color="white" />
-              </div>
-              <h3>Hardware Root of Trust</h3>
-              <p>MAC address, timestamp, and GPS coordinates are embedded via hardware, not software metadata.</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Database size={24} color="white" />
-              </div>
-              <h3>Instant Verification</h3>
-              <p>Social media platforms can verify image authenticity in seconds without forensic analysis.</p>
-            </div>
-          </section>
+function SignaturePreview({ signaturePreview }) {
+  const cells = buildSignaturePreview(signaturePreview);
 
-          <section className="section">
-            <h2 className="section-title">How It Works</h2>
-            <div className="blockchain-viz">
-              <div className="blockchain-header">
-                <Hash size={24} color="var(--accent-primary)" />
-                <h3>PixelRoot Verification Pipeline</h3>
-              </div>
-              <div style={{ display: 'grid', gap: '1rem' }}>
-                <div className="block">
-                  <div className="block-number">1</div>
-                  <div className="block-info">
-                    <div style={{ fontWeight: 600 }}>Capture</div>
-                    <div className="block-time">Image captured with embedded pixel signature (MAC + timestamp + GPS)</div>
-                  </div>
-                </div>
-                <div className="chain-link">|</div>
-                <div className="block">
-                  <div className="block-number">2</div>
-                  <div className="block-info">
-                    <div style={{ fontWeight: 600 }}>Hash Generation</div>
-                    <div className="block-time">SHA-256 hash computed from image data + metadata</div>
-                  </div>
-                </div>
-                <div className="chain-link">|</div>
-                <div className="block">
-                  <div className="block-number">3</div>
-                  <div className="block-info">
-                    <div style={{ fontWeight: 600 }}>Blockchain Submit</div>
-                    <div className="block-time">Hash logged to blockchain within seconds of capture</div>
-                  </div>
-                </div>
-                <div className="chain-link">|</div>
-                <div className="block">
-                  <div className="block-number">4</div>
-                  <div className="block-info">
-                    <div style={{ fontWeight: 600 }}>Verification</div>
-                    <div className="block-time">Anyone can verify authenticity via blockchain lookup</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        </>
-      )}
+  return (
+    <div className="signature-panel">
+      <div className="signature-header">
+        <strong>Signature preview</strong>
+        <span>First 16 embedded coordinates projected into an 8x8 visual grid.</span>
+      </div>
+      <div className="signature-grid">
+        {cells.map((active, index) => (
+          <div
+            key={index}
+            className={`signature-cell ${active ? 'active' : ''}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      {view === 'register' && (
-        <section className="section">
-          <h2 className="section-title">Register Image</h2>
-          <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-            Upload an image to generate its PixelRoot signature and register it on the blockchain.
+function OperationResult({ mode, result, onCopy }) {
+  if (!result) {
+    return null;
+  }
+
+  if (result.error) {
+    return (
+      <div className="panel result-panel error">
+        <div className="result-heading">
+          <XCircle size={20} />
+          <div>
+            <h3>{mode === 'register' ? 'Registration failed' : 'Verification failed'}</h3>
+            <p>{result.error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'verify' && result.verified === false) {
+    return (
+      <div className="panel result-panel warning">
+        <div className="result-heading">
+          <XCircle size={20} />
+          <div>
+            <h3>Image not verified</h3>
+            <p>{result.message}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const record = result.data;
+  const rows = [
+    {
+      label: 'Image hash',
+      value: shortHash(record.imageHash, 18, 14),
+      copyValue: record.imageHash,
+    },
+    {
+      label: 'Algorithm version',
+      value: record.algorithmVersion.toUpperCase(),
+    },
+    {
+      label: 'Ledger receipt',
+      value: shortHash(record.blockchainTx, 14, 12),
+      copyValue: record.blockchainTx,
+    },
+    {
+      label: 'Captured at',
+      value: formatDateTime(record.timestamp),
+    },
+    {
+      label: 'Location state',
+      value: formatLocation(record.location),
+    },
+    {
+      label: 'Storage mode',
+      value: formatStorageMode(result.storageMode || 'file'),
+    },
+  ];
+
+  if (mode === 'verify') {
+    rows.push({
+      label: 'Registered at',
+      value: formatDateTime(record.createdAt),
+    });
+  }
+
+  return (
+    <div className="panel result-panel success">
+      <div className="result-heading">
+        <CheckCircle size={20} />
+        <div>
+          <h3>{mode === 'register' ? 'Provenance record created' : 'Image verified against registry'}</h3>
+          <p>
+            {mode === 'register'
+              ? 'The registry stored a fresh provenance record and generated a simulated ledger receipt.'
+              : 'The uploaded bytes matched an existing registry record.'}
           </p>
-          
-          <label
-            className={`upload-zone ${dragOver ? 'dragover' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => handleDrop(e, 'register')}
-          >
-            <input type="file" accept="image/*" onChange={(e) => handleFileSelect(e, 'register')} />
-            <div className="upload-icon">
-              <Upload size={48} />
-            </div>
-            <p style={{ marginBottom: '0.5rem' }}>Drag and drop an image or click to select</p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Supports JPEG, PNG, GIF, WebP (max 10MB)</p>
-          </label>
+        </div>
+      </div>
+      <DetailList rows={rows} onCopy={onCopy} />
+      <SignaturePreview signaturePreview={record.pixelSignaturePreview} />
+    </div>
+  );
+}
 
-          {loading && (
-            <div className="loading">
-              <div className="spinner"></div>
-            </div>
-          )}
+function RegistryCard({ image, onCopy }) {
+  return (
+    <article className="registry-card">
+      <div className="registry-image-shell">
+        <img
+          className="registry-image"
+          src={image.fileUrl}
+          alt={image.originalFilename}
+          onError={(event) => {
+            event.currentTarget.style.visibility = 'hidden';
+          }}
+        />
+        <StatusBadge healthy={image.verified} label={image.verified ? 'Verified record' : 'Pending'} />
+      </div>
+      <div className="registry-body">
+        <div className="registry-row">
+          <strong>{image.originalFilename}</strong>
+          <CopyButton value={image.imageHash} label="Image hash" onCopy={onCopy} />
+        </div>
+        <p className="registry-hash">{shortHash(image.imageHash, 14, 12)}</p>
+        <div className="registry-meta">
+          <span>
+            <Clock size={14} />
+            {formatDateTime(image.createdAt)}
+          </span>
+          <span>
+            <Hash size={14} />
+            {image.algorithmVersion.toUpperCase()}
+          </span>
+        </div>
+        <div className="registry-meta">
+          <span>
+            <MapPin size={14} />
+            {formatLocation(image.location)}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
 
-          {uploadResult && uploadResult.success && (
-            <div className="result-card">
-              <div className="result-header">
-                <div className="result-status verified">
-                  <CheckCircle size={24} />
-                  <span>Image Registered Successfully</span>
-                </div>
-              </div>
-              <div className="result-details">
-                <div className="detail-row">
-                  <span className="detail-label">Image Hash</span>
-                  <span className="detail-value">{uploadResult.data.imageHash}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">MAC Address</span>
-                  <span className="detail-value">{uploadResult.data.macAddress}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Timestamp</span>
-                  <span className="detail-value">{formatDate(uploadResult.data.timestamp)}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Location</span>
-                  <span className="detail-value">{uploadResult.data.location.lat.toFixed(6)}, {uploadResult.data.location.lng.toFixed(6)}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">Blockchain TX</span>
-                  <span className="detail-value">{uploadResult.data.blockchainTx}</span>
-                </div>
-              </div>
-              
-              <div style={{ marginTop: '1.5rem' }}>
-                <h4 style={{ marginBottom: '0.5rem' }}>Pixel Signature Positions (First 10)</h4>
-                <div className="pixel-visualization">
-                  {Array.from({ length: 120 }, (_, i) => {
-                    const isEncoded = i < 10;
-                    const hue = isEncoded ? 180 : Math.random() * 360;
-                    return (
-                      <div
-                        key={i}
-                        className={`pixel ${isEncoded ? 'encoded' : ''}`}
-                        style={{
-                          backgroundColor: isEncoded 
-                            ? 'var(--accent-primary)' 
-                            : `hsl(${hue}, 50%, ${30 + Math.random() * 20}%)`
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                  Highlighted pixels contain embedded cryptographic data (150 total across full image)
-                </p>
-              </div>
-            </div>
-          )}
+function App() {
+  const [activeView, setActiveView] = useState('overview');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [health, setHealth] = useState(INITIAL_HEALTH);
+  const [stats, setStats] = useState({
+    totalImages: 0,
+    totalVerifications: 0,
+    storageMode: 'file',
+  });
+  const [images, setImages] = useState([]);
+  const [pageError, setPageError] = useState('');
+  const [copiedLabel, setCopiedLabel] = useState('');
+  const [isBooting, setIsBooting] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [busyAction, setBusyAction] = useState('');
+  const [registerDraft, setRegisterDraft] = useState(null);
+  const [verifyDraft, setVerifyDraft] = useState(null);
+  const [registerResult, setRegisterResult] = useState(null);
+  const [verifyResult, setVerifyResult] = useState(null);
 
-          {uploadResult && uploadResult.error && (
-            <div className="result-card">
-              <div className="result-status unverified">
-                <XCircle size={24} />
-                <span>{uploadResult.error}</span>
-              </div>
-            </div>
-          )}
-        </section>
-      )}
+  useEffect(() => {
+    loadOperationalData({ boot: true });
+  }, []);
 
-      {view === 'verify' && (
-        <section className="section">
-          <h2 className="section-title">Verify Image</h2>
-          <p style={{ textAlign: 'center', color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-            Upload an image to check if it has been registered and verify its authenticity.
-          </p>
-          
-          <label
-            className={`upload-zone ${dragOver ? 'dragover' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => handleDrop(e, 'verify')}
-          >
-            <input type="file" accept="image/*" onChange={(e) => handleFileSelect(e, 'verify')} />
-            <div className="upload-icon">
-              <Shield size={48} />
-            </div>
-            <p style={{ marginBottom: '0.5rem' }}>Drop an image to verify its authenticity</p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>We'll check if this image is registered on the blockchain</p>
-          </label>
+  useEffect(() => () => {
+    if (registerDraft?.previewUrl) {
+      URL.revokeObjectURL(registerDraft.previewUrl);
+    }
 
-          {loading && (
-            <div className="loading">
-              <div className="spinner"></div>
-            </div>
-          )}
+    if (verifyDraft?.previewUrl) {
+      URL.revokeObjectURL(verifyDraft.previewUrl);
+    }
+  }, [registerDraft, verifyDraft]);
 
-          {verifyResult && (
-            <div className="result-card">
-              <div className="result-header">
-                <div className={`result-status ${verifyResult.verified ? 'verified' : 'unverified'}`}>
-                  {verifyResult.verified ? <CheckCircle size={24} /> : <XCircle size={24} />}
-                  <span>{verifyResult.verified ? 'Verified Authentic' : 'Not Verified'}</span>
-                </div>
-              </div>
-              
-              {verifyResult.verified ? (
-                <div className="result-details">
-                  <div className="detail-row">
-                    <span className="detail-label">Image Hash</span>
-                    <span className="detail-value">{verifyResult.data.imageHash}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Device MAC</span>
-                    <span className="detail-value">{verifyResult.data.macAddress}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Captured At</span>
-                    <span className="detail-value">{formatDate(verifyResult.data.timestamp)}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Location</span>
-                    <span className="detail-value">{verifyResult.data.location.lat.toFixed(6)}, {verifyResult.data.location.lng.toFixed(6)}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Blockchain TX</span>
-                    <span className="detail-value">{verifyResult.data.blockchainTx}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="detail-label">Registered</span>
-                    <span className="detail-value">{new Date(verifyResult.data.registeredAt).toLocaleString()}</span>
-                  </div>
-                </div>
-              ) : (
-                <p style={{ color: 'var(--text-secondary)', marginTop: '1rem' }}>
-                  This image was not found in our registry. It may not have been registered with PixelRoot, 
-                  or it may have been altered since registration.
-                </p>
-              )}
-            </div>
-          )}
-        </section>
-      )}
+  async function loadOperationalData({ boot = false } = {}) {
+    setPageError('');
 
-      {view === 'dashboard' && (
-        <section className="section">
-          <h2 className="section-title">Registered Images</h2>
-          
-          <div className="hero-stats" style={{ marginBottom: '2rem' }}>
-            <div className="stat">
-              <div className="stat-value">{stats.totalImages}</div>
-              <div className="stat-label">Total Registered</div>
+    if (boot) {
+      setIsBooting(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
+    try {
+      const [healthPayload, statsPayload, imagesPayload] = await Promise.all([
+        apiRequest('/api/health'),
+        apiRequest('/api/stats'),
+        apiRequest('/api/images'),
+      ]);
+
+      startTransition(() => {
+        setHealth(healthPayload);
+        setStats(statsPayload);
+        setImages(imagesPayload);
+      });
+    } catch (error) {
+      setPageError(error.message);
+    } finally {
+      if (boot) {
+        setIsBooting(false);
+      } else {
+        setIsRefreshing(false);
+      }
+    }
+  }
+
+  function replaceDraft(setter, currentDraft, file) {
+    if (currentDraft?.previewUrl) {
+      URL.revokeObjectURL(currentDraft.previewUrl);
+    }
+
+    setter(createDraft(file));
+  }
+
+  async function handleRegister(file) {
+    replaceDraft(setRegisterDraft, registerDraft, file);
+    setRegisterResult(null);
+    setBusyAction('register');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const location = await requestGeolocation();
+      if (location) {
+        formData.append('latitude', `${location.latitude}`);
+        formData.append('longitude', `${location.longitude}`);
+      }
+
+      const payload = await apiRequest('/api/register', {
+        method: 'POST',
+        body: formData,
+      });
+
+      setRegisterResult({
+        ...payload,
+        storageMode: stats.storageMode,
+      });
+      await loadOperationalData();
+      setActiveView('register');
+    } catch (error) {
+      setRegisterResult({ error: error.message });
+    } finally {
+      setBusyAction('');
+    }
+  }
+
+  async function handleVerify(file) {
+    replaceDraft(setVerifyDraft, verifyDraft, file);
+    setVerifyResult(null);
+    setBusyAction('verify');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const payload = await apiRequest('/api/verify', {
+        method: 'POST',
+        body: formData,
+      });
+
+      setVerifyResult({
+        ...payload,
+        storageMode: stats.storageMode,
+      });
+      await loadOperationalData();
+      setActiveView('verify');
+    } catch (error) {
+      setVerifyResult({ error: error.message });
+    } finally {
+      setBusyAction('');
+    }
+  }
+
+  async function copyValue(value, label) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedLabel(`${label} copied`);
+      window.setTimeout(() => setCopiedLabel(''), 1500);
+    } catch (error) {
+      setCopiedLabel(`Clipboard unavailable for ${label.toLowerCase()}`);
+      window.setTimeout(() => setCopiedLabel(''), 1800);
+    }
+  }
+
+  function renderOverview() {
+    return (
+      <>
+        <section className="hero">
+          <div className="hero-copy">
+            <div className="eyebrow">Operational provenance console</div>
+            <h1>Professional image authenticity workflow for capture, registry, and verification.</h1>
+            <p>
+              PixelRoot now runs as a real operator surface: explicit storage health, deterministic
+              signature versioning, honest ledger messaging, and a registry that remains usable
+              even without a configured database.
+            </p>
+            <div className="hero-actions">
+              <button className="primary-button" type="button" onClick={() => setActiveView('register')}>
+                Register image
+                <ArrowRight size={16} />
+              </button>
+              <button className="secondary-button" type="button" onClick={() => setActiveView('verify')}>
+                Verify image
+              </button>
             </div>
-            <div className="stat">
-              <div className="stat-value">{stats.totalVerifications}</div>
-              <div className="stat-label">Total Verifications</div>
+            <div className="hero-trust-row">
+              <StatusBadge healthy={health.status === 'ok'} label={health.status === 'ok' ? 'System healthy' : 'Attention needed'} />
+              <span>{formatStorageMode(stats.storageMode)}</span>
+              <span>{health.algorithm.version.toUpperCase()} signature model</span>
             </div>
           </div>
 
-          {images.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-              <Image size={48} style={{ marginBottom: '1rem', opacity: 0.5 }} />
-              <p>No images registered yet. Be the first to register an image!</p>
-              <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => setView('register')}>
-                Register Image
+          <div className="hero-console panel">
+            <div className="panel-header">
+              <div>
+                <h3>System status</h3>
+                <p>Live runtime details from the backend health endpoint.</p>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => loadOperationalData()} disabled={isRefreshing}>
+                <RefreshCcw size={14} className={isRefreshing ? 'spinning' : ''} />
+                Refresh
               </button>
             </div>
-          ) : (
-            <div className="image-grid">
-              {images.map((img) => (
-                <div key={img.id} className="image-card">
-                  <img 
-                    src={`/uploads/${img.file_path}`} 
-                    alt={img.original_filename}
-                    className="image-preview"
-                    onError={(e) => { e.target.style.display = 'none'; }}
-                  />
-                  <div className="image-info">
-                    <div className="image-hash">{truncateHash(img.image_hash)}</div>
-                    <div className="image-meta">
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <Clock size={12} />
-                        {formatDate(img.timestamp)}
-                      </span>
-                      <span className="verified-badge">
-                        <CheckCircle size={12} />
-                        Verified
-                      </span>
-                    </div>
-                    <div className="image-meta" style={{ marginTop: '0.5rem' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <MapPin size={12} />
-                        {parseFloat(img.latitude).toFixed(2)}, {parseFloat(img.longitude).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
+
+            <div className="status-grid">
+              <MetricCard
+                label="Registered images"
+                value={stats.totalImages}
+                caption="All active provenance records"
+              />
+              <MetricCard
+                label="Successful verifications"
+                value={stats.totalVerifications}
+                caption="Positive registry matches"
+              />
+              <MetricCard
+                label="Storage backend"
+                value={formatStorageMode(stats.storageMode)}
+                caption={health.storage.dataFile || 'Persistent service storage'}
+              />
+              <MetricCard
+                label="Upload limit"
+                value={formatFileSize(health.uploadLimitBytes)}
+                caption={health.algorithm.coordinateEncoding}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="section">
+          <SectionHeader
+            eyebrow="What changed"
+            title="The app now behaves like an operational product, not a static demo."
+            description="These improvements address the runtime, data model, and the operator workflow together."
+          />
+          <div className="feature-grid">
+            {FEATURE_PILLARS.map((feature) => (
+              <FeatureCard feature={feature} key={feature.title} />
+            ))}
+          </div>
+        </section>
+
+        <section className="section split-layout">
+          <div className="panel">
+            <SectionHeader
+              eyebrow="Verification flow"
+              title="Four steps from capture to trust."
+              description="The workflow now surfaces what is simulated, what is persisted, and what the operator can verify immediately."
+            />
+            <div className="timeline">
+              {PIPELINE_STEPS.map((step, index) => (
+                <div className="timeline-step" key={step}>
+                  <div className="timeline-marker">{index + 1}</div>
+                  <p>{step}</p>
                 </div>
               ))}
             </div>
-          )}
-        </section>
-      )}
+          </div>
 
-      <footer>
-        <p>PixelRoot - Hardware-Anchored Media Authenticity Framework</p>
-        <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>Combating deepfakes with cryptographic provenance</p>
+          <div className="panel">
+            <SectionHeader
+              eyebrow="Registry preview"
+              title="Latest records"
+              description="Recent provenance entries appear here as soon as the registry updates."
+            />
+            {images.length === 0 ? (
+              <div className="empty-state">
+                <Image size={32} />
+                <p>No images registered yet. Use the register workflow to create the first provenance record.</p>
+              </div>
+            ) : (
+              <div className="preview-stack">
+                {images.slice(0, 3).map((image) => (
+                  <RegistryCard image={image} key={image.id} onCopy={copyValue} />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  function renderRegister() {
+    return (
+      <section className="section operation-layout">
+        <div>
+          <SectionHeader
+            eyebrow="Register"
+            title="Create a new provenance record."
+            description="Upload an image and PixelRoot will generate a deterministic registry record using the current signature model."
+          />
+          <FileDropzone
+            id="register-file"
+            title="Registration input"
+            description="The system will request geolocation when available. If location access is unavailable, the signature falls back to a neutral origin and the UI labels it accordingly."
+            hint="JPEG, PNG, GIF, or WebP up to 10 MB"
+            actionLabel={busyAction === 'register' ? 'Registering image...' : 'Drop an image here or select a file'}
+            busy={busyAction === 'register'}
+            draft={registerDraft}
+            onSelectFile={handleRegister}
+          />
+        </div>
+
+        <div className="operation-side">
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h3>Registration outcome</h3>
+                <p>The result includes algorithm version, ledger receipt, and a preview of embedded signature coordinates.</p>
+              </div>
+            </div>
+            {busyAction === 'register' ? <div className="busy-banner">Creating provenance record...</div> : null}
+            <OperationResult mode="register" result={registerResult} onCopy={copyValue} />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function renderVerify() {
+    return (
+      <section className="section operation-layout">
+        <div>
+          <SectionHeader
+            eyebrow="Verify"
+            title="Check whether an image matches the registry."
+            description="Verification recomputes the fingerprint against every stored record, including legacy v1 hashes if they exist."
+          />
+          <FileDropzone
+            id="verify-file"
+            title="Verification input"
+            description="Use the original registered image for a positive match. Any byte-level change will cause the verification step to fail."
+            hint="Upload the image you want to validate"
+            actionLabel={busyAction === 'verify' ? 'Verifying image...' : 'Drop an image here or select a file'}
+            busy={busyAction === 'verify'}
+            draft={verifyDraft}
+            onSelectFile={handleVerify}
+          />
+        </div>
+
+        <div className="operation-side">
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h3>Verification outcome</h3>
+                <p>Positive matches return the original registry metadata and signature preview.</p>
+              </div>
+            </div>
+            {busyAction === 'verify' ? <div className="busy-banner">Running verification...</div> : null}
+            <OperationResult mode="verify" result={verifyResult} onCopy={copyValue} />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  function renderRegistry() {
+    return (
+      <section className="section">
+        <SectionHeader
+          eyebrow="Registry"
+          title="Browse recent provenance records."
+          description="The registry view is backed by the same data served to verification, with file-backed persistence when no database is configured."
+          action={(
+            <button className="ghost-button" type="button" onClick={() => loadOperationalData()} disabled={isRefreshing}>
+              <RefreshCcw size={14} className={isRefreshing ? 'spinning' : ''} />
+              Refresh
+            </button>
+          )}
+        />
+
+        {images.length === 0 ? (
+          <div className="panel empty-state large">
+            <Image size={40} />
+            <p>The registry is empty. Create a record from the register view to populate it.</p>
+          </div>
+        ) : (
+          <div className="registry-grid">
+            {images.map((image) => (
+              <RegistryCard image={image} key={image.id} onCopy={copyValue} />
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      <div className="background-orb orb-a" />
+      <div className="background-orb orb-b" />
+
+      <header className="topbar">
+        <div className="brand-lockup">
+          <div className="brand-mark">PR</div>
+          <div>
+            <strong>PixelRoot</strong>
+            <span>Image authenticity console</span>
+          </div>
+        </div>
+
+        <nav className={`nav ${mobileNavOpen ? 'open' : ''}`}>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              className={`nav-link ${activeView === item.id ? 'active' : ''}`}
+              type="button"
+              onClick={() => {
+                setActiveView(item.id);
+                setMobileNavOpen(false);
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="topbar-actions">
+          {copiedLabel ? <span className="copy-toast">{copiedLabel}</span> : null}
+          <button
+            className="menu-button"
+            type="button"
+            onClick={() => setMobileNavOpen((value) => !value)}
+            aria-label="Toggle navigation"
+          >
+            {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </div>
+      </header>
+
+      <main className="main-content">
+        {pageError ? (
+          <div className="page-banner error">
+            <XCircle size={18} />
+            <span>{pageError}</span>
+          </div>
+        ) : null}
+
+        {isBooting ? (
+          <section className="boot-panel panel">
+            <RefreshCcw size={18} className="spinning" />
+            <span>Loading operational state...</span>
+          </section>
+        ) : null}
+
+        {!isBooting && activeView === 'overview' ? renderOverview() : null}
+        {!isBooting && activeView === 'register' ? renderRegister() : null}
+        {!isBooting && activeView === 'verify' ? renderVerify() : null}
+        {!isBooting && activeView === 'registry' ? renderRegistry() : null}
+      </main>
+
+      <footer className="footer">
+        <div>
+          <strong>PixelRoot</strong>
+          <p>Hardware-anchored provenance with professional operator visibility.</p>
+        </div>
+        <div className="footer-meta">
+          <span>{formatStorageMode(stats.storageMode)}</span>
+          <span>{health.algorithm.version.toUpperCase()} metadata model</span>
+          <span>{health.status === 'ok' ? 'Healthy' : 'Needs attention'}</span>
+        </div>
       </footer>
     </div>
   );
