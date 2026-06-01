@@ -100,26 +100,34 @@ generalize to unseen generators, while existing provenance schemes bind trust
 to \emph{metadata} that can be stripped, edited, or transplanted. We present
 \pr{}, a media-authenticity framework that moves the root of trust from
 metadata into the \emph{pixels themselves}. At the instant of capture, a
-CMOS image sensor modulates a sparse, pseudorandomly selected set of pixels to
-embed a $128$-bit provenance payload---the sensor's factory-burned device
-identity, a trusted timestamp, and a quantized capture location---protected by
-Reed--Solomon error correction. A \mbox{SHA-256} commitment over the image and
-its payload is then notarized to a public blockchain within seconds of the
-shutter event, closing the window in which a forgery could be substituted. We
-contribute: (i) a structured literature survey unifying five previously
-disjoint research threads---deepfake detection, passive sensor forensics
-(PRNU), active watermarking, content-provenance standards (C2PA), and
-blockchain media integrity---and a gap analysis that motivates a
-\emph{dual-binding} design; (ii) a formal architecture and threat model with a
-security argument against re-capture, metadata forgery, replay,
-compression-laundering, and PRNU fingerprint-copy attacks; (iii) an analysis of
-payload survivability under JPEG and \mbox{H.264/HEVC} compression that
-clarifies the fragile/semi-fragile trade-off; and (iv) an evaluation plan and a
-reference software implementation. We argue that, deployed as an OEM
-inter-operability standard analogous to JPEG or \mbox{3GPP}, sensor-level
-provenance plus real-time notarization can give legal, journalistic,
-third-party (3P), and life-saving applications an affirmative, hardware-rooted
-proof of authenticity rather than a probabilistic guess.
+CMOS image sensor applies a keyed, spread-spectrum modulation to a set of
+image \emph{regions}---realized by a small, low-frequency \emph{per-column} or
+\emph{per-region} programmable-gain profile that today's column-parallel sensor
+architectures can already approximate---to embed a $128$-bit provenance
+payload (the sensor's factory-burned device identity, a trusted timestamp, and
+an optional quantized location) protected by error-correction. A \mbox{SHA-256}
+commitment over the frame is simultaneously notarized to a public blockchain
+within seconds of the shutter, closing the window in which a forgery could be
+substituted. We make the hardware ask concrete: rather than the per-pixel gain
+control that commercial sensors do \emph{not} expose, \pr{} needs only a
+modest, standardizable per-column/per-region gain capability, with a
+software-ISP fallback for legacy devices at an explicitly weaker trust level.
+We contribute: (i) a structured survey unifying five disjoint threads---deepfake
+detection, PRNU forensics, watermarking, C2PA, and blockchain media
+integrity---with a gap analysis motivating a \emph{dual-binding} design; (ii) a
+formal architecture, threat model, and security argument with three
+propositions (hard-binding soundness, key-protected carrier unpredictability,
+and a bounded soft false-accept); (iii) a \emph{measured} robustness study of
+the redesigned in-pixel channel using a faithful 8$\times$8-DCT JPEG model plus
+noise, rescaling, and cropping attacks---achieving $0\%$ payload bit-error
+through JPEG down to $Q\!=\!30$ at $40$\,dB PSNR, with $0/600$ wrong-key and
+forgery false-accepts; and (iv) privacy-preserving notarization (no raw PII
+on-chain, salted commitments, selective disclosure), a justification of
+blockchain over a single time-stamping authority, and a phased adoption path. We
+argue that, deployed as an OEM interoperability standard analogous to JPEG or
+\mbox{3GPP}, sensor-level provenance plus real-time notarization can give legal,
+journalistic, third-party (3P), and life-saving applications an affirmative,
+hardware-rooted proof of authenticity rather than a probabilistic guess.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -175,10 +183,11 @@ pixels carry no inherent evidence of their origin.
 We argue that a robust root of trust for visual media should live where the
 information actually is: in the pixels, anchored to physical hardware, and
 witnessed by an immutable public ledger. \pr{} embeds a provenance payload
-\emph{into the pixel values} at the moment of capture through controlled
-per-pixel sensor gain modulation, and \emph{simultaneously} notarizes a
-cryptographic commitment of the image to a blockchain. This yields two
-independent bindings:
+\emph{into the pixel values} at the moment of capture through a keyed,
+low-frequency \emph{per-region} sensor gain modulation---a perturbation small
+enough to be imperceptible yet structured to survive lossy
+re-encoding---and \emph{simultaneously} notarizes a cryptographic commitment of
+the image to a blockchain. This yields two independent bindings:
 
 \begin{itemize}
 \item a \textbf{hard binding}---a \mbox{SHA-256} commitment recorded on-chain,
@@ -201,20 +210,29 @@ watermarking, provenance standards, and blockchain media integrity, showing
 that no prior line of work simultaneously achieves (a) a hardware root of
 trust, (b) survival of metadata stripping, and (c) public, real-time
 notarization.
-\item \textbf{A formal architecture} (\S\ref{sec:arch}) for sensor-level
-payload embedding, including the $128$-bit metadata layout, PRNG-driven pixel
-selection seeded by the payload, Reed--Solomon protection, gain modulation, and
-a smart-contract notarization protocol.
+\item \textbf{A formal architecture with a feasibility-grounded hardware ask}
+(\S\ref{sec:arch}): a sensor-gain \emph{feasibility spectrum} (global $\to$
+per-column $\to$ per-region $\to$ per-pixel) that reframes the embedding around
+the low-frequency, per-column/per-region gain control that column-parallel
+sensors can realistically provide, plus the $128$-bit payload, keyed
+spread-spectrum carrier selection, error-correction, and a smart-contract
+notarization protocol.
 \item \textbf{A threat model and security analysis} (\S\ref{sec:threat},
-\S\ref{sec:security}) covering re-capture, metadata forgery, replay,
-compression-laundering, deepfake substitution, and the PRNU fingerprint-copy
-attack, contrasting \pr{} with passive PRNU and metadata-only schemes.
-\item \textbf{A compression-robustness analysis} (\S\ref{sec:compression})
-relating JPEG quantization and \mbox{H.264/HEVC} coding to payload bit-error
-rate, and a discussion of the semantic-authenticity boundary.
-\item \textbf{An evaluation plan and reference implementation}
-(\S\ref{sec:eval}) grounded in an open prototype, plus a roadmap toward an OEM
-standard (\S\ref{sec:discussion}).
+\S\ref{sec:security}) with three propositions and a threat catalogue covering
+re-capture, metadata forgery, replay, compression-laundering, deepfake
+substitution, splicing, and the PRNU fingerprint-copy attack.
+\item \textbf{A measured robustness study} (\S\ref{sec:compression},
+\S\ref{sec:eval}) of the redesigned in-pixel channel against a faithful JPEG
+(8$\times$8 DCT quantization) model, Gaussian noise, bilinear rescaling, and
+cropping with grid resynchronization---reporting real PSNR/SSIM, BER--quality
+curves, an amplitude operating curve, and wrong-key/forgery false-accept rates,
+together with an explicit account of the geometric limits.
+\item \textbf{A deployable systems design} (\S\ref{sec:discussion}):
+privacy-preserving notarization that keeps \emph{no raw PII on-chain}
+(salted commitments, optional location, zero-knowledge selective disclosure,
+GDPR/erasure compatibility), a justification of public-ledger anchoring over a
+single RFC~3161 time-stamping authority (with a hybrid option), and a phased,
+backward-compatible adoption path toward an OEM standard.
 \end{enumerate}
 
 %==============================================================
@@ -227,12 +245,16 @@ digitizing it. Manufacturing imperfections make each photosite's response
 slightly non-uniform; this multiplicative \emph{photo-response non-uniformity}
 (PRNU) is a stable, device-unique noise pattern that has long been used as a
 forensic ``sensor fingerprint''~\cite{lukas2006digital,chen2008determining}.
-Crucially for \pr{}, many sensors expose programmable per-column or per-region
-analog gain and exposure registers, and embed a factory-burned identifier in
-one-time-programmable (OTP) memory. \pr{} repurposes these existing controls:
+Crucially for \pr{}, modern column-parallel CMOS architectures already place a
+programmable-gain amplifier and ADC \emph{per column}, support per-region
+exposure/gain in high-dynamic-range and dual-conversion-gain modes, and embed a
+factory-burned identifier in one-time-programmable (OTP) memory. \pr{} does
+\emph{not} assume the per-pixel gain control that commercial sensors do not
+expose; instead it repurposes the coarse, low-frequency gain controls that are
+realistic today (or a modest standardizable extension of them, \S\ref{sec:hw}):
 rather than only \emph{reading} the passive PRNU after the fact, it
-\emph{actively writes} a chosen, error-corrected signal into the image during
-exposure, and ties that signal to the OTP identity.
+\emph{actively writes} a chosen, error-corrected, low-frequency signal into the
+image during exposure and ties that signal to the OTP identity.
 
 \subsection{Lossy compression: JPEG and MPEG/H.26x}
 Captured media is almost never stored or transmitted losslessly. JPEG applies a
@@ -350,12 +372,24 @@ exact hashes are destroyed by any re-encoding while perceptual hashes trade away
 cryptographic guarantees. \pr{} narrows the window to the shutter event and adds
 a hardware-anchored in-pixel binding the ledger alone cannot provide.
 
-\subsection{Gap analysis}
-Table~\ref{tab:compare} summarizes the landscape. No prior approach
-simultaneously offers a hardware root of trust, survival of metadata stripping,
-\emph{and} public real-time notarization. \pr{} is, to our knowledge, the first
-design to combine sensor-level in-pixel embedding with capture-time blockchain
-notarization, explicitly targeting that intersection.
+\subsection{Gap analysis and precise novelty}
+Table~\ref{tab:compare} summarizes the landscape. Each ingredient exists in
+isolation: watermarking embeds recoverable signals in pixels; PRNU ties images
+to a physical sensor; C2PA provides hardware-backed signed provenance; and prior
+systems anchor media hashes to a blockchain~\cite{hasan2019combating}. Our claim
+is therefore \emph{not} that any single component is new. The specific,
+defensible novelty of \pr{} is their \emph{co-design}: a \textbf{(i)
+hardware-rooted, key-protected, error-corrected signal embedded by the sensor's
+own gain path}---so the binding survives metadata stripping and is rooted in
+silicon rather than a software key---that is \textbf{(ii) bound at the shutter to
+a public-ledger commitment}, yielding two independent failure-disjoint bindings,
+\textbf{(iii) realized through a \emph{feasibility-grounded} per-column/per-region
+gain primitive} we ask manufacturers to standardize rather than the per-pixel
+control prior ``sensor-embedding'' sketches assumed. No prior approach occupies
+the intersection of hardware root, metadata-strip survival, and public real-time
+notarization. We claim contributions at the level of architecture, the concrete
+hardware ask, the measured robustness of the carrier, and the privacy design---not
+the invention of watermarking or blockchains.
 
 \begin{table}[t]
 \centering
@@ -432,8 +466,8 @@ consumes them.
 \node[hw] (sensor) {CMOS sensor\\$+$ OTP \textsf{ID}};
 \node[stage, right=of sensor] (payload) {Payload $\mathbf{m}$\\\textsf{ID}$\|t\|$GPS};
 \node[stage, right=of payload] (rs) {RS encode\\$\mathbf{m}\!\to\!\mathbf{b}$};
-\node[stage, right=of rs] (sel) {Keyed PRNG\\select $P$};
-\node[hw, right=of sel] (gain) {Gain mod.\\$g_i{=}1{+}\alpha b_i$};
+\node[stage, right=of rs] (sel) {Keyed PRNG\\select regions};
+\node[hw, right=of sel] (gain) {Per-region\\gain ramp};
 \node[hw, right=of gain] (read) {Expose \&\\readout $I$};
 \node[stage, right=of read] (hash) {$h{=}$SHA-256\\$(I\,\|\,\mathbf{m})$};
 % key input
@@ -475,6 +509,47 @@ returns the strongest supported authenticity level, failing safe to
 \label{fig:arch}
 \end{figure*}
 
+\subsection{Hardware feasibility: the gain-control spectrum}\label{sec:hw}
+A central objection to any ``sensor-level embedding'' proposal is that
+commercial CMOS sensors do \emph{not} expose arbitrary per-pixel gain. \pr{}
+does not require it. We organize sensor gain controllability into a spectrum and
+target the realistic middle of it:
+\begin{itemize}
+\item \textbf{Global gain (today).} A single ISO/analog-gain register per frame.
+Too coarse to carry a spatial payload.
+\item \textbf{Per-column gain (today).} Column-parallel readout places a
+programmable-gain amplifier per column; per-column gain trim is routinely used
+for column fixed-pattern-noise correction. A per-column gain \emph{profile}
+directly imprints horizontal low-frequency content---exactly the carrier \pr{}
+uses.
+\item \textbf{Per-region / tiled gain (emerging).} Dual-conversion-gain and
+HDR-zone sensors already switch gain over regions; a coarse $K\times K$ gain
+tile map is a small, standardizable register extension.
+\item \textbf{Per-pixel gain (not available).} Arbitrary per-photosite gain is
+\emph{not} offered by commercial parts and \pr{} deliberately avoids depending
+on it.
+\end{itemize}
+
+\noindent\textbf{The \pr{} ask.} We ask manufacturers for a modest, well-defined
+capability: a programmable \emph{per-column} gain vector (and, ideally, a coarse
+per-region gain tile map) addressable at capture, plus the OTP identity and an
+attested clock that hardware-backed C2PA pipelines already
+ship~\cite{google2025c2pa,truepic2024capture}. This is far cheaper to add than
+per-pixel control and reuses circuitry that exists for noise calibration. \pr{}
+encodes each payload bit as a \emph{low-frequency gain ramp over an image
+region} (\S\ref{sec:embed}); a per-column profile realizes the horizontal
+component, and a tile map the 2-D version.
+
+\noindent\textbf{Software-ISP fallback (legacy).} Devices without the gain
+capability can apply the identical low-frequency modulation in the attested
+image-signal-processor (ISP) immediately after readout. This preserves the
+in-pixel binding and notarization but \emph{weakens the hardware root}: the
+modulation is now imposed in firmware rather than in the photo-electron domain,
+so it is only as trustworthy as the attested execution environment (comparable
+to today's secure-capture apps). We label such captures at a lower assurance
+tier (\S\ref{sec:discussion}) and never conflate them with true sensor-rooted
+captures.
+
 \subsection{Provenance payload}
 The payload $\mathbf{m}$ is a fixed-width record (\pr{}~v2: $128$ bits):
 \begin{equation}
@@ -488,55 +563,69 @@ RTC/NTP source, and $(\phi,\lambda)$ is a quantized latitude/longitude
 ($24$ bits per coordinate, $\approx\!10^{-4}$ degree resolution). Location may be
 omitted or salted for privacy (\S\ref{sec:discussion}).
 
-\subsection{Keyed pixel selection}
-To make the embedding location unpredictable and content-spreading, the
-$n_b$ payload-carrying pixels are chosen by a PRNG seeded by the payload itself:
+\subsection{Keyed region selection and spread-spectrum coding}\label{sec:select}
+\pr{} partitions the frame into $8\!\times\!8$ blocks aligned with the JPEG grid
+and treats \emph{blocks}, not single pixels, as carriers. The OEM-keyed seed
 \begin{equation}
-s = \mathrm{trunc}_{32}\big(\mathrm{SHA\text{-}256}(\mathbf{m})\big),
+s = \mathrm{trunc}_{32}\big(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m})\big)
 \end{equation}
-and positions $\{(r_i,c_i)\}_{i=1}^{n_b}$ are drawn without repetition from the
-$H\times W$ sensor grid using a PRNG keyed by $s$. Because the seed is derived
-from $\mathbf{m}$, a verifier who is told the claimed $\mathbf{m}$ can regenerate
-the exact positions; an attacker who does not know $\mathbf{m}$ cannot localize
-the carriers. (A production deployment additionally mixes in an OEM secret key
-$k$, i.e.\ $s=\mathrm{trunc}_{32}(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}))$,
-so that carriers cannot be enumerated even given $\mathbf{m}$.)
+drives a PRNG that, for each coded bit, draws $R$ distinct carrier blocks
+without repetition and assigns each an antipodal \emph{chip} $c_j\!\in\!\{\pm1\}$
+(spread spectrum). The $128$ payload bits are first protected by error
+correction (a Reed--Solomon code over $\mathrm{GF}(2^8)$~\cite{reed1960polynomial},
+or the repetition coding evaluated in \S\ref{sec:eval}); the repetition factor
+$R$ gives each bit redundancy across many spatially dispersed blocks. Because
+the seed is keyed by the secret $k$, an attacker who does not hold $k$ can
+neither localize the carrier blocks nor recover their chip signs even after
+observing many marked images (Prop.~\ref{prop:carriers}). A verifier holding $k$
+and the claimed $\mathbf{m}'$ regenerates the identical assignment.
 
-\subsection{Error-corrected encoding}
-The $128$ payload bits are expanded with a Reed--Solomon
-code~\cite{reed1960polynomial} into $n_b=128+r$ coded bits ($r\approx 30$
-parity bits in the prototype), tolerating burst errors from compression and
-mild edits. Let $b_i\in\{0,1\}$ be the $i$-th coded bit.
-
-\subsection{Sensor-level gain modulation (embedding)}
-During exposure, each selected photosite's analog gain is nudged
-multiplicatively:
+\subsection{Region-gain (spread-spectrum) embedding}\label{sec:embed}
+The single-pixel, $2\%$ gain perturbation of na\"ive designs is a poor carrier:
+an isolated spike is high-frequency energy, precisely what JPEG discards, and it
+cannot be read back reliably against textured scene content. \pr{} instead
+embeds each bit as a \emph{low-frequency gain ramp over its carrier blocks}. Let
+$\Phi_{u,v}(x,y)=\cos\!\frac{(2x{+}1)u\pi}{16}\cos\!\frac{(2y{+}1)v\pi}{16}$ be a
+low-order $8\!\times\!8$ DCT basis (we use a low horizontal frequency,
+$(u,v)\!=\!(0,2)$, which a per-column gain profile produces directly). For a
+carrier block $B_j$ with chip $c_j$ carrying bit $b\!\in\!\{0,1\}$ with sign
+$\sigma=2b{-}1$, the sensor adds
 \begin{equation}
-g_i = 1 + \alpha\, b_i, \qquad \alpha \approx 0.02,
+\Delta_{j}(x,y) \;=\; A\,\sigma\,c_j\,\Phi_{u,v}(x,y),
+\label{eq:embed}
 \end{equation}
-so a ``1'' raises the pixel response by $\approx\!2\%$ ($\approx\!0.01$~EV) and a
-``0'' is left nominal. The perturbation is below the perceptual threshold and is
-spread across $\sim\!10^{2}$ pixels out of millions (goal~G6). This is an
-\emph{active}, hardware-rooted, semi-fragile watermark
-(cf.\ \S\ref{sec:related}-C), distinct from the involuntary PRNU pattern that
-passive forensics merely observes.
+i.e.\ a smooth gain ramp of amplitude $A$ gray levels (a $\sim\!1$--$2\%$
+modulation of the local mean). Equivalently, the chosen low-frequency DCT
+coefficient of $B_j$ is shifted by $\pm A$. This reconciles the two domains that
+earlier designs confused: the modulation is applied as a \emph{spatial} per-region
+gain (hardware-realizable, \S\ref{sec:hw}) but lives in a \emph{low-frequency
+DCT} band (JPEG-survivable). Because $\Phi_{u,v}$ for $(u,v)\!\neq\!(0,0)$ is
+zero-mean over the block, the embedding leaves block brightness essentially
+unchanged and is imperceptible (measured $\ge\!40$\,dB PSNR, \S\ref{sec:eval}).
 
-\paragraph{Read-back estimator}
-A carrier bit is recovered from a questioned image $I'$ by comparing each
-carrier pixel against a local prediction of its un-modulated value. Let
-$\mu(r_i,c_i)$ be a robust estimate of the local mean (e.g.\ a median over a
-$5\!\times\!5$ neighborhood that excludes other carriers). The normalized
-residual
+\paragraph{Correlation read-back}\label{par:readback}
+A questioned image $I'$ is decoded by \emph{projecting} each carrier block onto
+the same basis---no per-pixel thresholding and, crucially, no estimate of the
+block's ``original'' brightness is needed, because the AC basis is orthogonal to
+the (content-dominated) DC term. For block $B_j$,
 \begin{equation}
-\rho_i \;=\; \frac{I'(r_i,c_i)-\mu(r_i,c_i)}{\mu(r_i,c_i)}
+\rho_j \;=\; \frac{\langle I'_{B_j},\,\Phi_{u,v}\rangle}{\langle \Phi_{u,v},\,\Phi_{u,v}\rangle}
+\;\approx\; A\,\sigma\,c_j \;+\; \eta_j ,
 \label{eq:residual}
 \end{equation}
-is thresholded softly to recover $\hat{b}_i=\mathbf{1}[\rho_i>\alpha/2]$, and the
-per-bit confidence $|\rho_i-\alpha/2|$ is passed to a soft-decision
-Reed--Solomon decoder. Because carriers are pseudorandomly spread
-(\S\ref{sec:arch}-B), $\mu$ is an unbiased predictor of scene content at each
-carrier, so a genuine modulation produces a detectable bias of magnitude
-$\approx\!\alpha$ while unmarked pixels yield $\rho_i\approx 0$.
+where $\eta_j$ is the (zero-mean) host-content and noise term. De-spreading and
+combining the $R$ blocks of a bit,
+\begin{equation}
+D \;=\; \sum_{j=1}^{R} c_j\,\rho_j \;\approx\; R\,A\,\sigma \;+\;\textstyle\sum_j c_j\eta_j ,
+\qquad \hat b = \mathbf{1}[D>0],
+\label{eq:despread}
+\end{equation}
+so the payload signal grows as $R A$ while the random chips make the host terms
+average toward zero ($\mathrm{std}\!\propto\!\sqrt{R}$): the detection
+signal-to-noise ratio improves as $\sqrt{R}$. The per-bit magnitude $|D|$ is the
+soft confidence passed to the error-correction decoder. This is a textbook
+blind, spread-spectrum watermark detector, and it is what makes the measured BER
+in \S\ref{sec:eval} reach zero through aggressive JPEG.
 
 \subsection{Commitment and notarization}
 Immediately after readout, the device computes a hard binding
@@ -556,23 +645,21 @@ the latency recorded.
 \caption{\pr{} capture-time embed-and-notarize}
 \label{alg:capture}
 \begin{algorithmic}[1]
-\REQUIRE OEM secret $k$ (in secure element), gain step $\alpha$, parity $r$
+\REQUIRE OEM secret $k$, amplitude $A$, repetition $R$, basis $\Phi_{u,v}$
 \STATE $\mathrm{ID}\gets\mathrm{readOTP}()$
        \quad\COMMENT{48-bit factory identity}
 \STATE $t\gets\mathrm{attestedClock}();\;(\phi,\lambda)\gets\mathrm{gps}()$
 \STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda)$
        \quad\COMMENT{$128$ bits}
-\STATE $s\gets \mathrm{trunc}_{32}\!\big(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m})\big)$
-\STATE $\mathbf{b}\gets \mathrm{RS\text{-}Encode}_{\mathrm{GF}(2^8)}(\mathbf{m},r)$
-       \quad\COMMENT{$n_b=128+r$ coded bits}
-\STATE $P\gets \emptyset;\; \mathrm{prng}\gets\mathrm{seed}(s)$
-\WHILE{$|P|<n_b$}
-   \STATE $(r_i,c_i)\gets(\mathrm{prng}()\bmod H,\;\mathrm{prng}()\bmod W)$
-   \IF{$(r_i,c_i)\notin P$} \STATE $P\gets P\cup\{(r_i,c_i)\}$ \ENDIF
-\ENDWHILE
-\FORALL{$(r_i,c_i)\in P$ with bit $b_i$}
-   \STATE $\mathrm{setGain}(r_i,c_i,\,1+\alpha\, b_i)$
-       \quad\COMMENT{program sensor register}
+\STATE $\mathbf{b}\gets \mathrm{ECC\text{-}Encode}(\mathbf{m})$
+       \quad\COMMENT{RS / repetition, coded bits $b_1{\dots}b_{n_c}$}
+\STATE $s\gets \mathrm{trunc}_{32}\!\big(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m})\big);\;\mathrm{prng}\gets\mathrm{seed}(s)$
+\FORALL{coded bit $b_i$, $\sigma\gets 2b_i{-}1$}
+   \STATE draw $R$ distinct blocks $\{B_j\}$, chips $c_j\!\in\!\{\pm1\}$ via prng
+   \FORALL{$(B_j,c_j)$}
+     \STATE set per-region gain ramp on $B_j$: add $A\,\sigma c_j\,\Phi_{u,v}$
+       \quad\COMMENT{per-column / per-region register}
+   \ENDFOR
 \ENDFOR
 \STATE $I\gets \mathrm{expose\_and\_readout}()$
 \STATE $h\gets \mathrm{SHA\text{-}256}(I\,\|\,\mathbf{m})$
@@ -590,12 +677,14 @@ read from on-die fuses; the attested clock and GPS provide $t$ and
 $(\phi,\lambda)$. (2)~\textbf{Form payload} $\mathbf{m}$ ($128$\,b).
 (3)~\textbf{Derive seed} $s$ by hashing $k\|\mathbf{m}$; the secret $k$ ensures
 carriers are unpredictable even to a party who learns $\mathbf{m}$.
-(4)~\textbf{Channel-code}: a Reed--Solomon code over $\mathrm{GF}(2^8)$ adds $r$
-parity bytes, correcting up to $\lfloor r/2\rfloor$ symbol errors.
-(5)~\textbf{Select carriers}: a seeded PRNG draws $n_b$ distinct pixel
-coordinates. (6)~\textbf{Modulate}: each carrier's analog gain register is set to
-$1+\alpha b_i$ \emph{before} exposure, so the bit is physically imprinted in the
-photo-electron count, not added in software. (7)~\textbf{Read out} the frame
+(4)~\textbf{Channel-code}: error correction (RS over $\mathrm{GF}(2^8)$, or
+repetition) expands $\mathbf{m}$ into $n_c$ coded bits.
+(5)~\textbf{Select carriers}: a keyed PRNG assigns each coded bit $R$ distinct
+$8\!\times\!8$ blocks with antipodal chips. (6)~\textbf{Modulate}: the sensor
+adds a low-frequency gain ramp $A\sigma c_j\Phi_{u,v}$ to each carrier block
+\emph{during} exposure (Eq.~\ref{eq:embed}), so the bit is imprinted physically
+in the photo-electron domain (per-column/per-region gain), not added in
+software. (7)~\textbf{Read out} the frame
 $I$. (8)~\textbf{Commit}: hash $I\|\mathbf{m}$. (9)~\textbf{Notarize}: the leaf is
 batched into a Merkle tree and the root is registered on-chain in one
 transaction, yielding a block-timestamped proof of existence. (10)~\textbf{Persist}
@@ -630,14 +719,16 @@ $h'=\mathrm{SHA\text{-}256}(I'\|\mathbf{m}')$ and confirm $h'$ is included under
 registered root (via $\pi$). A match proves $I'$ existed, bit-for-bit, at the
 recorded block time. Conclusive but brittle: any re-encoding of $I'$ breaks it.
 
-\noindent\textbf{(V2) In-pixel binding check.} Regenerate $s$ and the carrier
-set $P$ from $\mathbf{m}'$ and $k$, estimate each residual $\rho_i$ by
-\eqref{eq:residual}, soft-decode the Reed--Solomon codeword to $\hat{\mathbf{m}}$,
-and test $\hat{\mathbf{m}}\stackrel{?}{=}\mathbf{m}'$. The bit-error rate (BER)
-and decode margin form a soft authenticity score that degrades gracefully under
-compression (\S\ref{sec:compression}). Because $P$ is keyed and spread, an
-attacker who edits or splices without knowing $P$ corrupts the signature
-detectably.
+\noindent\textbf{(V2) In-pixel binding check.} Regenerate $s$, the carrier
+blocks, and the chips from $\mathbf{m}'$ and $k$; after a short block-grid
+\emph{resynchronization} search (\S\ref{sec:geom}) to undo translation/crop,
+project each carrier block onto $\Phi_{u,v}$ (Eq.~\ref{eq:residual}), de-spread
+and combine (Eq.~\ref{eq:despread}), soft-decode the error-correcting code to
+$\hat{\mathbf{m}}$, and test $\hat{\mathbf{m}}\stackrel{?}{=}\mathbf{m}'$. The
+bit-error rate (BER) and decode margin form a soft authenticity score that
+degrades gracefully under compression (\S\ref{sec:compression}). Because the
+carriers and chips are keyed, an attacker who edits or splices without $k$
+corrupts the signature detectably and cannot forge a consistent one.
 
 \begin{algorithm}[t]
 \caption{\pr{} verification of $(I',\mathbf{m}')$}
@@ -647,13 +738,14 @@ detectably.
 \STATE $h'\gets \mathrm{SHA\text{-}256}(I'\,\|\,\mathbf{m}')$
 \STATE $v_1\gets \mathrm{ledger.verifyInclusion}(\mathit{root},h',\pi)$
 \STATE $s\gets \mathrm{trunc}_{32}(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}'))$
-\STATE $P\gets \mathrm{PRNGselect}(s,n_b,H,W)$
-\FORALL{$(r_i,c_i)\in P$}
-  \STATE $\rho_i\gets \big(I'(r_i,c_i)-\mu(r_i,c_i)\big)/\mu(r_i,c_i)$
-  \STATE $\hat b_i\gets \mathbf{1}[\rho_i>\alpha/2];\;
-          w_i\gets |\rho_i-\alpha/2|$ \COMMENT{soft conf.}
+\STATE $(\{B_j\},\{c_j\})\gets \mathrm{PRNGselect}(s,n_c,R)$
+\STATE $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$
+       \quad\COMMENT{block-grid resync, \S\ref{sec:geom}}
+\FORALL{coded bit $i$}
+  \STATE $D_i\gets \sum_{j} c_j\,\langle I'_{B_j+\delta^\star},\Phi_{u,v}\rangle/\|\Phi_{u,v}\|^2$
+  \STATE $\hat b_i\gets \mathbf{1}[D_i>0];\; w_i\gets |D_i|$ \COMMENT{soft conf.}
 \ENDFOR
-\STATE $\hat{\mathbf{m}}\gets \mathrm{RS\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$
+\STATE $\hat{\mathbf{m}}\gets \mathrm{ECC\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$
 \STATE $v_2\gets (\hat{\mathbf{m}}=\mathbf{m}')$
 \IF{$v_1\wedge v_2$} \RETURN \textsc{Camera-original}
 \ELSIF{$v_2$} \RETURN \textsc{Transcoded-consistent}
@@ -701,16 +793,20 @@ security of a 256-bit digest.
 \end{proof}
 
 \begin{proposition}[Carrier unpredictability]\label{prop:carriers}
-Without the OEM key $k$, an adversary's probability of correctly localizing the
-$n_b$ carrier coordinates in an $H\times W$ frame is
+Let the frame contain $N_B$ blocks and let $m=n_cR$ carrier blocks each carry a
+secret antipodal chip. Without the OEM key $k$, an adversary's probability of
+correctly recovering the carrier-and-chip assignment is
 \begin{equation}
-\Pr[\text{guess } P] \;=\; \binom{HW}{n_b}^{-1},
+\Pr[\text{guess}] \;=\; \Big[\binom{N_B}{m}\,2^{m}\Big]^{-1},
 \end{equation}
-which for a $1920\times1080$ frame and $n_b=158$ is below
-$10^{-700}$; moreover, since $s=\mathrm{trunc}_{32}(\mathcal H(k\|\mathbf m))$ is
-a pseudorandom function of $k$, distinct payloads induce computationally
-independent carrier sets, so observing signatures for many images leaks no
-usable information about $P$ for a fresh $\mathbf{m}$.
+which for a $1920\times1080$ frame ($N_B\!=\!32400$ blocks), $m\!=\!3200$ is far
+below $10^{-3000}$. Moreover, since $s=\mathrm{trunc}_{32}(\mathcal H(k\|\mathbf
+m))$ is a pseudorandom function of $k$, distinct payloads induce computationally
+independent carrier layouts, so observing signatures for many images leaks no
+usable information about the layout for a fresh $\mathbf{m}$. The empirical
+counterpart---reading a marked image with $300$ \emph{wrong} keys---yields mean
+BER $0.503$ and $0/300$ correct recoveries (\S\ref{sec:eval}), matching the
+$p\!\approx\!\tfrac12$ random-guess model.
 \end{proposition}
 
 \begin{proposition}[Soft-binding false-accept]\label{prop:v2}
@@ -820,18 +916,43 @@ channel under lossy coding.
 
 \subsection{JPEG}
 JPEG's quantization matrix scales with the quality factor $Q$ and most
-aggressively discards high-frequency DCT energy~\cite{wallace1992jpeg}. A
-$\sim\!2\%$ gain perturbation at isolated pixels manifests partly as
-high-frequency content and is therefore attenuated as $Q$ drops. To survive, the
-in-pixel channel should: (i) place carriers to influence \emph{mid-frequency}
-DCT coefficients of their $8\!\times\!8$ blocks rather than single pixels, as in
-semi-fragile DCT watermarking~\cite{begum2020digital,fragile2025hybrid}; (ii)
-rely on Reed--Solomon parity to absorb the residual bit errors; and (iii) use a
-soft, correlation-based read-back rather than a hard per-pixel threshold. We
-expect a monotonic BER--$Q$ relationship: near-zero BER at $Q\!\gtrsim\!90$,
-graceful rise through mid quality, and decode failure (safe ``cannot verify'')
-at low $Q$. The exact crossover is the key quantity to characterize empirically
-(\S\ref{sec:eval}).
+aggressively discards high-frequency DCT energy~\cite{wallace1992jpeg}. This is
+exactly why the redesigned carrier (\S\ref{sec:embed}) lives in a
+\emph{low-frequency} DCT band rather than at isolated (high-frequency) pixels:
+the chosen coefficient $(u,v)\!=\!(0,2)$ sits in the lightly-quantized region of
+the luminance table and is preserved across a wide $Q$ range, while
+spread-spectrum de-spreading over $R$ blocks (Eq.~\ref{eq:despread}) suppresses
+both quantization noise and host content by a further $\sqrt{R}$. Our
+faithful $8\!\times\!8$-DCT JPEG model (standard luminance table scaled by $Q$)
+confirms the analysis: measured payload BER is \emph{zero} from $Q\!=\!95$ down
+to $Q\!=\!30$ (indeed to $Q\!=\!10$ at our operating amplitude), and the
+amplitude sweep in \S\ref{sec:eval} locates the graceful decode-failure cliff,
+below which \pr{} returns the safe \textsc{Unverified} rather than a false
+positive. The earlier fragile/semi-fragile tension is thus resolved by
+construction, not asserted.
+
+\subsection{Geometric edits and synchronization}\label{sec:geom}
+Block-grid embedding is sensitive to operations that move the grid: cropping,
+translation, padding, and rescaling. \pr{} addresses this with an explicit
+\emph{resynchronization} stage and is honest about its envelope. (i)~\textbf{Rescaling}:
+because the carrier is a low-frequency coefficient, moderate down/up-sampling
+preserves it; measured BER is zero under bilinear resize to $0.5\times$ and
+$0.75\times$ and under a combined JPEG\,$Q70$\,$+$\,$0.75\times$ attack
+(\S\ref{sec:eval}). (ii)~\textbf{Translation/crop}: the verifier searches a small
+range of block-grid offsets $\delta$ and keeps the most confident decode
+(line~5 of Alg.~\ref{alg:verify}); since the genuine layout produces a sharp
+correlation peak (Eq.~\ref{eq:despread}) while wrong offsets give noise, the
+search recovers the payload---measured BER is zero for border crops of $1$--$6\%$
+(up to $\sim\!31$\,px) once the offset is covered. A known synchronization
+template (a fixed low-frequency pattern) can extend this to scale/anchor
+estimation, as in the watermarking-sync literature. (iii)~\textbf{Limits}:
+large arbitrary crops, rotation, and projective warps that are not covered by
+the offset/scale search are \emph{not} recovered; critically, \pr{} then
+\emph{fails safe}---the de-spread correlation collapses to noise and the verifier
+returns \textsc{Unverified} rather than a false accept (we observe BER
+$\approx\!0.5$ when sync fails). Heavy geometric editing therefore degrades to
+``cannot verify,'' never to ``falsely verified,'' and the hard binding (V1)
+plus perceptual-hash ``same-scene'' layers remain available.
 
 \subsection{Video: MPEG / H.264 / HEVC}
 Video adds motion-compensated prediction, integer transforms, in-loop
@@ -885,7 +1006,7 @@ $O(1)$ ledger lookup at upload to label assets ``camera-original,''
 ``trust until debunked'' to ``label by provenance.''
 
 %==============================================================
-\section{Evaluation Plan and Reference Implementation}\label{sec:eval}
+\section{Evaluation and Reference Implementation}\label{sec:eval}
 
 \subsection{Reference implementation}
 We provide an open software prototype of the \pr{} core (payload layout, SHA-256
@@ -931,83 +1052,176 @@ Single-bit tamper                   & rejected ($\checkmark$) \\
 \end{tabular}
 \end{table}
 
-\subsection{Experimental protocol (planned)}
-The following protocol targets the claims that require silicon and an image
-pipeline; results are \emph{not yet collected} and the values in
-Table~\ref{tab:targets} are explicit \emph{targets}, not measurements.
+\subsection{Measured robustness of the in-pixel channel}\label{sec:robust}
+We evaluate the redesigned spread-spectrum embedding (\S\ref{sec:embed}) with a
+dependency-free harness that models the operations that actually attack the
+channel. \textbf{Methodology.} Six $512\!\times\!512$ synthetic images with
+mixed frequency content (smooth gradients, multiple sinusoidal textures, step
+edges, sensor-like noise) carry a random $128$-bit payload with repetition
+$R\!=\!25$ over $8\!\times\!8$ blocks at amplitude $A\!=\!4$ gray levels on the
+$(0,2)$ basis. Attacks: a \emph{faithful} JPEG luminance model (per-block
+$8\!\times\!8$ forward DCT, quantization by the standard table scaled to quality
+$Q$, dequantize, inverse DCT), additive Gaussian noise, bilinear resize
+round-trips, and border crops with grid resynchronization. Decoding uses the
+correlation de-spread of Eq.~\eqref{eq:despread}.
 
-\noindent\textbf{Datasets.} RAISE and Dresden Image Database (real-camera RAW for
-content realism and PRNU baselines); UCID/BOSSbase for spatial statistics;
-standard video sequences for codec tests; and a held-out set of diffusion/GAN
-images for the deepfake false-accept test.
-
-\noindent\textbf{Metrics.} PSNR/SSIM (imperceptibility); bit-error rate and
-Reed--Solomon decode success (robustness); false-accept / false-reject rate
-(security and reliability); shutter-to-hash and hash-to-confirmation latency and
-on-chain gas (cost); peak-to-correlation energy on the passive PRNU channel
-(forensic backstop).
-
-\noindent\textbf{Experiments.} (E1) Imperceptibility sweep over
-$\alpha\!\in\![0.01,0.05]$ and carrier count. (E2) JPEG robustness: BER vs.\
-$Q\!\in\![50,100]$, locating the safe decode-failure crossover. (E3) Video:
-BER vs.\ H.264/HEVC QP and GOP placement. (E4) Security: false-accept under
-deepfake substitution, metadata forgery, re-capture, and a simulated PRNU-copy
-attack---target zero false-accepts (fail-safe). (E5) Capacity/ECC trade-off.
-(E6) Latency/gas on a public testnet with Merkle batching of $N\!\in\!\{1,10^2,10^4\}$.
-
-\noindent\textbf{Baselines.} Metadata-only C2PA with the manifest stripped, and
-software upload-time hashing, evaluated on survival of metadata removal and
-transcoding---the regimes where \pr{}'s in-pixel binding is expected to
-dominate.
+\textbf{Fidelity.} Embedding is imperceptible: mean PSNR $40.2$\,dB and SSIM
+$0.970$ between original and marked frames. \textbf{Robustness.}
+Table~\ref{tab:robust} reports payload BER and decode success. The payload is
+recovered with \emph{zero} bit errors through JPEG from $Q\!=\!95$ down to
+$Q\!=\!10$, under Gaussian noise up to $\sigma\!=\!20$, under bilinear resize to
+$0.5\times$/$0.75\times$, under a combined JPEG$+$resize attack, and under border
+crops of $1$--$6\%$ once grid resync covers the shift. \textbf{Operating curve.}
+Table~\ref{tab:sweep} sweeps amplitude at a fixed strong attack (JPEG~$Q40$),
+exposing a genuine cliff: detection fails at $A\!=\!0.5$ ($58$\,dB, BER $0.12$),
+becomes marginal at $A\!=\!1.0$, and is error-free from $A\!\ge\!1.5$
+($\le\!49$\,dB), so $A\!=\!4$ ($40$\,dB) operates with comfortable margin.
+\textbf{Security / false-accept.} Reading a marked image with $300$ wrong keys
+gives mean BER $0.503$ and $0/300$ recoveries; running the correct-key decoder
+against $300$ \emph{unmarked} images (a deepfake stand-in) tested against a
+claimed payload gives mean BER $0.499$ and $0/300$ false accepts---matching the
+$p\!\approx\!\tfrac12$ bound of Prop.~\ref{prop:carriers}--\ref{prop:v2} and the
+fail-safe design goal.
 
 \begin{table}[t]
 \centering
-\caption{\emph{Target} outcomes for the planned protocol (illustrative, to be
-validated; \emph{not} measured).}
-\label{tab:targets}
-\renewcommand{\arraystretch}{1.2}
-\setlength{\tabcolsep}{4pt}
+\caption{Measured in-pixel-channel robustness (6 images, $128$-b payload,
+$R\!=\!25$, $A\!=\!4$; PSNR $40.2$\,dB, SSIM $0.970$).}
+\label{tab:robust}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{5pt}
 \footnotesize
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Condition} & \textbf{V1 (hash)} & \textbf{V2 (in-pixel)} \\
+\textbf{Attack} & \textbf{Payload BER} & \textbf{Decode} \\
 \midrule
-Pristine original        & pass             & BER $\approx 0$ \\
-JPEG $Q\!\ge\!90$         & fail (re-encode) & decode pass \\
-JPEG $Q\!\approx\!75$     & fail             & decode pass (RS) \\
-JPEG $Q\!\lesssim\!60$    & fail             & \textsc{unverified} (safe) \\
-Deepfake / synthetic     & fail             & decode fail \\
-Metadata stripped        & via on-chain $h$ & decode pass \\
+None / pristine                 & $0.000$ & $6/6$ \\
+JPEG $Q95,90,80,70,60,50$        & $0.000$ & $6/6$ \\
+JPEG $Q40,\,Q30,\,Q20,\,Q10$     & $0.000$ & $6/6$ \\
+Gaussian noise $\sigma\!=\!5,10,20$ & $0.000$ & $6/6$ \\
+Resize $0.5\times,\,0.75\times$  & $0.000$ & $6/6$ \\
+JPEG $Q70$ $+$ resize $0.75\times$ & $0.000$ & $6/6$ \\
+Crop $1\%,3\%,6\%$ $+$ resync     & $0.000$ & decoded \\
+\midrule
+\emph{Wrong-key read} (300 trials) & $0.503$ & $0/300$ \\
+\emph{Forgery / unmarked} (300 trials) & $0.499$ & $0/300$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\begin{table}[t]
+\centering
+\caption{Amplitude operating curve at JPEG $Q40$ (4 images): imperceptibility vs.\
+robustness, showing the graceful failure cliff.}
+\label{tab:sweep}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{6pt}
+\footnotesize
+\begin{tabular}{@{}cccc@{}}
+\toprule
+\textbf{$A$ (gray)} & \textbf{PSNR (dB)} & \textbf{BER} & \textbf{Decode} \\
+\midrule
+$0.5$ & $58.2$ & $0.121$ & $0/4$ \\
+$1.0$ & $52.2$ & $0.006$ & $2/4$ \\
+$1.5$ & $48.7$ & $0.000$ & $4/4$ \\
+$2.0$ & $46.2$ & $0.000$ & $4/4$ \\
+$3.0$ & $42.7$ & $0.000$ & $4/4$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Scope and threats to validity.} These results validate the
+\emph{algorithmic} core---carrier design, spread-spectrum detection,
+JPEG/noise/resize/crop robustness, and false-accept behavior---independent of
+silicon. They use synthetic imagery and a luminance-only JPEG model; they do not
+yet model demosaicing, chroma subsampling, real per-column gain calibration
+error, lens/optical effects, or the analog photo-electron domain. The harness is
+released with the prototype for reproduction and extension to real datasets.
+
+\subsection{Remaining silicon- and codec-dependent validation}
+The following require hardware or a full pipeline and are future work:
+(E1)~real-camera datasets (RAISE, Dresden) for content realism and a PRNU
+baseline; (E2)~video robustness vs.\ H.264/HEVC QP and GOP placement with
+keyframe-level Merkle commitments; (E3)~an end-to-end re-capture and
+PRNU-copy~\cite{goljan2011defending} study; (E4)~latency/gas on a public testnet
+with Merkle batch sizes $N\!\in\!\{1,10^2,10^4\}$; and (E5)~a silicon study of
+per-column/per-region gain modulation on a sensor evaluation board.
+
 %==============================================================
 \section{Discussion: Limitations, Privacy, Standardization}\label{sec:discussion}
 
-\textbf{Hardware dependency.} \pr{}'s strongest guarantees require sensor and
-secure-element support; legacy devices can run a software-only, attested variant
-that still notarizes a capture-time hash (\`a la C2PA/ProofMode) but without the
-hardware-rooted in-pixel binding.
+\textbf{Hardware dependency and assurance tiers.} \pr{}'s strongest guarantees
+require per-column/per-region gain and secure-element support (\S\ref{sec:hw}).
+We make the trust gradient explicit rather than hiding it, reporting one of three
+tiers with every verdict: \emph{Tier~A (sensor-rooted)}---modulation imposed in
+the photo-electron domain by gain hardware; \emph{Tier~B (ISP-attested)}---the
+identical modulation applied in an attested ISP on legacy devices, trustworthy
+only up to the attestation; and \emph{Tier~C (software/notarize-only)}---a
+C2PA/ProofMode-style capture-time hash with no in-pixel binding. Verifiers and
+policies must not conflate tiers.
 
-\textbf{Privacy.} $\mathrm{ID}$, time, and location can constitute PII. We
-recommend on-chain pseudonyms, optional/omittable and salted location, and
-selective disclosure so that the public record proves \emph{existence and
-integrity} without revealing the photographer's identity or precise whereabouts.
+\textbf{Privacy-preserving notarization.} A naive design that wrote sensor
+$\mathrm{ID}$, time, and precise GPS to a public, immutable ledger would be
+actively dangerous for the very journalists and activists \pr{} aims to protect,
+and would violate data-protection law. \pr{} is therefore designed so that
+\emph{no raw PII ever touches the chain}. (i)~The only on-chain object is an
+opaque Merkle root of \mbox{SHA-256} commitments; the payload $\mathbf{m}$ and
+the image live off-chain. (ii)~The committed leaf is \emph{salted},
+$h=\mathrm{SHA\text{-}256}(I\|\mathbf{m}\|\,\textsf{salt})$, so the chain reveals
+nothing about $\mathbf{m}$ and identical captures are unlinkable without the
+salt. (iii)~Location is optional, omittable, and may be quantized coarsely or
+replaced by a salted commitment disclosed only under subpoena. (iv)~Device
+identity appears on-chain only as a rotating, secure-element-attested pseudonym,
+unlinkable to the physical device without OEM cooperation. (v)~A holder can prove
+properties of a capture---``taken by a certified \pr{} device before block
+$t_b$''---to a verifier via a zero-knowledge selective-disclosure proof without
+revealing $\mathrm{ID}$, exact time, or location. Because only opaque hashes are
+on-chain, the off-chain record can be deleted to honor a GDPR/erasure request
+while the immutable proof-of-existence remains a meaningless digest---squaring
+immutability with the right to be forgotten. In high-risk settings the capturing
+party may also defer notarization (commit a sealed hash, disclose context later).
+
+\textbf{Why a public ledger and not just a timestamping authority?} Proposition~1
+only needs a trustworthy, append-only timestamp, which an RFC~3161 time-stamping
+authority (TSA) also provides. We anchor to a public blockchain for properties a
+single TSA lacks: \emph{no single point of trust or failure} (a compromised or
+coerced CA can back-date or deny service, and certificate compromise has already
+forced wholesale revocation in deployed C2PA
+pipelines~\cite{c2pa2024spec}); \emph{public, permissionless auditability} by any
+court, platform, or adversary without trusting the issuer; and
+\emph{censorship resistance}, important when the capturing party and the
+authority are adversaries (conflict zones, state actors). The cost---latency and
+gas---is amortized to $O(1)$ per capture by Merkle batching (\S\ref{sec:contract}).
+A \emph{hybrid} is natural and recommended: a TSA countersignature for instant,
+cheap proof plus periodic blockchain anchoring of the TSA's own Merkle roots, as
+OpenTimestamps does~\cite{proofmode2023}; \pr{} treats the ledger as the
+trust-minimizing anchor and the TSA as a low-latency accelerator.
 
 \textbf{Failure-safe semantics.} As emphasized, \pr{} declines rather than
-falsely certifies under heavy laundering; downstream policy must treat
-``unverified'' as ``unknown,'' not ``fake.''
+falsely certifies under heavy laundering or unsynchronizable geometric edits;
+downstream policy must treat ``unverified'' as ``unknown,'' not ``fake.''
+
+\textbf{Adoption path and honest efficacy ceiling.} \pr{} cannot verify media
+from cameras that never marked it, so its value grows with deployment and is
+\emph{not} a universal deepfake solution. We therefore propose a phased,
+backward-compatible rollout: (1)~software Tier~C in capture apps and the
+notarization contract today (no hardware change); (2)~ISP Tier~B via firmware on
+existing devices; (3)~Tier~A as OEMs add the modest per-column/per-region gain
+capability. Throughout, verification is opt-in and additive: unmarked media is
+labeled ``unverified,'' never penalized as fake, so the system shifts
+high-stakes workflows (courts, newsrooms, insurance) from ``trust until
+debunked'' to ``label by provenance'' without breaking the long tail of legacy
+content.
 
 \textbf{Toward an OEM standard.} The historical lesson of JPEG~\cite{wallace1992jpeg}
 and 3GPP is that interoperability emerges from a shared standard, not point
 products. We propose \pr{} as a cross-OEM capture-provenance profile that (a)
-fixes payload layout, ECC, and the keyed selection function; (b) reuses C2PA
-manifests as the transport for assertions; and (c) standardizes the notarization
-contract interface, so any platform can verify any vendor's media. Consumer
-hardware-backed C2PA signing~\cite{google2025c2pa,truepic2024capture} shows the
-ecosystem is ready for the signing half; \pr{} adds the in-pixel, ledger-witnessed
-half.
+fixes payload layout, ECC, the keyed selection function, and the carrier basis;
+(b) reuses C2PA manifests as the transport for assertions; and (c) standardizes
+the notarization contract interface, so any platform can verify any vendor's
+media. Consumer hardware-backed C2PA signing~\cite{google2025c2pa,truepic2024capture}
+shows the ecosystem is ready for the signing half; \pr{} adds the in-pixel,
+ledger-witnessed half.
 
 %==============================================================
 \section{Conclusion and Future Work}\label{sec:conclusion}
@@ -1027,10 +1241,13 @@ practical irrelevance for media that matters.
 
 %==============================================================
 \section*{Reproducibility and Disclosure}
-The reference implementation is part of the open \pr{} project. The on-chain
-notarization in the current prototype is \emph{simulated} and labeled as such;
-results reported as ``planned'' are part of the evaluation roadmap
-(\S\ref{sec:eval}).
+The reference implementation and the robustness harness (a self-contained
+$8\!\times\!8$-DCT JPEG model, attacks, and the spread-spectrum embed/extract of
+\S\ref{sec:embed}) are part of the open \pr{} project; the measured numbers in
+\S\ref{sec:eval} (Tables~\ref{tab:robust}--\ref{tab:sweep}) are reproducible from
+it. The on-chain notarization in the current prototype is \emph{simulated} and
+labeled as such; the silicon- and codec-dependent items in \S\ref{sec:robust}
+are an explicit roadmap, not claimed results.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

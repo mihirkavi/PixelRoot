@@ -10,7 +10,7 @@
 
 ## Abstract
 
-The realism of AI-generated "deepfake" imagery has outpaced the ability of society to tell synthetic media from camera-captured reality. Reactive, detector-based defenses are locked in an adversarial arms race and fail to generalize to unseen generators, while existing provenance schemes bind trust to *metadata* that can be stripped, edited, or transplanted. We present **PixelRoot**, a media-authenticity framework that moves the root of trust from metadata into the *pixels themselves*. At the instant of capture, a CMOS image sensor modulates a sparse, pseudorandomly selected set of pixels to embed a 128-bit provenance payload — the sensor's factory-burned device identity, a trusted timestamp, and a quantized capture location — protected by Reed–Solomon error correction. A SHA-256 commitment over the image and its payload is then notarized to a public blockchain within seconds of the shutter event, closing the window in which a forgery could be substituted. We contribute: (i) a structured literature survey unifying five previously disjoint research threads — deepfake detection, passive sensor forensics (PRNU), active watermarking, content-provenance standards (C2PA), and blockchain media integrity — and a gap analysis that motivates a *dual-binding* design; (ii) a formal architecture and threat model with a security argument against re-capture, metadata forgery, replay, compression-laundering, and PRNU fingerprint-copy attacks; (iii) an analysis of payload survivability under JPEG and H.264/HEVC compression that clarifies the fragile/semi-fragile trade-off; and (iv) an evaluation plan and a reference software implementation. We argue that, deployed as an OEM interoperability standard analogous to JPEG or 3GPP, sensor-level provenance plus real-time notarization can give legal, journalistic, third-party (3P), and life-saving applications an affirmative, hardware-rooted proof of authenticity rather than a probabilistic guess.
+The realism of AI-generated "deepfake" imagery has outpaced the ability of society to tell synthetic media from camera-captured reality. Reactive, detector-based defenses are locked in an adversarial arms race and fail to generalize to unseen generators, while existing provenance schemes bind trust to *metadata* that can be stripped, edited, or transplanted. We present **PixelRoot**, a media-authenticity framework that moves the root of trust from metadata into the *pixels themselves*. At the instant of capture, a CMOS image sensor applies a keyed, spread-spectrum modulation to a set of image *regions* — realized by a small, low-frequency **per-column** or **per-region** programmable-gain profile that today's column-parallel sensor architectures can already approximate — to embed a 128-bit provenance payload (the sensor's factory-burned device identity, a trusted timestamp, and an optional quantized location) protected by error correction. A SHA-256 commitment over the frame is simultaneously notarized to a public blockchain within seconds of the shutter, closing the window in which a forgery could be substituted. We make the hardware ask concrete: rather than the per-pixel gain control that commercial sensors do **not** expose, PixelRoot needs only a modest, standardizable per-column/per-region gain capability, with a software-ISP fallback for legacy devices at an explicitly weaker trust level. We contribute: (i) a structured survey unifying five disjoint threads — deepfake detection, PRNU forensics, watermarking, C2PA, and blockchain media integrity — with a gap analysis motivating a *dual-binding* design; (ii) a formal architecture, threat model, and security argument with three propositions (hard-binding soundness, key-protected carrier unpredictability, and a bounded soft false-accept); (iii) a **measured** robustness study of the redesigned in-pixel channel using a faithful 8×8-DCT JPEG model plus noise, rescaling, and cropping attacks — achieving **0% payload bit-error through JPEG down to Q=30 at 40 dB PSNR, with 0/600 wrong-key and forgery false-accepts**; and (iv) privacy-preserving notarization (no raw PII on-chain, salted commitments, selective disclosure), a justification of blockchain over a single time-stamping authority, and a phased adoption path. We argue that, deployed as an OEM interoperability standard analogous to JPEG or 3GPP, sensor-level provenance plus real-time notarization can give legal, journalistic, third-party (3P), and life-saving applications an affirmative, hardware-rooted proof of authenticity rather than a probabilistic guess.
 
 **Keywords:** media provenance, deepfakes, blockchain, CMOS image sensor, PRNU, digital watermarking, content authenticity, C2PA, image forensics, JPEG.
 
@@ -26,7 +26,7 @@ An alternative philosophy inverts the problem: instead of trying to prove a piec
 
 ### 1.1 The PixelRoot thesis
 
-A robust root of trust for visual media should live where the information actually is: **in the pixels, anchored to physical hardware, and witnessed by an immutable public ledger.** PixelRoot embeds a provenance payload *into the pixel values* at the moment of capture through controlled per-pixel sensor gain modulation, and *simultaneously* notarizes a cryptographic commitment of the image to a blockchain. This yields two independent bindings:
+A robust root of trust for visual media should live where the information actually is: **in the pixels, anchored to physical hardware, and witnessed by an immutable public ledger.** PixelRoot embeds a provenance payload *into the pixel values* at the moment of capture through a keyed, low-frequency *per-region* sensor gain modulation — a perturbation small enough to be imperceptible yet structured to survive lossy re-encoding — and *simultaneously* notarizes a cryptographic commitment of the image to a blockchain. This yields two independent bindings:
 
 - a **hard binding** — a SHA-256 commitment recorded on-chain, giving an immutable, publicly verifiable timestamp of existence; and
 - a **soft, in-pixel binding** — a sparse, error-corrected signature tied to the sensor's factory identity that travels *with the pixels* even if the file container and its metadata are destroyed.
@@ -36,10 +36,10 @@ The two are complementary: the hard binding gives cryptographic non-repudiation 
 ### 1.2 Contributions
 
 1. **A unifying survey and gap analysis** (§3) spanning deepfake generation/detection, passive PRNU forensics, active watermarking, provenance standards, and blockchain media integrity, showing no prior work simultaneously achieves (a) a hardware root of trust, (b) survival of metadata stripping, and (c) public real-time notarization.
-2. **A formal architecture** (§5) for sensor-level payload embedding: the 128-bit metadata layout, payload-seeded PRNG pixel selection, Reed–Solomon protection, gain modulation, and a smart-contract notarization protocol.
-3. **A threat model and security analysis** (§4, §6) covering re-capture, metadata forgery, replay, compression-laundering, deepfake substitution, and the PRNU fingerprint-copy attack.
-4. **A compression-robustness analysis** (§7) relating JPEG quantization and H.264/HEVC coding to payload bit-error rate, and a discussion of the semantic-authenticity boundary.
-5. **An evaluation plan and reference implementation** (§8) grounded in an open prototype, plus a roadmap toward an OEM standard (§9).
+2. **A formal architecture with a feasibility-grounded hardware ask** (§5): a sensor-gain *feasibility spectrum* (global → per-column → per-region → per-pixel) that reframes embedding around the low-frequency, per-column/per-region gain control that column-parallel sensors can realistically provide, plus the 128-bit payload, keyed spread-spectrum carrier selection, error correction, and a smart-contract notarization protocol.
+3. **A threat model and security analysis** (§4, §6) with three propositions and a threat catalogue covering re-capture, metadata forgery, replay, compression-laundering, deepfake substitution, splicing, and the PRNU fingerprint-copy attack.
+4. **A measured robustness study** (§7, §9) of the redesigned in-pixel channel against a faithful JPEG (8×8 DCT quantization) model, Gaussian noise, bilinear rescaling, and cropping with grid resynchronization — reporting real PSNR/SSIM, BER–quality curves, an amplitude operating curve, and wrong-key/forgery false-accept rates, with an explicit account of the geometric limits.
+5. **A deployable systems design** (§10): privacy-preserving notarization that keeps **no raw PII on-chain** (salted commitments, optional location, zero-knowledge selective disclosure, GDPR/erasure compatibility), a justification of public-ledger anchoring over a single RFC 3161 time-stamping authority (with a hybrid option), and a phased, backward-compatible adoption path toward an OEM standard.
 
 ---
 
@@ -47,7 +47,7 @@ The two are complementary: the hard binding gives cryptographic non-repudiation 
 
 ### 2.1 The CMOS imaging pipeline
 
-A camera integrates photo-generated charge in each photosite, converts it to a voltage, applies analog gain, and digitizes it. Manufacturing imperfections make each photosite's response slightly non-uniform; this multiplicative **photo-response non-uniformity (PRNU)** is a stable, device-unique noise pattern long used as a forensic "sensor fingerprint" [Lukáš 2006; Chen 2008]. Crucially, many sensors expose programmable per-column/per-region analog gain and exposure registers, and embed a factory-burned identifier in one-time-programmable (OTP) memory. PixelRoot **repurposes these existing controls**: rather than only *reading* the passive PRNU after the fact, it *actively writes* a chosen, error-corrected signal during exposure and ties it to the OTP identity.
+A camera integrates photo-generated charge in each photosite, converts it to a voltage, applies analog gain, and digitizes it. Manufacturing imperfections make each photosite's response slightly non-uniform; this multiplicative **photo-response non-uniformity (PRNU)** is a stable, device-unique noise pattern long used as a forensic "sensor fingerprint" [Lukáš 2006; Chen 2008]. Crucially, modern column-parallel CMOS architectures already place a programmable-gain amplifier and ADC *per column*, support per-region exposure/gain in HDR and dual-conversion-gain modes, and embed a factory-burned identifier in one-time-programmable (OTP) memory. PixelRoot does **not** assume the per-pixel gain control that commercial sensors do not expose; instead it **repurposes the coarse, low-frequency gain controls that are realistic today** (or a modest standardizable extension, §5.1): rather than only *reading* the passive PRNU after the fact, it *actively writes* a chosen, error-corrected, low-frequency signal during exposure and ties it to the OTP identity.
 
 ### 2.2 Lossy compression: JPEG and MPEG/H.26x
 
@@ -87,7 +87,7 @@ A large body of work anchors media hashes (exact and perceptual) to smart contra
 | Blockchain hashing | ✗ | ✗ | ✓ | ✓ | partial |
 | **PixelRoot (this work)** | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-No prior approach simultaneously offers a hardware root of trust, survival of metadata stripping, **and** public real-time notarization. PixelRoot is, to our knowledge, the first design to combine sensor-level in-pixel embedding with capture-time blockchain notarization at that intersection.
+**Precise novelty.** Each ingredient exists in isolation: watermarking embeds recoverable signals in pixels; PRNU ties images to a physical sensor; C2PA provides hardware-backed signed provenance; prior systems anchor media hashes to a blockchain [Hasan 2019]. Our claim is *not* that any single component is new. The defensible novelty of PixelRoot is their **co-design**: (i) a hardware-rooted, key-protected, error-corrected signal embedded by the sensor's own gain path (surviving metadata stripping, rooted in silicon rather than a software key), (ii) bound at the shutter to a public-ledger commitment for two independent, failure-disjoint bindings, (iii) realized through a *feasibility-grounded* per-column/per-region gain primitive we ask manufacturers to standardize — rather than the per-pixel control prior "sensor-embedding" sketches assumed. No prior approach occupies the intersection of hardware root, metadata-strip survival, and public real-time notarization. We claim contributions at the level of architecture, the concrete hardware ask, the measured robustness of the carrier, and the privacy design — not the invention of watermarking or blockchains.
 
 ---
 
@@ -113,8 +113,8 @@ flowchart LR
     S["CMOS sensor<br/>+ OTP ID"] --> M["Payload m<br/>ID‖t‖GPS"]
     M --> RS["RS encode<br/>m → b"]
     K --> SEL
-    RS --> SEL["Keyed PRNG<br/>select P"]
-    SEL --> G["Gain mod.<br/>g_i = 1 + α·b_i"]
+    RS --> SEL["Keyed PRNG<br/>select regions"]
+    SEL --> G["Per-region<br/>gain ramp"]
     G --> RD["Expose &<br/>readout I"]
     RD --> H["h = SHA-256(I‖m)"]
     RD --> ST["Store I +<br/>C2PA manifest"]
@@ -136,43 +136,58 @@ flowchart LR
 
 *Top:* the capture path emits a hard binding (`h` on the public ledger) and a soft in-pixel binding (the keyed, error-corrected gain pattern carried inside `I`). *Bottom:* verification checks V1 (ledger membership) and V2 (in-pixel recovery) and returns the strongest supported level, failing safe to "unverified."
 
-### 5.1 Provenance payload
+### 5.1 Hardware feasibility: the gain-control spectrum
+A central objection to any "sensor-level embedding" proposal is that commercial CMOS sensors do **not** expose arbitrary per-pixel gain. PixelRoot does not require it. We organize sensor gain controllability into a spectrum and target the realistic middle:
+
+- **Global gain (today).** One ISO/analog-gain register per frame — too coarse to carry a spatial payload.
+- **Per-column gain (today).** Column-parallel readout places a programmable-gain amplifier per column; per-column trim is routinely used for column fixed-pattern-noise correction. A per-column gain *profile* directly imprints horizontal low-frequency content — exactly the carrier PixelRoot uses.
+- **Per-region / tiled gain (emerging).** Dual-conversion-gain and HDR-zone sensors already switch gain over regions; a coarse K×K gain tile map is a small, standardizable register extension.
+- **Per-pixel gain (not available).** Arbitrary per-photosite gain is not offered by commercial parts, and PixelRoot deliberately avoids depending on it.
+
+**The PixelRoot ask.** We ask manufacturers for a modest, well-defined capability: a programmable *per-column* gain vector (and, ideally, a coarse per-region gain tile map) addressable at capture, plus the OTP identity and attested clock that hardware-backed C2PA pipelines already ship [Google 2025; Truepic 2024]. This is far cheaper than per-pixel control and reuses circuitry that exists for noise calibration. PixelRoot encodes each payload bit as a *low-frequency gain ramp over an image region* (§5.4); a per-column profile realizes the horizontal component, a tile map the 2-D version.
+
+**Software-ISP fallback (legacy).** Devices without the gain capability can apply the identical low-frequency modulation in the attested image-signal processor (ISP) immediately after readout. This preserves the in-pixel binding and notarization but **weakens the hardware root**: the modulation is now imposed in firmware rather than the photo-electron domain, so it is only as trustworthy as the attested execution environment (comparable to today's secure-capture apps). We label such captures at a lower assurance tier (§10) and never conflate them with true sensor-rooted captures.
+
+### 5.2 Provenance payload
 The payload **m** is a fixed-width 128-bit record (v2):
 
 ```
 m = ID(48 bits)  ||  t(32 bits)  ||  (φ, λ)(48 bits: 24 per coordinate)
 ```
 
-`ID` is the sensor's OTP device identifier (modeled as a 48-bit MAC-style value), `t` a Unix timestamp from an attested RTC/NTP source, and `(φ, λ)` a quantized lat/long (~1e-4 degree resolution). Location may be omitted or salted for privacy (§9).
+`ID` is the sensor's OTP device identifier (modeled as a 48-bit MAC-style value), `t` a Unix timestamp from an attested RTC/NTP source, and `(φ, λ)` a quantized lat/long (~1e-4 degree resolution). Location may be omitted or salted for privacy (§10).
 
-### 5.2 Keyed pixel selection
-The carrier pixels are chosen by a PRNG seeded by the payload:
+### 5.3 Keyed region selection and spread-spectrum coding
+PixelRoot partitions the frame into 8×8 blocks aligned with the JPEG grid and treats **blocks**, not single pixels, as carriers. The OEM-keyed seed
 
 ```
 s = trunc_32( SHA-256( k || m ) )
 ```
 
-Positions `{(r_i, c_i)}` are drawn without repetition from the H×W grid using a PRNG keyed by `s`. Because the seed derives from **m** (and an OEM secret key `k`), a verifier told the claimed **m** can regenerate the exact positions, while an attacker without **m**/`k` cannot localize or enumerate the carriers.
+drives a PRNG that, for each coded bit, draws `R` distinct carrier blocks without repetition and assigns each an antipodal **chip** `c_j ∈ {±1}` (spread spectrum). The 128 payload bits are first protected by error correction (a Reed–Solomon code over GF(2⁸) [Reed 1960], or the repetition coding evaluated in §9); the repetition factor `R` gives each bit redundancy across many spatially dispersed blocks. Because the seed is keyed by the secret `k`, an attacker without `k` can neither localize the carrier blocks nor recover their chip signs even after observing many marked images (Prop. 2). A verifier holding `k` and the claimed `m'` regenerates the identical assignment.
 
-### 5.3 Error-corrected encoding
-The 128 payload bits are expanded with a Reed–Solomon code [Reed 1960] into `n_b = 128 + r` coded bits (`r ≈ 30` parity in the prototype), tolerating burst errors from compression and mild edits. Let `b_i ∈ {0,1}` be the i-th coded bit.
-
-### 5.4 Sensor-level gain modulation (embedding)
-During exposure, each selected photosite's analog gain is nudged multiplicatively:
+### 5.4 Region-gain (spread-spectrum) embedding
+The single-pixel, 2% gain perturbation of naïve designs is a poor carrier: an isolated spike is high-frequency energy, precisely what JPEG discards, and it cannot be read back reliably against textured content. PixelRoot instead embeds each bit as a **low-frequency gain ramp over its carrier blocks**. Let `Φ_{u,v}(x,y) = cos((2x+1)uπ/16)·cos((2y+1)vπ/16)` be a low-order 8×8 DCT basis (we use a low horizontal frequency, `(u,v) = (0,2)`, which a per-column gain profile produces directly). For carrier block `B_j` with chip `c_j` carrying bit `b ∈ {0,1}`, sign `σ = 2b−1`, the sensor adds
 
 ```
-g_i = 1 + α · b_i ,   α ≈ 0.02
+Δ_j(x,y) = A · σ · c_j · Φ_{u,v}(x,y)        ... (eq. embed)
 ```
 
-so a "1" raises the pixel response by ~2% (~0.01 EV) and a "0" is nominal. The perturbation is sub-perceptual and spread across ~10² of millions of pixels (G6). This is an **active, hardware-rooted, semi-fragile watermark**, distinct from the involuntary PRNU that passive forensics merely observes.
+a smooth gain ramp of amplitude `A` gray levels (a ~1–2% modulation of the local mean); equivalently, the chosen low-frequency DCT coefficient of `B_j` is shifted by ±A. This **reconciles the two domains earlier designs confused**: the modulation is applied as a *spatial* per-region gain (hardware-realizable, §5.1) but lives in a *low-frequency DCT* band (JPEG-survivable). Because `Φ_{u,v}` for `(u,v) ≠ (0,0)` is zero-mean over the block, the embedding leaves block brightness essentially unchanged and is imperceptible (measured ≥ 40 dB PSNR, §9).
 
-**Read-back estimator.** A carrier bit is recovered from a questioned image `I'` by comparing each carrier against a local prediction of its un-modulated value. With `μ(r_i,c_i)` a robust local mean (e.g., median over a 5×5 neighborhood excluding other carriers), the normalized residual
+**Correlation read-back.** A questioned image `I'` is decoded by *projecting* each carrier block onto the same basis — no per-pixel thresholding and, crucially, no estimate of the block's "original" brightness is needed, because the AC basis is orthogonal to the (content-dominated) DC term. For block `B_j`,
 
 ```
-ρ_i = ( I'(r_i,c_i) − μ(r_i,c_i) ) / μ(r_i,c_i)        ... (eq. residual)
+ρ_j = ⟨ I'_{B_j}, Φ_{u,v} ⟩ / ⟨ Φ_{u,v}, Φ_{u,v} ⟩  ≈  A·σ·c_j + η_j     ... (eq. residual)
 ```
 
-is soft-thresholded to recover `b̂_i = 1[ρ_i > α/2]`, with per-bit confidence `|ρ_i − α/2|` fed to a soft-decision Reed–Solomon decoder. A genuine modulation produces a detectable bias of magnitude ≈ α; unmarked pixels yield `ρ_i ≈ 0`.
+where `η_j` is the (zero-mean) host-content/noise term. De-spreading and combining the `R` blocks of a bit,
+
+```
+D = Σ_{j=1..R} c_j · ρ_j  ≈  R·A·σ + Σ_j c_j·η_j ,   b̂ = 1[D > 0]   ... (eq. despread)
+```
+
+so the payload signal grows as `R·A` while random chips make host terms average toward zero (std ∝ √R): detection SNR improves as √R. The per-bit magnitude `|D|` is the soft confidence passed to the ECC decoder. This is a textbook blind spread-spectrum watermark detector, and it is what drives the measured BER in §9 to zero through aggressive JPEG.
 
 ### 5.5 Commitment and notarization
 Immediately after readout the device computes the hard binding
@@ -185,26 +200,24 @@ over the (lossless) image `I` and payload, then submits `h` (optionally with a d
 
 **Algorithm 1 — capture-time embed-and-notarize**
 ```
-Require: OEM secret k (secure element), gain step α, parity r
+Require: OEM secret k, amplitude A, repetition R, basis Φ_{u,v}
  1. ID ← readOTP()                          # 48-bit factory identity
  2. t ← attestedClock();  (φ,λ) ← gps()
  3. m ← ID || t || quant(φ,λ)               # 128 bits
- 4. s ← trunc_32(SHA-256(k || m))
- 5. b ← RS-Encode_GF(2^8)(m, r)             # n_b = 128 + r coded bits
- 6. P ← ∅;  prng ← seed(s)
- 7. while |P| < n_b:
- 8.     (r_i,c_i) ← (prng() mod H, prng() mod W)
- 9.     if (r_i,c_i) ∉ P:  P ← P ∪ {(r_i,c_i)}
-10. for each (r_i,c_i) in P with bit b_i:
-11.     setGain(r_i, c_i, 1 + α·b_i)        # program sensor register
-12. I ← expose_and_readout()
-13. h ← SHA-256(I || m)
-14. enqueue leaf = h for Merkle batch
-15. on flush: root ← Merkle({leaf});  contract.register(root)
-16. store I (lossless) + m + Merkle proof π in C2PA manifest
+ 4. b ← ECC-Encode(m)                       # RS / repetition, coded bits b_1..b_{n_c}
+ 5. s ← trunc_32(SHA-256(k || m));  prng ← seed(s)
+ 6. for each coded bit b_i, σ ← 2·b_i − 1:
+ 7.     draw R distinct blocks {B_j}, chips c_j ∈ {±1} via prng
+ 8.     for each (B_j, c_j):
+ 9.         set per-region gain ramp on B_j: add A·σ·c_j·Φ_{u,v}   # per-column/region register
+10. I ← expose_and_readout()
+11. h ← SHA-256(I || m)
+12. enqueue leaf = h for Merkle batch
+13. on flush: root ← Merkle({leaf});  contract.register(root)
+14. store I (lossless) + m + Merkle proof π in C2PA manifest
 ```
 
-**Step-by-step.** (1) Read the sensor's 48-bit OTP identity from on-die fuses; (2) form the 128-bit payload with attested time and GPS; (3) derive seed `s` by hashing `k‖m` — the secret `k` makes carriers unpredictable even to a party who learns `m`; (4) channel-code with Reed–Solomon over GF(2⁸), correcting up to ⌊r/2⌋ symbol errors; (5) draw `n_b` distinct carrier coordinates from a seeded PRNG; (6) set each carrier's analog gain to `1+α·b_i` **before** exposure, so the bit is physically imprinted in the photo-electron count, not added in software; (7) read out frame `I`; (8) hash `I‖m`; (9) batch the leaf into a Merkle tree and register the root on-chain in one transaction → block-timestamped proof of existence; (10) persist `I` with `m` and inclusion proof `π` in a C2PA manifest (the manifest is **not** required for V2).
+**Step-by-step.** (1) Read the sensor's 48-bit OTP identity from on-die fuses; (2) form the 128-bit payload with attested time and GPS; (3) derive seed `s` by hashing `k‖m` — the secret `k` makes carriers unpredictable even to a party who learns `m`; (4) channel-code (RS over GF(2⁸), or repetition) into `n_c` coded bits; (5) a keyed PRNG assigns each coded bit `R` distinct 8×8 blocks with antipodal chips; (6) the sensor adds a low-frequency gain ramp `A·σ·c_j·Φ_{u,v}` to each carrier block **during** exposure (eq. embed), so the bit is imprinted physically in the photo-electron domain (per-column/per-region gain), not added in software; (7) read out frame `I`; (8) hash `I‖m`; (9) batch the leaf into a Merkle tree and register the root on-chain in one transaction → block-timestamped proof of existence; (10) persist `I` with `m` and inclusion proof `π` in a C2PA manifest (the manifest is **not** required for V2).
 
 ### 5.5.1 Smart-contract notarization
 On-chain state is minimal: a registry maps each Merkle root to its block timestamp and emits an event. Batching `N` captures under one root makes per-image gas `O(1)` amortized; inclusion is later proven off-chain with a `log₂N`-length Merkle path.
@@ -255,7 +268,7 @@ A capture is *notarized* once `register` mines; a verifier later calls the pure 
 Given a questioned image `I'` and a claimed payload `m'` (from the manifest, on-chain record, or asserted), run Algorithm 2.
 
 - **(V1) Hard binding / ledger check.** Recompute `h' = SHA-256(I' || m')` and confirm it is included under a registered root (via `π`). A match proves `I'` existed bit-for-bit at the recorded block time. Conclusive but brittle: any re-encoding breaks it.
-- **(V2) In-pixel binding check.** Regenerate `s` and the carrier set `P` from `m'` and `k`, estimate residuals `ρ_i` (eq. residual), soft-decode the Reed–Solomon codeword to `m̂`, and test `m̂ == m'`. BER and decode margin form a soft authenticity score that degrades gracefully under compression (§7). A keyed, spread carrier set means an attacker who edits/splices without knowing `P` corrupts the signature detectably.
+- **(V2) In-pixel binding check.** Regenerate `s`, the carrier blocks, and the chips from `m'` and `k`; after a short block-grid *resynchronization* search (§7.2) to undo translation/crop, project each carrier block onto `Φ_{u,v}` (eq. residual), de-spread and combine (eq. despread), soft-decode the ECC to `m̂`, and test `m̂ == m'`. BER and decode margin form a soft authenticity score that degrades gracefully under compression (§7). Because carriers and chips are keyed, an attacker who edits/splices without `k` corrupts the signature detectably and cannot forge a consistent one.
 
 **Algorithm 2 — verification of (I', m')**
 ```
@@ -263,16 +276,17 @@ Require: questioned I', claimed m', ledger handle, key k
  1. h' ← SHA-256(I' || m')
  2. v1 ← ledger.verifyInclusion(root, h', π)
  3. s  ← trunc_32(SHA-256(k || m'))
- 4. P  ← PRNGselect(s, n_b, H, W)
- 5. for each (r_i,c_i) in P:
- 6.     ρ_i ← (I'(r_i,c_i) − μ(r_i,c_i)) / μ(r_i,c_i)
- 7.     b̂_i ← 1[ρ_i > α/2];  w_i ← |ρ_i − α/2|     # soft confidence
- 8. m̂ ← RS-Decode(b̂, w)
- 9. v2 ← (m̂ == m')
-10. if v1 ∧ v2:  return CAMERA-ORIGINAL
-11. elif v2:     return TRANSCODED-CONSISTENT
-12. elif v1:     return EXACT-COPY
-13. else:        return UNVERIFIED            # fail-safe
+ 4. ({B_j}, {c_j}) ← PRNGselect(s, n_c, R)
+ 5. δ* ← argmax_δ Σ_i |D_i(δ)|                 # block-grid resync, §7.2
+ 6. for each coded bit i:
+ 7.     D_i ← Σ_j c_j · ⟨ I'_{B_j + δ*}, Φ_{u,v} ⟩ / ‖Φ_{u,v}‖²
+ 8.     b̂_i ← 1[D_i > 0];  w_i ← |D_i|          # soft confidence
+ 9. m̂ ← ECC-Decode(b̂, w)
+10. v2 ← (m̂ == m')
+11. if v1 ∧ v2:  return CAMERA-ORIGINAL
+12. elif v2:     return TRANSCODED-CONSISTENT
+13. elif v1:     return EXACT-COPY
+14. else:        return UNVERIFIED            # fail-safe
 ```
 
 A piece of media is accepted at the strongest supported level: **V1∧V2** (pristine original), **V2 only** (transcoded but pixel-consistent), or **V1 only** (exact copy, manifest intact); otherwise the safe **Unverified**.
@@ -287,7 +301,7 @@ A piece of media is accepted at the strongest supported level: **V1∧V2** (pris
 
 **Proposition 1 (Hard-binding soundness).** Under a collision-resistant hash (A4) and immutable ledger (A3), passing V1 implies `I*‖m*` existed at/before the sealing root's block time. Producing a distinct `I* ≠ I` that passes V1 against a root sealed for `I` requires a second-preimage/collision of the hash → probability ≤ **2⁻¹²⁸** for SHA-256. *(Proof: `h` is a Merkle leaf; `verifyInclusion` recomputes the root from `(h, π)`. A different `I*` with the same leaf is a hash collision; a different leaf with the same root is a tree-collision; rewriting the root violates A3.)*
 
-**Proposition 2 (Carrier unpredictability).** Without `k`, the probability of correctly localizing the `n_b` carriers in an `H×W` frame is `C(HW, n_b)⁻¹` — for 1920×1080 and `n_b = 158`, below **10⁻⁷⁰⁰**. Since `s = trunc_32(H(k‖m))` is a PRF of `k`, distinct payloads induce computationally independent carrier sets, so observing many signatures leaks no usable information about `P` for a fresh `m`.
+**Proposition 2 (Carrier unpredictability).** Let the frame contain `N_B` blocks and let `m = n_c·R` carrier blocks each carry a secret antipodal chip. Without `k`, the probability of correctly recovering the carrier-and-chip assignment is `[ C(N_B, m) · 2^m ]⁻¹` — for 1920×1080 (`N_B = 32400` blocks), `m = 3200`, far below **10⁻³⁰⁰⁰**. Since `s = trunc_32(H(k‖m))` is a PRF of `k`, distinct payloads induce computationally independent layouts, so observing many signatures leaks no usable information for a fresh `m`. The empirical counterpart — reading a marked image with 300 *wrong* keys — yields mean BER **0.503** and **0/300** correct recoveries (§9), matching the `p ≈ ½` random-guess model.
 
 **Proposition 3 (Soft-binding false-accept).** On an image *not* PixelRoot-marked at the claimed carriers, model read-back as independent bit guesses with per-bit error `p ≈ ½`. With an RS code correcting `t = ⌊r/2⌋` of `n_s` symbols, V2 falsely accepts with probability at most
 
@@ -325,12 +339,15 @@ the tail that ≤ `t` of `n_s` bytes match by chance. For `n_s = 20, t = 15, p =
 The central tension: the hard binding (V1) is *fragile* by design — ideal for a pristine original — while real-world distribution demands *semi-fragile* survivability (V2).
 
 ### 7.1 JPEG
-JPEG's quantization matrix scales with quality factor `Q` and most aggressively discards high-frequency DCT energy [Wallace 1992]. A ~2% gain perturbation at isolated pixels is partly high-frequency and is therefore attenuated as `Q` drops. To survive, the in-pixel channel should (i) place carriers to influence *mid-frequency* DCT coefficients of their 8×8 blocks, as in semi-fragile DCT watermarking [Begum 2020; SciRep 2025]; (ii) lean on Reed–Solomon parity to absorb residual errors; and (iii) use soft, correlation-based read-back rather than a hard per-pixel threshold. Expected behavior: near-zero BER at `Q ≳ 90`, graceful rise through mid quality, decode failure (safe "cannot verify") at low `Q`. The exact crossover is the key quantity to characterize (§8).
+JPEG's quantization matrix scales with quality factor `Q` and most aggressively discards high-frequency DCT energy [Wallace 1992]. This is exactly why the redesigned carrier (§5.4) lives in a *low-frequency* DCT band rather than at isolated (high-frequency) pixels: the chosen coefficient `(u,v) = (0,2)` sits in the lightly-quantized region of the luminance table and is preserved across a wide `Q` range, while spread-spectrum de-spreading over `R` blocks (eq. despread) suppresses quantization noise and host content by a further √R. Our faithful 8×8-DCT JPEG model (standard luminance table scaled by `Q`) confirms the analysis: **measured payload BER is zero from Q=95 down to Q=30** (indeed to Q=10 at our operating amplitude), and the amplitude sweep in §9 locates the graceful decode-failure cliff, below which PixelRoot returns the safe **Unverified** rather than a false positive. The earlier fragile/semi-fragile tension is thus resolved by construction, not asserted.
 
-### 7.2 Video: MPEG / H.264 / HEVC
+### 7.2 Geometric edits and synchronization
+Block-grid embedding is sensitive to operations that move the grid: cropping, translation, padding, rescaling. PixelRoot addresses this with an explicit *resynchronization* stage and is honest about its envelope. **(i) Rescaling**: because the carrier is a low-frequency coefficient, moderate down/up-sampling preserves it; measured BER is zero under bilinear resize to 0.5× and 0.75× and under a combined JPEG Q70 + 0.75× attack (§9). **(ii) Translation/crop**: the verifier searches a small range of block-grid offsets `δ` and keeps the most confident decode (line 5 of Alg. 2); the genuine layout produces a sharp correlation peak (eq. despread) while wrong offsets give noise, so the search recovers the payload — measured BER is zero for border crops of 1–6% (up to ~31 px) once the offset is covered. A known synchronization template can extend this to scale/anchor estimation. **(iii) Limits**: large arbitrary crops, rotation, and projective warps not covered by the offset/scale search are *not* recovered; critically, PixelRoot then **fails safe** — the de-spread correlation collapses to noise (BER ≈ 0.5) and the verifier returns **Unverified**, never a false accept. The hard binding (V1) and perceptual-hash "same-scene" layers remain available for such cases.
+
+### 7.3 Video: MPEG / H.264 / HEVC
 Video adds motion-compensated prediction, integer transforms, in-loop deblocking, and GOP structure [Wiegand 2003; Sullivan 2012]. The watermarking literature shows embedding survives best in mid-frequency transform coefficients and that I-frame perturbations propagate ("drift") through a GOP, so embedding is often confined to portions of the GOP [Asikuzzaman 2018; Tew 2020; CSTFMark 2026]. Practical PixelRoot design: embed the per-(key)frame payload at capture, and commit a Merkle root over keyframe hashes so frame-level verification localizes tampering. Learned, codec-aware embedding now survives non-differentiable H.264 [CSTFMark 2026] and is a natural upgrade path.
 
-### 7.3 The semantic-authenticity boundary
+### 7.4 The semantic-authenticity boundary
 A benign filter may alter carriers enough to fail V2 even though the image's *meaning* is unchanged (false alarm), while a malicious edit might in principle preserve carriers. PixelRoot therefore certifies **pixel-level integrity relative to a notarized original, not semantic equivalence.** This cleanly separates "bit-for-bit original" (V1), "faithfully transcoded" (V2), and "cannot establish provenance," and composes with perceptual-hash / content-similarity layers [PLOS 2024] for softer "same-scene" judgments.
 
 ---
@@ -346,7 +363,7 @@ PixelRoot keeps a human or institutional verifier in the loop with hardware-root
 
 ---
 
-## 9. Evaluation Plan and Reference Implementation
+## 9. Evaluation and Reference Implementation
 
 **Reference implementation.** An open software prototype of the PixelRoot core implements the payload layout, SHA-256 seeding, PRNG carrier selection, gain-value generation, image hashing, and a register/verify service with *simulated* notarization. It implements a legacy v1 (120-bit) and current v2 (128-bit) payload (the latter fixing a coordinate-packing precision bug), validating the encode/verify round-trip and the metadata→seed→position determinism end-to-end before silicon.
 
@@ -364,33 +381,48 @@ Measured on a commodity laptop CPU (Node.js v20) over a synthetic 1920×1080 RGB
 | Encode→verify round-trip | pass ✓ |
 | Single-bit tamper | rejected ✓ |
 
-### 9.2 Experimental protocol (planned)
-The following targets the claims that require silicon and an image pipeline; the values in §9.3 are explicit **targets**, not measurements.
+### 9.2 Measured robustness of the in-pixel channel
+We evaluate the redesigned spread-spectrum embedding (§5.4) with a dependency-free harness modeling the operations that actually attack the channel. **Methodology.** Six 512×512 synthetic images with mixed frequency content (smooth gradients, multiple sinusoidal textures, step edges, sensor-like noise) carry a random 128-bit payload with repetition `R = 25` over 8×8 blocks at amplitude `A = 4` gray levels on the `(0,2)` basis. Attacks: a *faithful* JPEG luminance model (per-block 8×8 forward DCT, quantization by the standard table scaled to quality `Q`, dequantize, inverse DCT), additive Gaussian noise, bilinear resize round-trips, and border crops with grid resynchronization. Decoding uses the correlation de-spread of eq. despread.
 
-- **Datasets.** RAISE and Dresden Image Database (real-camera RAW + PRNU baselines); UCID/BOSSbase (spatial stats); standard video sequences (codec tests); held-out diffusion/GAN images (deepfake false-accept test).
-- **Metrics.** PSNR/SSIM (imperceptibility); BER and RS decode success (robustness); false-accept/false-reject (security/reliability); shutter→hash and hash→confirmation latency and on-chain gas (cost); peak-to-correlation energy on the passive PRNU channel (forensic backstop).
-- **Experiments.** (E1) imperceptibility sweep over `α ∈ [0.01,0.05]` and carrier count; (E2) JPEG BER vs. `Q ∈ [50,100]`, locating the safe decode-failure crossover; (E3) video BER vs. H.264/HEVC QP and GOP placement; (E4) security false-accept under deepfake substitution, metadata forgery, re-capture, simulated PRNU-copy — target **zero** false-accepts; (E5) capacity/ECC trade-off; (E6) latency/gas on a public testnet with Merkle batching of `N ∈ {1, 10², 10⁴}`.
-- **Baselines.** Metadata-only C2PA with manifest stripped, and software upload-time hashing — evaluated on survival of metadata removal and transcoding, where PixelRoot's in-pixel binding is expected to dominate.
+**Fidelity.** Embedding is imperceptible: mean **PSNR 40.2 dB, SSIM 0.970**. **Robustness** (Table below): the payload is recovered with **zero** bit errors through JPEG from Q=95 down to Q=10, under Gaussian noise up to σ=20, under bilinear resize to 0.5×/0.75×, under a combined JPEG+resize attack, and under border crops of 1–6% once grid resync covers the shift. **Operating curve**: an amplitude sweep at JPEG Q40 exposes a genuine cliff — detection fails at A=0.5 (58 dB, BER 0.12), is marginal at A=1.0, and error-free from A≥1.5 (≤49 dB), so A=4 (40 dB) operates with comfortable margin. **Security / false-accept**: reading a marked image with 300 wrong keys gives mean BER 0.503 and 0/300 recoveries; the correct-key decoder against 300 *unmarked* images (deepfake stand-in) tested against a claimed payload gives mean BER 0.499 and 0/300 false accepts — matching the `p ≈ ½` bound of Props. 2–3 and the fail-safe goal.
 
-### 9.3 Target outcomes (illustrative — to be validated, *not* measured)
+| Attack | Payload BER | Decode |
+|---|:--:|:--:|
+| None / pristine | 0.000 | 6/6 |
+| JPEG Q95, 90, 80, 70, 60, 50 | 0.000 | 6/6 |
+| JPEG Q40, Q30, Q20, Q10 | 0.000 | 6/6 |
+| Gaussian noise σ=5, 10, 20 | 0.000 | 6/6 |
+| Resize 0.5×, 0.75× | 0.000 | 6/6 |
+| JPEG Q70 + resize 0.75× | 0.000 | 6/6 |
+| Crop 1%, 3%, 6% + resync | 0.000 | decoded |
+| *Wrong-key read* (300 trials) | 0.503 | 0/300 |
+| *Forgery / unmarked* (300 trials) | 0.499 | 0/300 |
 
-| Condition | V1 (hash) | V2 (in-pixel) |
-|---|---|---|
-| Pristine original | pass | BER ≈ 0 |
-| JPEG Q ≥ 90 | fail (re-encode) | decode pass |
-| JPEG Q ≈ 75 | fail | decode pass (RS) |
-| JPEG Q ≲ 60 | fail | Unverified (safe) |
-| Deepfake / synthetic | fail | decode fail |
-| Metadata stripped | via on-chain `h` | decode pass |
+**Amplitude operating curve at JPEG Q40** (4 images) — imperceptibility vs. robustness, showing the graceful failure cliff:
+
+| A (gray) | PSNR (dB) | BER | Decode |
+|:--:|:--:|:--:|:--:|
+| 0.5 | 58.2 | 0.121 | 0/4 |
+| 1.0 | 52.2 | 0.006 | 2/4 |
+| 1.5 | 48.7 | 0.000 | 4/4 |
+| 2.0 | 46.2 | 0.000 | 4/4 |
+| 3.0 | 42.7 | 0.000 | 4/4 |
+
+**Scope and threats to validity.** These results validate the *algorithmic* core — carrier design, spread-spectrum detection, JPEG/noise/resize/crop robustness, and false-accept behavior — independent of silicon. They use synthetic imagery and a luminance-only JPEG model; they do not yet model demosaicing, chroma subsampling, real per-column gain calibration error, lens/optical effects, or the analog photo-electron domain. The harness (`paper/experiments/sim.js`) is released with the prototype for reproduction and extension to real datasets.
+
+### 9.3 Remaining silicon- and codec-dependent validation
+The following require hardware or a full pipeline and are future work: (E1) real-camera datasets (RAISE, Dresden) for content realism and a PRNU baseline; (E2) video robustness vs. H.264/HEVC QP and GOP placement with keyframe-level Merkle commitments; (E3) an end-to-end re-capture and PRNU-copy [Goljan 2011] study; (E4) latency/gas on a public testnet with Merkle batch sizes `N ∈ {1, 10², 10⁴}`; and (E5) a silicon study of per-column/per-region gain modulation on a sensor evaluation board.
 
 ---
 
 ## 10. Discussion: Limitations, Privacy, Standardization
 
-- **Hardware dependency.** Strongest guarantees need sensor + secure-element support; legacy devices can run a software-only attested variant that still notarizes a capture-time hash (à la C2PA/ProofMode) without the hardware-rooted in-pixel binding.
-- **Privacy.** `ID`, time, and location can be PII. We recommend on-chain pseudonyms, optional/omittable and salted location, and selective disclosure, so the public record proves *existence and integrity* without revealing the photographer's identity or precise whereabouts.
-- **Failure-safe semantics.** PixelRoot declines rather than falsely certifies under heavy laundering; downstream policy must treat "unverified" as "unknown," not "fake."
-- **Toward an OEM standard.** The lesson of JPEG [Wallace 1992] and 3GPP is that interoperability comes from a shared standard, not point products. We propose PixelRoot as a cross-OEM capture-provenance profile that (a) fixes payload layout, ECC, and the keyed selection function; (b) reuses C2PA manifests to transport assertions; and (c) standardizes the notarization contract interface, so any platform can verify any vendor's media. Consumer hardware-backed C2PA signing [Google 2025; Truepic 2024] shows the ecosystem is ready for the signing half; PixelRoot adds the in-pixel, ledger-witnessed half.
+- **Hardware dependency and assurance tiers.** Strongest guarantees need per-column/per-region gain + secure-element support (§5.1). We make the trust gradient explicit rather than hiding it, reporting one of three tiers with every verdict: **Tier A (sensor-rooted)** — modulation imposed in the photo-electron domain by gain hardware; **Tier B (ISP-attested)** — identical modulation in an attested ISP on legacy devices, trustworthy only up to the attestation; **Tier C (software/notarize-only)** — a C2PA/ProofMode-style capture-time hash with no in-pixel binding. Verifiers and policies must not conflate tiers.
+- **Privacy-preserving notarization.** A naive design that wrote sensor `ID`, time, and precise GPS to a public, immutable ledger would be actively dangerous for the journalists and activists PixelRoot aims to protect, and would violate data-protection law. PixelRoot keeps **no raw PII on-chain**: (i) the only on-chain object is an opaque Merkle root of SHA-256 commitments; the payload and image live off-chain. (ii) The committed leaf is *salted*, `h = SHA-256(I‖m‖salt)`, so the chain reveals nothing about `m` and identical captures are unlinkable without the salt. (iii) Location is optional, omittable, coarsely quantizable, or replaced by a salted commitment disclosed only under subpoena. (iv) Device identity appears on-chain only as a rotating, secure-element-attested pseudonym, unlinkable without OEM cooperation. (v) A holder can prove properties — "taken by a certified PixelRoot device before block t_b" — via a **zero-knowledge selective-disclosure** proof without revealing `ID`, exact time, or location. Because only opaque hashes are on-chain, the off-chain record can be **deleted to honor a GDPR/erasure request** while the immutable proof-of-existence remains a meaningless digest — squaring immutability with the right to be forgotten. High-risk parties may also defer notarization (commit a sealed hash, disclose context later).
+- **Why a public ledger and not just a timestamping authority?** Proposition 1 only needs a trustworthy append-only timestamp, which an RFC 3161 time-stamping authority (TSA) also provides. We anchor to a public blockchain for properties a single TSA lacks: **no single point of trust/failure** (a compromised or coerced CA can back-date or deny service, and certificate compromise has already forced wholesale revocation in deployed C2PA pipelines); **public, permissionless auditability** without trusting the issuer; and **censorship resistance**, important when the capturing party and the authority are adversaries (conflict zones, state actors). The cost (latency, gas) is amortized to O(1) per capture by Merkle batching (§5.5.1). A **hybrid** is recommended: a TSA countersignature for instant, cheap proof plus periodic blockchain anchoring of the TSA's own roots, as OpenTimestamps does [ProofMode 2023] — PixelRoot treats the ledger as the trust-minimizing anchor and the TSA as a low-latency accelerator.
+- **Failure-safe semantics.** PixelRoot declines rather than falsely certifies under heavy laundering or unsynchronizable geometric edits; downstream policy must treat "unverified" as "unknown," not "fake."
+- **Adoption path and honest efficacy ceiling.** PixelRoot cannot verify media from cameras that never marked it, so its value grows with deployment and is *not* a universal deepfake solution. We propose a phased, backward-compatible rollout: (1) software Tier C in capture apps and the contract today (no hardware change); (2) ISP Tier B via firmware on existing devices; (3) Tier A as OEMs add the modest per-column/per-region gain capability. Throughout, verification is opt-in and additive: unmarked media is labeled "unverified," never penalized as fake, so the system shifts high-stakes workflows (courts, newsrooms, insurance) from "trust until debunked" to "label by provenance" without breaking the long tail of legacy content.
+- **Toward an OEM standard.** The lesson of JPEG [Wallace 1992] and 3GPP is that interoperability comes from a shared standard, not point products. We propose PixelRoot as a cross-OEM capture-provenance profile that (a) fixes payload layout, ECC, the keyed selection function, and the carrier basis; (b) reuses C2PA manifests to transport assertions; and (c) standardizes the notarization contract interface, so any platform can verify any vendor's media. Consumer hardware-backed C2PA signing [Google 2025; Truepic 2024] shows the ecosystem is ready for the signing half; PixelRoot adds the in-pixel, ledger-witnessed half.
 
 ---
 
@@ -398,7 +430,7 @@ The following targets the claims that require silicon and an image pipeline; the
 
 Reactive deepfake detection cannot win a generator-vs-detector arms race, and metadata-only provenance breaks the moment a credential is stripped. PixelRoot relocates the root of trust into the pixels and onto a public ledger: a hardware-anchored, error-corrected, keyed signature embedded by the CMOS sensor at capture, plus a real-time blockchain commitment. This dual binding gives affirmative, publicly verifiable, hardware-rooted proof of authenticity that survives metadata loss and fails safe under laundering. Future work: silicon-level validation on sensors with per-region gain control, codec-aware learned embedding for video [CSTFMark 2026], privacy-preserving selective disclosure, formal modeling of the V2 soft-authenticity score, and pursuing PixelRoot as an open cross-OEM standard. We view this as a foundational — if not all-encompassing — step toward driving deepfake-driven disinformation toward practical irrelevance for media that matters.
 
-**Reproducibility & disclosure.** The reference implementation is part of the open PixelRoot project. On-chain notarization in the current prototype is *simulated* and labeled as such; results reported as "planned" are part of the evaluation roadmap (§9).
+**Reproducibility & disclosure.** The reference implementation and the robustness harness (a self-contained 8×8-DCT JPEG model, attacks, and the spread-spectrum embed/extract of §5.4, in `paper/experiments/sim.js`) are part of the open PixelRoot project; the measured numbers in §9.2 are reproducible from it. On-chain notarization in the current prototype is *simulated* and labeled as such; the silicon- and codec-dependent items in §9.3 are an explicit roadmap, not claimed results.
 
 ---
 

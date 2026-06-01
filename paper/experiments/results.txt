@@ -1,0 +1,41 @@
+=== PixelRoot in-pixel binding: measured robustness ===
+Config                  N=512, blocks=4096, payload=128b, R=25, alpha=N/A,A=4, images=6
+Avg embed PSNR          40.17 dB
+Avg embed SSIM          0.9701
+
+Attack                   BER       decode-success
+none                    0.0000    6/6
+JPEG Q95                0.0000    6/6
+JPEG Q90                0.0000    6/6
+JPEG Q80                0.0000    6/6
+JPEG Q70                0.0000    6/6
+JPEG Q60                0.0000    6/6
+JPEG Q50                0.0000    6/6
+JPEG Q40                0.0000    6/6
+JPEG Q30                0.0000    6/6
+JPEG Q20                0.0000    6/6
+JPEG Q10                0.0000    6/6
+Noise s5                0.0000    6/6
+Noise s10               0.0000    6/6
+Noise s20               0.0000    6/6
+Resize 0.5x             0.0000    6/6
+Resize 0.75x            0.0000    6/6
+JPEG70+Resize0.75       0.0000    6/6
+
+Geometric crop + grid-resync:
+Crop 1% (5px)           BER 0.0000  (decoded)
+Crop 3% (15px)          BER 0.0000  (decoded)
+Crop 6% (31px)          BER 0.0000  (decoded)
+
+Amplitude sweep @ JPEG Q40 (PSNR / BER / success), 4 images:
+A=0.5                   PSNR 58.2dB  BER 0.1211  0/4
+A=1.0                   PSNR 52.2dB  BER 0.0059  2/4
+A=1.5                   PSNR 48.7dB  BER 0.0000  4/4
+A=2.0                   PSNR 46.2dB  BER 0.0000  4/4
+A=3.0                   PSNR 42.7dB  BER 0.0000  4/4
+
+=== security: false-accept / secrecy (300 trials each) ===
+(A) wrong-key mean BER  0.5030  (ideal ~0.5)
+(A) wrong-key accepts   0/300
+(B) forgery mean BER    0.4987  (ideal ~0.5)
+(B) forgery accepts     0/300
