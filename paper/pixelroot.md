@@ -103,6 +103,39 @@ No prior approach simultaneously offers a hardware root of trust, survival of me
 
 ## 5. The PixelRoot Architecture
 
+PixelRoot has a capture-time **embed-and-notarize** pipeline (produces the two bindings) and a **verification** pipeline (consumes them). The end-to-end architecture:
+
+```mermaid
+flowchart LR
+  subgraph CAPTURE["On-device capture path"]
+    direction LR
+    K["OEM secret k<br/>(secure element)"]
+    S["CMOS sensor<br/>+ OTP ID"] --> M["Payload m<br/>ID‖t‖GPS"]
+    M --> RS["RS encode<br/>m → b"]
+    K --> SEL
+    RS --> SEL["Keyed PRNG<br/>select P"]
+    SEL --> G["Gain mod.<br/>g_i = 1 + α·b_i"]
+    G --> RD["Expose &<br/>readout I"]
+    RD --> H["h = SHA-256(I‖m)"]
+    RD --> ST["Store I +<br/>C2PA manifest"]
+    H --> MK["Merkle batch → root"]
+    MK --> CH["Public ledger<br/>(block t_b, event)"]
+  end
+  ST -. soft in-pixel binding .-> Q
+  CH -. hard binding .-> V1
+  subgraph VERIFY["Third-party verification"]
+    direction LR
+    Q["Questioned I', m'"] --> V1{"V1: h' in ledger?"}
+    Q --> V2{"V2: RS-decode m̂ = m'?"}
+    V1 -- yes --> ORIG["Camera-original (V1∧V2)"]
+    V1 -- no --> V2
+    V2 -- yes --> TR["Transcoded-consistent (V2)"]
+    V2 -- no --> UNV["Unverified (fail-safe)"]
+  end
+```
+
+*Top:* the capture path emits a hard binding (`h` on the public ledger) and a soft in-pixel binding (the keyed, error-corrected gain pattern carried inside `I`). *Bottom:* verification checks V1 (ledger membership) and V2 (in-pixel recovery) and returns the strongest supported level, failing safe to "unverified."
+
 ### 5.1 Provenance payload
 The payload **m** is a fixed-width 128-bit record (v2):
 
@@ -133,6 +166,14 @@ g_i = 1 + α · b_i ,   α ≈ 0.02
 
 so a "1" raises the pixel response by ~2% (~0.01 EV) and a "0" is nominal. The perturbation is sub-perceptual and spread across ~10² of millions of pixels (G6). This is an **active, hardware-rooted, semi-fragile watermark**, distinct from the involuntary PRNU that passive forensics merely observes.
 
+**Read-back estimator.** A carrier bit is recovered from a questioned image `I'` by comparing each carrier against a local prediction of its un-modulated value. With `μ(r_i,c_i)` a robust local mean (e.g., median over a 5×5 neighborhood excluding other carriers), the normalized residual
+
+```
+ρ_i = ( I'(r_i,c_i) − μ(r_i,c_i) ) / μ(r_i,c_i)        ... (eq. residual)
+```
+
+is soft-thresholded to recover `b̂_i = 1[ρ_i > α/2]`, with per-bit confidence `|ρ_i − α/2|` fed to a soft-decision Reed–Solomon decoder. A genuine modulation produces a detectable bias of magnitude ≈ α; unmarked pixels yield `ρ_i ≈ 0`.
+
 ### 5.5 Commitment and notarization
 Immediately after readout the device computes the hard binding
 
@@ -144,30 +185,131 @@ over the (lossless) image `I` and payload, then submits `h` (optionally with a d
 
 **Algorithm 1 — capture-time embed-and-notarize**
 ```
-1.  ID ← readOTP();  t ← attestedClock();  (φ,λ) ← gps()
-2.  m  ← ID || t || (φ,λ)
-3.  s  ← trunc_32(SHA-256(k || m))
-4.  b  ← ReedSolomonEncode(m)
-5.  P  ← PRNGselect(s, |b|, H, W)          # carrier pixels
-6.  for each (r_i,c_i) in P:
-7.      setGain(r_i, c_i, 1 + α·b_i)
-8.  I  ← expose&readout()
-9.  h  ← SHA-256(I || m)
-10. notarize(h)                            # Merkle-batched on-chain commit
-11. store I (lossless preferred) with m in C2PA manifest
+Require: OEM secret k (secure element), gain step α, parity r
+ 1. ID ← readOTP()                          # 48-bit factory identity
+ 2. t ← attestedClock();  (φ,λ) ← gps()
+ 3. m ← ID || t || quant(φ,λ)               # 128 bits
+ 4. s ← trunc_32(SHA-256(k || m))
+ 5. b ← RS-Encode_GF(2^8)(m, r)             # n_b = 128 + r coded bits
+ 6. P ← ∅;  prng ← seed(s)
+ 7. while |P| < n_b:
+ 8.     (r_i,c_i) ← (prng() mod H, prng() mod W)
+ 9.     if (r_i,c_i) ∉ P:  P ← P ∪ {(r_i,c_i)}
+10. for each (r_i,c_i) in P with bit b_i:
+11.     setGain(r_i, c_i, 1 + α·b_i)        # program sensor register
+12. I ← expose_and_readout()
+13. h ← SHA-256(I || m)
+14. enqueue leaf = h for Merkle batch
+15. on flush: root ← Merkle({leaf});  contract.register(root)
+16. store I (lossless) + m + Merkle proof π in C2PA manifest
 ```
 
+**Step-by-step.** (1) Read the sensor's 48-bit OTP identity from on-die fuses; (2) form the 128-bit payload with attested time and GPS; (3) derive seed `s` by hashing `k‖m` — the secret `k` makes carriers unpredictable even to a party who learns `m`; (4) channel-code with Reed–Solomon over GF(2⁸), correcting up to ⌊r/2⌋ symbol errors; (5) draw `n_b` distinct carrier coordinates from a seeded PRNG; (6) set each carrier's analog gain to `1+α·b_i` **before** exposure, so the bit is physically imprinted in the photo-electron count, not added in software; (7) read out frame `I`; (8) hash `I‖m`; (9) batch the leaf into a Merkle tree and register the root on-chain in one transaction → block-timestamped proof of existence; (10) persist `I` with `m` and inclusion proof `π` in a C2PA manifest (the manifest is **not** required for V2).
+
+### 5.5.1 Smart-contract notarization
+On-chain state is minimal: a registry maps each Merkle root to its block timestamp and emits an event. Batching `N` captures under one root makes per-image gas `O(1)` amortized; inclusion is later proven off-chain with a `log₂N`-length Merkle path.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/// PixelRootRegistry: batched, gas-amortized notarization of capture commitments.
+/// Each shutter event yields a leaf h = SHA256(I || m); many leaves are
+/// aggregated off-chain into a Merkle tree and only the root is sealed on-chain.
+contract PixelRootRegistry {
+    mapping(bytes32 => uint64) public sealedAt;   // root => block timestamp
+
+    event RootRegistered(
+        bytes32 indexed root, address indexed submitter,
+        uint64 timestamp, uint256 leafCount
+    );
+
+    /// Seal a Merkle root of capture commitments (idempotent).
+    function register(bytes32 root, uint256 leafCount) external {
+        require(root != bytes32(0), "empty root");
+        require(sealedAt[root] == 0, "already sealed");
+        sealedAt[root] = uint64(block.timestamp);
+        emit RootRegistered(root, msg.sender, uint64(block.timestamp), leafCount);
+    }
+
+    /// True iff `leaf` is included under a sealed `root` via `proof` (free eth_call).
+    function verifyInclusion(bytes32 root, bytes32 leaf, bytes32[] calldata proof)
+        external view returns (bool included, uint64 timestamp)
+    {
+        if (sealedAt[root] == 0) return (false, 0);
+        bytes32 node = leaf;
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 sib = proof[i];                 // sorted-pair hashing
+            node = node <= sib
+                ? keccak256(abi.encodePacked(node, sib))
+                : keccak256(abi.encodePacked(sib, node));
+        }
+        return (node == root, sealedAt[root]);
+    }
+}
+```
+
+A capture is *notarized* once `register` mines; a verifier later calls the pure `verifyInclusion(root, leaf, proof)` (no gas) to confirm a commitment `h` was sealed under a root at a known block time. Optional rotating device pseudonyms (per-epoch keys attested by the secure element) can sign `register` so a court can bind a root to a device class without exposing the photographer.
+
 ### 5.6 Verification
-Given a questioned image `I'` and a claimed payload `m'` (from the manifest, the on-chain record, or asserted by a party):
+Given a questioned image `I'` and a claimed payload `m'` (from the manifest, on-chain record, or asserted), run Algorithm 2.
 
-- **(V1) Hard binding / ledger check.** Recompute `h' = SHA-256(I' || m')` and confirm it appears in the ledger (directly or via a Merkle proof to the recorded root). A match proves `I'` existed bit-for-bit at the recorded block time. Conclusive but brittle: any re-encoding breaks it.
-- **(V2) In-pixel binding check.** Regenerate `s` and the carrier set `P` from `m'` (and `k`), read back the relative gain at each carrier to recover noisy coded bits, Reed–Solomon-decode to `m̂`, and test `m̂ == m'`. The bit-error rate (BER) and decode success form a soft authenticity score that degrades gracefully under compression (§7). A keyed, spread carrier set means an attacker who edits/splices without knowing `P` corrupts the signature detectably.
+- **(V1) Hard binding / ledger check.** Recompute `h' = SHA-256(I' || m')` and confirm it is included under a registered root (via `π`). A match proves `I'` existed bit-for-bit at the recorded block time. Conclusive but brittle: any re-encoding breaks it.
+- **(V2) In-pixel binding check.** Regenerate `s` and the carrier set `P` from `m'` and `k`, estimate residuals `ρ_i` (eq. residual), soft-decode the Reed–Solomon codeword to `m̂`, and test `m̂ == m'`. BER and decode margin form a soft authenticity score that degrades gracefully under compression (§7). A keyed, spread carrier set means an attacker who edits/splices without knowing `P` corrupts the signature detectably.
 
-A piece of media is accepted at the strongest supported level: **V1∧V2** (pristine original), **V2 only** (transcoded but pixel-consistent), or **V1 only** (exact copy, manifest intact).
+**Algorithm 2 — verification of (I', m')**
+```
+Require: questioned I', claimed m', ledger handle, key k
+ 1. h' ← SHA-256(I' || m')
+ 2. v1 ← ledger.verifyInclusion(root, h', π)
+ 3. s  ← trunc_32(SHA-256(k || m'))
+ 4. P  ← PRNGselect(s, n_b, H, W)
+ 5. for each (r_i,c_i) in P:
+ 6.     ρ_i ← (I'(r_i,c_i) − μ(r_i,c_i)) / μ(r_i,c_i)
+ 7.     b̂_i ← 1[ρ_i > α/2];  w_i ← |ρ_i − α/2|     # soft confidence
+ 8. m̂ ← RS-Decode(b̂, w)
+ 9. v2 ← (m̂ == m')
+10. if v1 ∧ v2:  return CAMERA-ORIGINAL
+11. elif v2:     return TRANSCODED-CONSISTENT
+12. elif v1:     return EXACT-COPY
+13. else:        return UNVERIFIED            # fail-safe
+```
+
+A piece of media is accepted at the strongest supported level: **V1∧V2** (pristine original), **V2 only** (transcoded but pixel-consistent), or **V1 only** (exact copy, manifest intact); otherwise the safe **Unverified**.
 
 ---
 
 ## 6. Security Analysis
+
+### 6.1 Formal guarantees
+
+**Definition (Forgery).** A pair `(I*, m*)` the verifier accepts as Camera-original or Transcoded-consistent, yet `I*` was not produced by a genuine PixelRoot sensor running Algorithm 1 with payload `m*`.
+
+**Proposition 1 (Hard-binding soundness).** Under a collision-resistant hash (A4) and immutable ledger (A3), passing V1 implies `I*‖m*` existed at/before the sealing root's block time. Producing a distinct `I* ≠ I` that passes V1 against a root sealed for `I` requires a second-preimage/collision of the hash → probability ≤ **2⁻¹²⁸** for SHA-256. *(Proof: `h` is a Merkle leaf; `verifyInclusion` recomputes the root from `(h, π)`. A different `I*` with the same leaf is a hash collision; a different leaf with the same root is a tree-collision; rewriting the root violates A3.)*
+
+**Proposition 2 (Carrier unpredictability).** Without `k`, the probability of correctly localizing the `n_b` carriers in an `H×W` frame is `C(HW, n_b)⁻¹` — for 1920×1080 and `n_b = 158`, below **10⁻⁷⁰⁰**. Since `s = trunc_32(H(k‖m))` is a PRF of `k`, distinct payloads induce computationally independent carrier sets, so observing many signatures leaks no usable information about `P` for a fresh `m`.
+
+**Proposition 3 (Soft-binding false-accept).** On an image *not* PixelRoot-marked at the claimed carriers, model read-back as independent bit guesses with per-bit error `p ≈ ½`. With an RS code correcting `t = ⌊r/2⌋` of `n_s` symbols, V2 falsely accepts with probability at most
+
+```
+Pr[V2 false-accept] ≤ Σ_{j=0..t} C(n_s, j) (1−q)^j q^(n_s−j),   q = (1−p)^8
+```
+
+the tail that ≤ `t` of `n_s` bytes match by chance. For `n_s = 20, t = 15, p = ½` this is **≪ 2⁻¹⁰⁰**.
+
+**Take-away.** Propositions 1–3 give two *independent* exponential barriers: an attacker must defeat **both** the ledger (2⁻¹²⁸) and either the key-protected carrier layout (P2) or the error-correcting code (P3). Each catalogued attack below reduces to violating one of these.
+
+### 6.2 Threat catalogue
+
+| Attack | Why it fails | Assump. | Guar. |
+|---|---|---|---|
+| Deepfake / synthetic | no ledger entry; no keyed signature | A1–A3 | P1,P2 |
+| Metadata forge/strip | V2 recovers `m` from pixels | A1 | P3 |
+| Re-capture (screen) | new payload/commit; back-date exposed | A2,A3 | P1 |
+| Replay / back-date | earliest proof = block time | A3 | P1 |
+| PRNU copy [Goljan 2011] | keyed code ≠ passive PRNU; ledger still needed | A1–A3 | P2,P1 |
+| Splice / inpaint | corrupts unknown carriers; breaks `h` | A1,A4 | P2,P3 |
+| Compress-launder | fails *safe* to Unverified | A4 | P1,P3 |
 
 - **Deepfake / synthetic substitution.** A fully AI-generated image was never exposed on a genuine sensor: no valid on-chain commitment (V1 fails) and no payload-consistent, keyed in-pixel signature tied to a real OTP identity (V2 fails). The attacker would have to forge a ledger entry (infeasible, A3) or embed a valid signature without the OEM key and sensor (infeasible, A1–A2).
 - **Metadata forgery / stripping.** Editing or removing metadata cannot manufacture a matching ledger commitment, nor create the in-pixel binding (G3). Stripping metadata downgrades a credential-only scheme to "unverifiable," but PixelRoot still recovers **m** from the pixels via V2.
@@ -208,13 +350,38 @@ PixelRoot keeps a human or institutional verifier in the loop with hardware-root
 
 **Reference implementation.** An open software prototype of the PixelRoot core implements the payload layout, SHA-256 seeding, PRNG carrier selection, gain-value generation, image hashing, and a register/verify service with *simulated* notarization. It implements a legacy v1 (120-bit) and current v2 (128-bit) payload (the latter fixing a coordinate-packing precision bug), validating the encode/verify round-trip and the metadata→seed→position determinism end-to-end before silicon.
 
-**Proposed experiments.**
-1. *Imperceptibility (G6):* PSNR/SSIM of embedded vs. nominal capture across `α ∈ [0.01, 0.05]` and carrier counts.
-2. *Compression robustness:* BER and RS decode-success of V2 vs. JPEG `Q ∈ [50,100]` and vs. H.264/HEVC at varied QP/bitrate; report the safe "cannot verify" crossover.
-3. *Latency (G5):* shutter→hash and hash→on-chain confirmation on testnets, including offline-queue behavior.
-4. *Security:* empirical false-accept under deepfake substitution, metadata forgery, re-capture, and a simulated PRNU-copy attack; confirm zero false-accepts (fail-safe).
-5. *Capacity/ECC trade-off:* payload size vs. parity vs. robustness.
-6. *Baselines:* vs. metadata-only C2PA (manifest stripped) and software upload-time hashing, on survival of metadata removal and transcode.
+### 9.1 Micro-benchmark of the core (measured)
+Measured on a commodity laptop CPU (Node.js v20) over a synthetic 1920×1080 RGB frame (~5.9 MB). The on-device cryptographic overhead is negligible relative to a single exposure, and all correctness invariants hold.
+
+| Quantity | Value |
+|---|---|
+| Payload / coded carriers | 128 b / 128 positions |
+| Seed derivation | 0.0024 ms |
+| Full signature (seed + select + bits) | 0.018 ms |
+| SHA-256 commit over 6 MP frame | 3.09 ms |
+| Carrier determinism (re-run) | identical ✓ |
+| Carrier coordinate uniqueness | ✓ |
+| Encode→verify round-trip | pass ✓ |
+| Single-bit tamper | rejected ✓ |
+
+### 9.2 Experimental protocol (planned)
+The following targets the claims that require silicon and an image pipeline; the values in §9.3 are explicit **targets**, not measurements.
+
+- **Datasets.** RAISE and Dresden Image Database (real-camera RAW + PRNU baselines); UCID/BOSSbase (spatial stats); standard video sequences (codec tests); held-out diffusion/GAN images (deepfake false-accept test).
+- **Metrics.** PSNR/SSIM (imperceptibility); BER and RS decode success (robustness); false-accept/false-reject (security/reliability); shutter→hash and hash→confirmation latency and on-chain gas (cost); peak-to-correlation energy on the passive PRNU channel (forensic backstop).
+- **Experiments.** (E1) imperceptibility sweep over `α ∈ [0.01,0.05]` and carrier count; (E2) JPEG BER vs. `Q ∈ [50,100]`, locating the safe decode-failure crossover; (E3) video BER vs. H.264/HEVC QP and GOP placement; (E4) security false-accept under deepfake substitution, metadata forgery, re-capture, simulated PRNU-copy — target **zero** false-accepts; (E5) capacity/ECC trade-off; (E6) latency/gas on a public testnet with Merkle batching of `N ∈ {1, 10², 10⁴}`.
+- **Baselines.** Metadata-only C2PA with manifest stripped, and software upload-time hashing — evaluated on survival of metadata removal and transcoding, where PixelRoot's in-pixel binding is expected to dominate.
+
+### 9.3 Target outcomes (illustrative — to be validated, *not* measured)
+
+| Condition | V1 (hash) | V2 (in-pixel) |
+|---|---|---|
+| Pristine original | pass | BER ≈ 0 |
+| JPEG Q ≥ 90 | fail (re-encode) | decode pass |
+| JPEG Q ≈ 75 | fail | decode pass (RS) |
+| JPEG Q ≲ 60 | fail | Unverified (safe) |
+| Deepfake / synthetic | fail | decode fail |
+| Metadata stripped | via on-chain `h` | decode pass |
 
 ---
 

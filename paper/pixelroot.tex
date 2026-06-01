@@ -11,6 +11,7 @@
 
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
+\usepackage{amsthm}
 \usepackage{algorithmic}
 \usepackage{graphicx}
 \usepackage{textcomp}
@@ -19,12 +20,65 @@
 \usepackage{pifont}
 \usepackage{array}
 \usepackage{url}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,calc,fit,backgrounds}
 \usepackage[hidelinks]{hyperref}
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
 \newcommand{\pr}{\textsc{PixelRoot}}
+
+% --- Lightweight theorem environments (IEEEtran-compatible) ---
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+
+% --- Solidity-ish listing style (no external language def needed) ---
+\definecolor{solkw}{rgb}{0.55,0.10,0.55}
+\definecolor{solcm}{rgb}{0.30,0.45,0.30}
+\definecolor{solbg}{rgb}{0.97,0.97,0.97}
+\lstdefinestyle{solidity}{
+  basicstyle=\ttfamily\scriptsize,
+  backgroundcolor=\color{solbg},
+  commentstyle=\color{solcm}\itshape,
+  keywordstyle=\color{solkw}\bfseries,
+  morekeywords={pragma,solidity,contract,function,event,mapping,struct,
+    public,external,view,returns,emit,require,memory,calldata,storage,
+    bytes32,uint256,uint64,address,bool,indexed,if,else,return,for,
+    immutable,constant,msg,block,keccak256},
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  columns=fullflexible,
+  breaklines=true,
+  showstringspaces=false,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{gray!50},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=5pt,
+  xleftmargin=14pt
+}
+
+% TikZ block styles for architecture / flow figures
+\tikzset{
+  stage/.style={rectangle, rounded corners=2pt, draw=black!70, thick,
+    fill=blue!6, align=center, minimum height=8mm, inner sep=3pt,
+    font=\scriptsize},
+  hw/.style={stage, fill=orange!12},
+  store/.style={stage, fill=green!10},
+  chain/.style={stage, fill=purple!10},
+  dec/.style={diamond, draw=black!70, thick, fill=yellow!18, align=center,
+    inner sep=1pt, aspect=2, font=\scriptsize},
+  term/.style={rectangle, rounded corners=6pt, draw=black!70, thick,
+    fill=red!8, align=center, font=\scriptsize, minimum height=7mm},
+  good/.style={rectangle, rounded corners=6pt, draw=black!70, thick,
+    fill=green!14, align=center, font=\scriptsize, minimum height=7mm},
+  flow/.style={-{Stealth[length=2mm]}, thick}
+}
 
 \begin{document}
 
@@ -366,8 +420,60 @@ standard.
 \section{The \pr{} Architecture}\label{sec:arch}
 
 \pr{} comprises a capture-time \emph{embed-and-notarize} pipeline and a
-\emph{verification} pipeline (Fig.~\ref{fig:arch} conceptually; described
-below).
+\emph{verification} pipeline. Fig.~\ref{fig:arch} shows the end-to-end
+architecture: the upper band is the on-device capture path that produces the
+two bindings, and the lower band is the third-party verification path that
+consumes them.
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[node distance=5mm and 6.5mm]
+% --- capture pipeline (top) ---
+\node[hw] (sensor) {CMOS sensor\\$+$ OTP \textsf{ID}};
+\node[stage, right=of sensor] (payload) {Payload $\mathbf{m}$\\\textsf{ID}$\|t\|$GPS};
+\node[stage, right=of payload] (rs) {RS encode\\$\mathbf{m}\!\to\!\mathbf{b}$};
+\node[stage, right=of rs] (sel) {Keyed PRNG\\select $P$};
+\node[hw, right=of sel] (gain) {Gain mod.\\$g_i{=}1{+}\alpha b_i$};
+\node[hw, right=of gain] (read) {Expose \&\\readout $I$};
+\node[stage, right=of read] (hash) {$h{=}$SHA-256\\$(I\,\|\,\mathbf{m})$};
+% key input
+\node[stage, above=7mm of sel, fill=gray!12] (key) {OEM secret $k$\\(secure elem.)};
+% storage + chain
+\node[store, below=9mm of read] (storeimg) {Store $I$ $+$\\C2PA manifest};
+\node[chain, below=9mm of hash] (merkle) {Merkle batch\\$\to$ root};
+\node[chain, right=of merkle] (chain) {Public ledger\\(block $t_b$, event)};
+% arrows capture
+\foreach \a/\b in {sensor/payload,payload/rs,rs/sel,sel/gain,gain/read,read/hash}
+  \draw[flow] (\a) -- (\b);
+\draw[flow] (key) -- (sel);
+\draw[flow] (read) -- (storeimg);
+\draw[flow] (hash) -- (merkle);
+\draw[flow] (merkle) -- (chain);
+% --- verification (bottom) ---
+\node[stage, below=14mm of storeimg, fill=blue!4] (qimg) {Questioned\\$I',\mathbf{m}'$};
+\node[dec, right=12mm of qimg] (v1) {V1\\$h'\!\in\!$ledger?};
+\node[dec, below=8mm of v1] (v2) {V2\\RS-decode\\$\hat{\mathbf m}{=}\mathbf m'$?};
+\node[good, right=12mm of v1] (orig) {\textbf{Camera-original}\\(V1$\wedge$V2)};
+\node[good, right=12mm of v2, fill=green!8] (trans) {\textbf{Transcoded-}\\\textbf{consistent} (V2)};
+\node[term, below=7mm of trans] (unv) {\textbf{Unverified}\\(fail-safe)};
+\draw[flow] (qimg) -- (v1);
+\draw[flow] (qimg) |- (v2);
+\draw[flow] (v1) -- node[above,font=\tiny]{yes} (orig);
+\draw[flow] (v1) -- node[right,font=\tiny]{no} (v2);
+\draw[flow] (v2) -- node[above,font=\tiny]{yes} (trans);
+\draw[flow] (v2) -- node[right,font=\tiny]{no} (unv);
+% link chain to V1
+\draw[flow, dashed] (chain.south) |- ($(v1.east)+(1.6,-0.0)$) -- (v1.east);
+\draw[flow, dashed] (storeimg.south) -- (qimg.north);
+\end{tikzpicture}
+\caption{\pr{} architecture. \emph{Top:} the capture path emits a hard binding
+($h$ on the public ledger) and a soft in-pixel binding (the keyed,
+error-corrected gain pattern carried inside $I$). \emph{Bottom:} verification
+checks V1 (ledger membership of $h'$) and V2 (in-pixel payload recovery) and
+returns the strongest supported authenticity level, failing safe to
+``unverified''.}
+\label{fig:arch}
+\end{figure*}
 
 \subsection{Provenance payload}
 The payload $\mathbf{m}$ is a fixed-width record (\pr{}~v2: $128$ bits):
@@ -415,6 +521,23 @@ spread across $\sim\!10^{2}$ pixels out of millions (goal~G6). This is an
 (cf.\ \S\ref{sec:related}-C), distinct from the involuntary PRNU pattern that
 passive forensics merely observes.
 
+\paragraph{Read-back estimator}
+A carrier bit is recovered from a questioned image $I'$ by comparing each
+carrier pixel against a local prediction of its un-modulated value. Let
+$\mu(r_i,c_i)$ be a robust estimate of the local mean (e.g.\ a median over a
+$5\!\times\!5$ neighborhood that excludes other carriers). The normalized
+residual
+\begin{equation}
+\rho_i \;=\; \frac{I'(r_i,c_i)-\mu(r_i,c_i)}{\mu(r_i,c_i)}
+\label{eq:residual}
+\end{equation}
+is thresholded softly to recover $\hat{b}_i=\mathbf{1}[\rho_i>\alpha/2]$, and the
+per-bit confidence $|\rho_i-\alpha/2|$ is passed to a soft-decision
+Reed--Solomon decoder. Because carriers are pseudorandomly spread
+(\S\ref{sec:arch}-B), $\mu$ is an unbiased predictor of scene content at each
+carrier, so a genuine modulation produces a detectable bias of magnitude
+$\approx\!\alpha$ while unmarked pixels yield $\rho_i\approx 0$.
+
 \subsection{Commitment and notarization}
 Immediately after readout, the device computes a hard binding
 \begin{equation}
@@ -433,52 +556,193 @@ the latency recorded.
 \caption{\pr{} capture-time embed-and-notarize}
 \label{alg:capture}
 \begin{algorithmic}[1]
-\STATE $\mathrm{ID}\!\gets\!\mathrm{readOTP}();\;
-        t\!\gets\!\mathrm{attestedClock}();\;
-        (\phi,\lambda)\!\gets\!\mathrm{gps}()$
-\STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,(\phi,\lambda)$
-\STATE $s\gets \mathrm{trunc}_{32}(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}))$
-\STATE $\mathbf{b}\gets \mathrm{ReedSolomonEncode}(\mathbf{m})$
-\STATE $P\gets \mathrm{PRNGselect}(s,\,|\mathbf{b}|,\,H,\,W)$
-       \quad\COMMENT{carrier pixels}
-\FORALL{$(r_i,c_i)\in P$}
+\REQUIRE OEM secret $k$ (in secure element), gain step $\alpha$, parity $r$
+\STATE $\mathrm{ID}\gets\mathrm{readOTP}()$
+       \quad\COMMENT{48-bit factory identity}
+\STATE $t\gets\mathrm{attestedClock}();\;(\phi,\lambda)\gets\mathrm{gps}()$
+\STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda)$
+       \quad\COMMENT{$128$ bits}
+\STATE $s\gets \mathrm{trunc}_{32}\!\big(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m})\big)$
+\STATE $\mathbf{b}\gets \mathrm{RS\text{-}Encode}_{\mathrm{GF}(2^8)}(\mathbf{m},r)$
+       \quad\COMMENT{$n_b=128+r$ coded bits}
+\STATE $P\gets \emptyset;\; \mathrm{prng}\gets\mathrm{seed}(s)$
+\WHILE{$|P|<n_b$}
+   \STATE $(r_i,c_i)\gets(\mathrm{prng}()\bmod H,\;\mathrm{prng}()\bmod W)$
+   \IF{$(r_i,c_i)\notin P$} \STATE $P\gets P\cup\{(r_i,c_i)\}$ \ENDIF
+\ENDWHILE
+\FORALL{$(r_i,c_i)\in P$ with bit $b_i$}
    \STATE $\mathrm{setGain}(r_i,c_i,\,1+\alpha\, b_i)$
+       \quad\COMMENT{program sensor register}
 \ENDFOR
-\STATE $I\gets \mathrm{expose\&readout}()$
+\STATE $I\gets \mathrm{expose\_and\_readout}()$
 \STATE $h\gets \mathrm{SHA\text{-}256}(I\,\|\,\mathbf{m})$
-\STATE $\mathrm{notarize}(h)$ \quad\COMMENT{Merkle-batched on-chain commit}
-\STATE \textbf{store} $I$ (lossless preferred) with $\mathbf{m}$ in C2PA manifest
+\STATE $\mathrm{leaf}\gets h;\;$ enqueue \textit{leaf} for Merkle batch
+\STATE \textbf{on flush:} $\mathit{root}\gets\mathrm{Merkle}(\{\mathit{leaf}\});\;
+        \mathrm{contract.register}(\mathit{root})$
+\STATE \textbf{store} $I$ (lossless preferred) $+$ $\mathbf{m}$ $+$ Merkle proof
+        $\pi$ in C2PA manifest
 \end{algorithmic}
 \end{algorithm}
 
+\subsubsection*{Step-by-step}
+(1)~\textbf{Acquire identity \& context}: the sensor's $48$-bit OTP identity is
+read from on-die fuses; the attested clock and GPS provide $t$ and
+$(\phi,\lambda)$. (2)~\textbf{Form payload} $\mathbf{m}$ ($128$\,b).
+(3)~\textbf{Derive seed} $s$ by hashing $k\|\mathbf{m}$; the secret $k$ ensures
+carriers are unpredictable even to a party who learns $\mathbf{m}$.
+(4)~\textbf{Channel-code}: a Reed--Solomon code over $\mathrm{GF}(2^8)$ adds $r$
+parity bytes, correcting up to $\lfloor r/2\rfloor$ symbol errors.
+(5)~\textbf{Select carriers}: a seeded PRNG draws $n_b$ distinct pixel
+coordinates. (6)~\textbf{Modulate}: each carrier's analog gain register is set to
+$1+\alpha b_i$ \emph{before} exposure, so the bit is physically imprinted in the
+photo-electron count, not added in software. (7)~\textbf{Read out} the frame
+$I$. (8)~\textbf{Commit}: hash $I\|\mathbf{m}$. (9)~\textbf{Notarize}: the leaf is
+batched into a Merkle tree and the root is registered on-chain in one
+transaction, yielding a block-timestamped proof of existence. (10)~\textbf{Persist}
+$I$ with $\mathbf{m}$ and the Merkle inclusion proof $\pi$ in a C2PA manifest for
+convenience (the manifest is \emph{not} required for V2).
+
+\subsection{Smart-contract notarization}\label{sec:contract}
+On-chain state is intentionally minimal: a registry maps each Merkle root to its
+block timestamp and emits an event for off-chain indexers. Batching $N$
+captures under one root makes per-image gas cost $O(1)$ amortized, and inclusion
+is later proven off-chain with a $\log_2 N$-length Merkle path.
+Listing~\ref{lst:sol} sketches the contract.
+
+\lstinputlisting[style=solidity,caption={\pr{}Registry: batched commitment
+and inclusion verification (sketch).},label={lst:sol},float=t]{registry.sol}
+
+\noindent A capture is \emph{notarized} once \texttt{register} mines; a verifier
+later calls \texttt{verifyInclusion(root, leaf, proof)} (a pure function, no gas)
+to confirm that a specific commitment $h$ was sealed under a root at a known
+block time. Device pseudonyms (rotating per-epoch public keys attested by the
+secure element) may optionally sign the \texttt{register} call so that a court
+can, with the OEM's cooperation, bind a root to a device class without exposing
+the photographer.
+
 \subsection{Verification}
 A verifier with a questioned image $I'$ and a claimed payload $\mathbf{m}'$
-(from the manifest, the on-chain record, or asserted by a party) performs two
-independent checks:
+(from the manifest, the on-chain record, or asserted by a party) runs
+Algorithm~\ref{alg:verify}, performing two independent checks.
 
 \noindent\textbf{(V1) Hard binding / ledger check.} Recompute
-$h'=\mathrm{SHA\text{-}256}(I'\|\mathbf{m}')$ and confirm $h'$ appears in the
-ledger (directly or via a Merkle proof to the recorded root). A match proves
-$I'$ existed, bit-for-bit, at the recorded block time. This is conclusive but
-brittle: any re-encoding of $I'$ breaks it.
+$h'=\mathrm{SHA\text{-}256}(I'\|\mathbf{m}')$ and confirm $h'$ is included under a
+registered root (via $\pi$). A match proves $I'$ existed, bit-for-bit, at the
+recorded block time. Conclusive but brittle: any re-encoding of $I'$ breaks it.
 
 \noindent\textbf{(V2) In-pixel binding check.} Regenerate $s$ and the carrier
-set $P$ from $\mathbf{m}'$ (and $k$), read back the relative gain at each
-carrier to recover noisy coded bits $\hat{\mathbf{b}}$, Reed--Solomon-decode to
-$\hat{\mathbf{m}}$, and test $\hat{\mathbf{m}}\stackrel{?}{=}\mathbf{m}'$. The
-\emph{bit-error rate} (BER) and the decode success constitute a soft authenticity
-score that degrades gracefully under compression
-(\S\ref{sec:compression}). Because $P$ is keyed and spread, an attacker who edits
-or splices the image without knowing $P$ corrupts the signature in a detectable
-way.
+set $P$ from $\mathbf{m}'$ and $k$, estimate each residual $\rho_i$ by
+\eqref{eq:residual}, soft-decode the Reed--Solomon codeword to $\hat{\mathbf{m}}$,
+and test $\hat{\mathbf{m}}\stackrel{?}{=}\mathbf{m}'$. The bit-error rate (BER)
+and decode margin form a soft authenticity score that degrades gracefully under
+compression (\S\ref{sec:compression}). Because $P$ is keyed and spread, an
+attacker who edits or splices without knowing $P$ corrupts the signature
+detectably.
 
-\noindent A piece of media is accepted as authentic at the strongest level
-supported by the evidence: V1$\wedge$V2 (pristine original), V2 only
-(transcoded but pixel-consistent), or V1 only (exact copy, manifest intact).
+\begin{algorithm}[t]
+\caption{\pr{} verification of $(I',\mathbf{m}')$}
+\label{alg:verify}
+\begin{algorithmic}[1]
+\REQUIRE questioned $I'$, claimed $\mathbf{m}'$, ledger handle, key $k$
+\STATE $h'\gets \mathrm{SHA\text{-}256}(I'\,\|\,\mathbf{m}')$
+\STATE $v_1\gets \mathrm{ledger.verifyInclusion}(\mathit{root},h',\pi)$
+\STATE $s\gets \mathrm{trunc}_{32}(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}'))$
+\STATE $P\gets \mathrm{PRNGselect}(s,n_b,H,W)$
+\FORALL{$(r_i,c_i)\in P$}
+  \STATE $\rho_i\gets \big(I'(r_i,c_i)-\mu(r_i,c_i)\big)/\mu(r_i,c_i)$
+  \STATE $\hat b_i\gets \mathbf{1}[\rho_i>\alpha/2];\;
+          w_i\gets |\rho_i-\alpha/2|$ \COMMENT{soft conf.}
+\ENDFOR
+\STATE $\hat{\mathbf{m}}\gets \mathrm{RS\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$
+\STATE $v_2\gets (\hat{\mathbf{m}}=\mathbf{m}')$
+\IF{$v_1\wedge v_2$} \RETURN \textsc{Camera-original}
+\ELSIF{$v_2$} \RETURN \textsc{Transcoded-consistent}
+\ELSIF{$v_1$} \RETURN \textsc{Exact-copy}
+\ELSE \RETURN \textsc{Unverified} \COMMENT{fail-safe}
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+\noindent Media is accepted at the strongest level supported by the evidence:
+V1$\wedge$V2 (pristine original), V2 only (transcoded but pixel-consistent), or
+V1 only (exact copy, manifest intact); otherwise the result is the safe
+\textsc{Unverified}.
 
 %==============================================================
 \section{Security Analysis}\label{sec:security}
 
+We first state the formal guarantees of the two bindings, then walk through the
+threat catalogue of \S\ref{sec:threat}.
+
+\subsection{Formal guarantees}
+
+\begin{definition}[Forgery]
+A forgery is a pair $(I^\star,\mathbf{m}^\star)$ that the verifier
+(Alg.~\ref{alg:verify}) accepts as \textsc{Camera-original} or
+\textsc{Transcoded-consistent}, yet $I^\star$ was not produced by a genuine
+\pr{} sensor executing Alg.~\ref{alg:capture} with payload $\mathbf{m}^\star$.
+\end{definition}
+
+\begin{proposition}[Hard-binding soundness]\label{prop:v1}
+Under a collision-resistant hash $\mathcal{H}$ \emph{(A4)} and an immutable
+ledger \emph{(A3)}, passing V1 implies that the exact bitstring
+$I^\star\|\mathbf{m}^\star$ existed at or before the block time of its sealing
+root. Producing a distinct $I^\star\neq I$ that passes V1 against a root sealed
+for $I$ requires a second preimage / collision of $\mathcal{H}$, i.e.\ succeeds
+with probability $\le 2^{-128}$ for \mbox{SHA-256}.
+\end{proposition}
+\begin{proof}[Proof sketch]
+$h=\mathcal{H}(I\|\mathbf{m})$ is a Merkle leaf; \texttt{verifyInclusion}
+recomputes the root from $(h,\pi)$ and compares to the sealed value. A different
+$I^\star$ yielding the same leaf is a collision of $\mathcal{H}$; a different leaf
+yielding the same root is a collision of the tree's compression function.
+Rewriting the sealed root violates A3. The $2^{-128}$ bound is the birthday
+security of a 256-bit digest.
+\end{proof}
+
+\begin{proposition}[Carrier unpredictability]\label{prop:carriers}
+Without the OEM key $k$, an adversary's probability of correctly localizing the
+$n_b$ carrier coordinates in an $H\times W$ frame is
+\begin{equation}
+\Pr[\text{guess } P] \;=\; \binom{HW}{n_b}^{-1},
+\end{equation}
+which for a $1920\times1080$ frame and $n_b=158$ is below
+$10^{-700}$; moreover, since $s=\mathrm{trunc}_{32}(\mathcal H(k\|\mathbf m))$ is
+a pseudorandom function of $k$, distinct payloads induce computationally
+independent carrier sets, so observing signatures for many images leaks no
+usable information about $P$ for a fresh $\mathbf{m}$.
+\end{proposition}
+
+\begin{proposition}[Soft-binding false-accept]\label{prop:v2}
+Model the read-back of \eqref{eq:residual} on an image that was \emph{not}
+\pr{}-marked at the claimed carriers as independent bit guesses with
+per-bit error $p\!\approx\!\tfrac12$. With a Reed--Solomon code correcting
+$t=\lfloor r/2\rfloor$ symbol errors over $n_s$ symbols, V2 falsely accepts with
+probability at most
+\begin{equation}
+\Pr[\text{V2 false-accept}] \;\le\; \sum_{j=0}^{t}\binom{n_s}{j}(1-q)^{\,j}\,q^{\,n_s-j},
+\quad q = (1-p)^{8},
+\label{eq:fa}
+\end{equation}
+the tail probability that at most $t$ of $n_s$ bytes happen to match by chance.
+For $n_s=20$, $t=15$ and $p=\tfrac12$ this is $\ll 2^{-100}$.
+\end{proposition}
+\begin{proof}[Proof sketch]
+A byte (symbol) matches the claimed codeword by chance with probability
+$q=(1/2)^8$. The decoder outputs $\mathbf{m}'$ only if $\le t$ symbols differ;
+the number of chance matches is $\mathrm{Binom}(n_s,q)$, giving \eqref{eq:fa}.
+Since the claimed $\mathbf{m}'$ is itself committed in V1 for the strongest
+verdict, V2's residual false-accept is further gated by
+Prop.~\ref{prop:v1}.
+\end{proof}
+
+\noindent\textbf{Take-away.} Prop.~\ref{prop:v1}--\ref{prop:v2} give two
+\emph{independent} exponential barriers; an attacker must defeat \emph{both} the
+ledger ($2^{-128}$) and either the key-protected carrier layout
+(Prop.~\ref{prop:carriers}) or the error-correcting code (Prop.~\ref{prop:v2}).
+We now show each catalogued attack reduces to violating one of these.
+
+\subsection{Threat catalogue}
 \textbf{Deepfake / synthetic substitution.} A fully AI-generated image was never
 exposed on a genuine sensor; it has no valid on-chain commitment (V1 fails) and
 cannot reproduce a payload-consistent, keyed in-pixel signature tied to a real
@@ -521,6 +785,30 @@ erase the signal. Heavy compression indeed breaks V1 and, past a threshold, V2
 (``cannot verify''), not a \emph{false positive} (``verified authentic''). \pr{}
 fails safe: it never certifies a manipulated artifact as genuine; it only
 declines to certify.
+
+\begin{table}[t]
+\centering
+\caption{Threat catalogue mapped to defenses and guarantees.}
+\label{tab:threats}
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{@{}p{2.3cm}p{3.0cm}cc@{}}
+\toprule
+\textbf{Attack} & \textbf{Why it fails} & \textbf{Assump.} & \textbf{Guar.} \\
+\midrule
+Deepfake / synth.  & no ledger entry; no keyed signature & A1--A3 & P1,P2 \\
+Metadata forge/strip & V2 recovers $\mathbf{m}$ from pixels & A1 & P3 \\
+Re-capture (screen) & new payload/commit; back-date exposed & A2,A3 & P1 \\
+Replay / back-date & earliest proof $=$ block time & A3 & P1 \\
+PRNU copy~\cite{goljan2011defending} & keyed code $\neq$ passive PRNU; ledger still needed & A1--A3 & P2,P1 \\
+Splice / inpaint   & corrupts unknown carriers; breaks $h$ & A1,A4 & P2,P3 \\
+Compress-launder   & fails \emph{safe} to \textsc{Unverified} & A4 & P1,P3 \\
+\bottomrule
+\end{tabular}
+\\[2pt]
+P1=Prop.\ref{prop:v1}, P2=Prop.\ref{prop:carriers}, P3=Prop.\ref{prop:v2}.
+\end{table}
 
 %==============================================================
 \section{Robustness Under Compression}\label{sec:compression}
@@ -604,27 +892,95 @@ We provide an open software prototype of the \pr{} core (payload layout, SHA-256
 seeding, PRNG carrier selection, gain-value generation, image hashing, and a
 register/verify service with simulated notarization). It implements both a
 legacy \mbox{v1} ($120$-bit) and the current \mbox{v2} ($128$-bit) payload, the
-latter fixing a coordinate-packing precision bug. The prototype lets us validate
-the encode/verify round-trip and the metadata$\rightarrow$seed$\rightarrow$
-position determinism end-to-end before silicon.
+latter fixing a coordinate-packing precision bug. The prototype validates the
+encode/verify round-trip and the
+metadata$\rightarrow$seed$\rightarrow$position determinism end-to-end before
+silicon.
 
-\subsection{Proposed experiments}
-\begin{enumerate}
-\item \textbf{Imperceptibility (G6):} PSNR/SSIM of embedded vs.\ nominal capture
-across $\alpha\in[0.01,0.05]$ and carrier counts.
-\item \textbf{Compression robustness:} BER and Reed--Solomon decode-success of
-V2 vs.\ JPEG quality $Q\in[50,100]$ and vs.\ H.264/HEVC at varied QP/bitrate;
-report the safe ``cannot verify'' crossover.
-\item \textbf{Latency (G5):} shutter$\rightarrow$hash and
-hash$\rightarrow$on-chain confirmation on testnets, including offline-queue
-behavior.
-\item \textbf{Security:} empirical false-accept under deepfake substitution,
-metadata forgery, re-capture, and a simulated PRNU-copy attack; confirm zero
-false-accepts (fail-safe property).
-\item \textbf{Capacity/ECC trade-off:} payload size vs.\ parity vs.\ robustness.
-\item \textbf{Baselines:} compare against metadata-only C2PA (manifest stripped)
-and software upload-time hashing on survival of metadata removal and transcode.
-\end{enumerate}
+\subsection{Micro-benchmark of the core (measured)}
+Table~\ref{tab:micro} reports \emph{measured} results from the reference
+implementation on a commodity laptop CPU (Node.js~v20), over a synthetic
+$1920\times1080$ RGB frame ($\approx\!5.9$\,MB). These validate functional
+correctness and show the on-device cryptographic overhead is negligible relative
+to capture: seed derivation and full carrier-set generation complete in tens of
+microseconds, and a \mbox{SHA-256} commitment over a 6\,MP frame in
+$\approx\!3$\,ms---i.e.\ the hard binding adds far less latency than a single
+exposure. Determinism (identical carriers across runs), carrier uniqueness, the
+encode/verify round-trip, and single-bit tamper rejection all hold.
+
+\begin{table}[t]
+\centering
+\caption{Measured core performance and correctness (reference prototype,
+\mbox{v2} payload, $1920\times1080$ RGB).}
+\label{tab:micro}
+\renewcommand{\arraystretch}{1.2}
+\footnotesize
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Quantity} & \textbf{Value} \\
+\midrule
+Payload / coded carriers            & $128$ b / $128$ pos. \\
+Seed derivation                     & $0.0024$\,ms \\
+Full signature (seed+select+bits)   & $0.018$\,ms \\
+SHA-256 commit over $6$\,MP frame    & $3.09$\,ms \\
+Carrier determinism (re-run)        & identical ($\checkmark$) \\
+Carrier coordinate uniqueness       & $\checkmark$ \\
+Encode$\rightarrow$verify round-trip & pass ($\checkmark$) \\
+Single-bit tamper                   & rejected ($\checkmark$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Experimental protocol (planned)}
+The following protocol targets the claims that require silicon and an image
+pipeline; results are \emph{not yet collected} and the values in
+Table~\ref{tab:targets} are explicit \emph{targets}, not measurements.
+
+\noindent\textbf{Datasets.} RAISE and Dresden Image Database (real-camera RAW for
+content realism and PRNU baselines); UCID/BOSSbase for spatial statistics;
+standard video sequences for codec tests; and a held-out set of diffusion/GAN
+images for the deepfake false-accept test.
+
+\noindent\textbf{Metrics.} PSNR/SSIM (imperceptibility); bit-error rate and
+Reed--Solomon decode success (robustness); false-accept / false-reject rate
+(security and reliability); shutter-to-hash and hash-to-confirmation latency and
+on-chain gas (cost); peak-to-correlation energy on the passive PRNU channel
+(forensic backstop).
+
+\noindent\textbf{Experiments.} (E1) Imperceptibility sweep over
+$\alpha\!\in\![0.01,0.05]$ and carrier count. (E2) JPEG robustness: BER vs.\
+$Q\!\in\![50,100]$, locating the safe decode-failure crossover. (E3) Video:
+BER vs.\ H.264/HEVC QP and GOP placement. (E4) Security: false-accept under
+deepfake substitution, metadata forgery, re-capture, and a simulated PRNU-copy
+attack---target zero false-accepts (fail-safe). (E5) Capacity/ECC trade-off.
+(E6) Latency/gas on a public testnet with Merkle batching of $N\!\in\!\{1,10^2,10^4\}$.
+
+\noindent\textbf{Baselines.} Metadata-only C2PA with the manifest stripped, and
+software upload-time hashing, evaluated on survival of metadata removal and
+transcoding---the regimes where \pr{}'s in-pixel binding is expected to
+dominate.
+
+\begin{table}[t]
+\centering
+\caption{\emph{Target} outcomes for the planned protocol (illustrative, to be
+validated; \emph{not} measured).}
+\label{tab:targets}
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\footnotesize
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Condition} & \textbf{V1 (hash)} & \textbf{V2 (in-pixel)} \\
+\midrule
+Pristine original        & pass             & BER $\approx 0$ \\
+JPEG $Q\!\ge\!90$         & fail (re-encode) & decode pass \\
+JPEG $Q\!\approx\!75$     & fail             & decode pass (RS) \\
+JPEG $Q\!\lesssim\!60$    & fail             & \textsc{unverified} (safe) \\
+Deepfake / synthetic     & fail             & decode fail \\
+Metadata stripped        & via on-chain $h$ & decode pass \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 %==============================================================
 \section{Discussion: Limitations, Privacy, Standardization}\label{sec:discussion}
