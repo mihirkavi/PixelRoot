@@ -1,0 +1,682 @@
+%==============================================================
+%  PixelRoot: Hardware-Anchored, Sensor-Level Media Provenance
+%  with Real-Time Blockchain Notarization
+%
+%  Compile:  pdflatex pixelroot  ->  bibtex pixelroot
+%            ->  pdflatex pixelroot  ->  pdflatex pixelroot
+%  (Requires IEEEtran.cls; available by default on Overleaf.)
+%==============================================================
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{pifont}
+\usepackage{array}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\newcommand{\pr}{\textsc{PixelRoot}}
+
+\begin{document}
+
+\title{\pr{}: Hardware-Anchored, Sensor-Level Media Provenance with
+Real-Time Blockchain Notarization for Trustworthy Imaging}
+
+\author{\IEEEauthorblockN{Mihir Kavishwar}
+\IEEEauthorblockA{\textit{PixelRoot Project} \\
+\texttt{hello@mihirkavishwar.com}}}
+
+\maketitle
+
+%==============================================================
+\begin{abstract}
+The realism of AI-generated ``deepfake'' imagery has outpaced the ability of
+society to tell synthetic media from camera-captured reality. Reactive,
+detector-based defenses are locked in an adversarial arms race and fail to
+generalize to unseen generators, while existing provenance schemes bind trust
+to \emph{metadata} that can be stripped, edited, or transplanted. We present
+\pr{}, a media-authenticity framework that moves the root of trust from
+metadata into the \emph{pixels themselves}. At the instant of capture, a
+CMOS image sensor modulates a sparse, pseudorandomly selected set of pixels to
+embed a $128$-bit provenance payload---the sensor's factory-burned device
+identity, a trusted timestamp, and a quantized capture location---protected by
+Reed--Solomon error correction. A \mbox{SHA-256} commitment over the image and
+its payload is then notarized to a public blockchain within seconds of the
+shutter event, closing the window in which a forgery could be substituted. We
+contribute: (i) a structured literature survey unifying five previously
+disjoint research threads---deepfake detection, passive sensor forensics
+(PRNU), active watermarking, content-provenance standards (C2PA), and
+blockchain media integrity---and a gap analysis that motivates a
+\emph{dual-binding} design; (ii) a formal architecture and threat model with a
+security argument against re-capture, metadata forgery, replay,
+compression-laundering, and PRNU fingerprint-copy attacks; (iii) an analysis of
+payload survivability under JPEG and \mbox{H.264/HEVC} compression that
+clarifies the fragile/semi-fragile trade-off; and (iv) an evaluation plan and a
+reference software implementation. We argue that, deployed as an OEM
+inter-operability standard analogous to JPEG or \mbox{3GPP}, sensor-level
+provenance plus real-time notarization can give legal, journalistic,
+third-party (3P), and life-saving applications an affirmative, hardware-rooted
+proof of authenticity rather than a probabilistic guess.
+\end{abstract}
+
+\begin{IEEEkeywords}
+media provenance, deepfakes, blockchain, CMOS image sensor, PRNU, digital
+watermarking, content authenticity, C2PA, image forensics, JPEG.
+\end{IEEEkeywords}
+
+%==============================================================
+\section{Introduction}
+\IEEEPARstart{D}{igital} images and videos have become primary evidence in
+journalism, courts, insurance, humanitarian monitoring, and everyday social
+discourse. That evidentiary role is collapsing. Diffusion models, generative
+adversarial networks, and neural rendering now synthesize photorealistic faces,
+scenes, and full videos that humans---and automated detectors---routinely fail
+to distinguish from reality~\cite{croitoru2024deepfake,verdoliva2020media}. The
+harm is no longer hypothetical. Industry incident trackers attribute on the
+order of \$1.2--1.3~billion in documented fraud losses to deepfakes in 2025,
+roughly tripling year over year, with the overwhelming majority of losses
+originating on social-media platforms~\cite{resemble2025threat,surfshark2025fraud};
+enterprise surveys report that a majority of organizations experienced
+deepfake-related incidents with mean losses exceeding
+\$280{,}000~\cite{ironscales2025}. Beyond fraud, non-consensual intimate
+imagery and election disinformation erode personal safety and institutional
+trust.
+
+The dominant technical response has been \emph{reactive detection}: train a
+classifier to spot the statistical fingerprints of a given generator. This
+strategy is structurally disadvantaged. Detectors overfit to the artifacts of
+the generators in their training set and degrade sharply on unseen
+models---recent in-the-wild benchmarks report AUC drops of roughly
+$45$--$50\%$ relative to academic
+datasets~\cite{chandra2025deepfakeeval,croitoru2024deepfake}. Because every
+published detector also serves as a differentiable signal that the next
+generation of generators can be trained to defeat, detection is a perpetual
+``tug of war'' that the defender is not guaranteed to
+win~\cite{tugofwar2024,deepfakevideo2024review}.
+
+An alternative philosophy inverts the problem: instead of trying to prove a
+piece of media is \emph{fake}, prove that a piece of media is \emph{real} by
+binding it, at creation time, to a trustworthy origin. This is the
+\emph{provenance} paradigm now embodied by the C2PA Content Credentials
+standard and by secure-capture products such as Truepic and
+ProofMode~\cite{c2pa2024spec,truepic2024capture,proofmode2023,google2025c2pa}.
+These systems are a major advance, but they share a common structural weakness:
+the authenticity claim is carried in a \emph{signed metadata container}
+attached to the file. Metadata can be deliberately stripped by platforms,
+lost in transcoding, or, worse, the binding can be attacked
+(a 2025 camera firmware deployment had to revoke all certificates after a
+signing vulnerability~\cite{c2pa2024spec}). If the credential is removed, the
+pixels carry no inherent evidence of their origin.
+
+\subsection{The \pr{} thesis}
+We argue that a robust root of trust for visual media should live where the
+information actually is: in the pixels, anchored to physical hardware, and
+witnessed by an immutable public ledger. \pr{} embeds a provenance payload
+\emph{into the pixel values} at the moment of capture through controlled
+per-pixel sensor gain modulation, and \emph{simultaneously} notarizes a
+cryptographic commitment of the image to a blockchain. This yields two
+independent bindings:
+
+\begin{itemize}
+\item a \textbf{hard binding}---a \mbox{SHA-256} commitment recorded on-chain,
+giving an immutable, publicly verifiable timestamp of existence; and
+\item a \textbf{soft, in-pixel binding}---a sparse, error-corrected signature
+tied to the sensor's factory identity that travels \emph{with the pixels} even
+if the file container and its metadata are destroyed.
+\end{itemize}
+
+\noindent The two bindings are complementary: the hard binding gives
+cryptographic non-repudiation but is destroyed by any re-encoding; the in-pixel
+binding tolerates mild processing and survives metadata stripping, but is
+statistically softer. Together they cover each other's failure modes.
+
+\subsection{Contributions}
+\begin{enumerate}
+\item \textbf{A unifying survey and gap analysis} (\S\ref{sec:related})
+spanning deepfake generation/detection, passive PRNU forensics, active
+watermarking, provenance standards, and blockchain media integrity, showing
+that no prior line of work simultaneously achieves (a) a hardware root of
+trust, (b) survival of metadata stripping, and (c) public, real-time
+notarization.
+\item \textbf{A formal architecture} (\S\ref{sec:arch}) for sensor-level
+payload embedding, including the $128$-bit metadata layout, PRNG-driven pixel
+selection seeded by the payload, Reed--Solomon protection, gain modulation, and
+a smart-contract notarization protocol.
+\item \textbf{A threat model and security analysis} (\S\ref{sec:threat},
+\S\ref{sec:security}) covering re-capture, metadata forgery, replay,
+compression-laundering, deepfake substitution, and the PRNU fingerprint-copy
+attack, contrasting \pr{} with passive PRNU and metadata-only schemes.
+\item \textbf{A compression-robustness analysis} (\S\ref{sec:compression})
+relating JPEG quantization and \mbox{H.264/HEVC} coding to payload bit-error
+rate, and a discussion of the semantic-authenticity boundary.
+\item \textbf{An evaluation plan and reference implementation}
+(\S\ref{sec:eval}) grounded in an open prototype, plus a roadmap toward an OEM
+standard (\S\ref{sec:discussion}).
+\end{enumerate}
+
+%==============================================================
+\section{Background}\label{sec:background}
+
+\subsection{The CMOS imaging pipeline}
+A modern camera forms an image by integrating photo-generated charge in each
+sensor photosite, converting it to a voltage, applying analog gain, and
+digitizing it. Manufacturing imperfections make each photosite's response
+slightly non-uniform; this multiplicative \emph{photo-response non-uniformity}
+(PRNU) is a stable, device-unique noise pattern that has long been used as a
+forensic ``sensor fingerprint''~\cite{lukas2006digital,chen2008determining}.
+Crucially for \pr{}, many sensors expose programmable per-column or per-region
+analog gain and exposure registers, and embed a factory-burned identifier in
+one-time-programmable (OTP) memory. \pr{} repurposes these existing controls:
+rather than only \emph{reading} the passive PRNU after the fact, it
+\emph{actively writes} a chosen, error-corrected signal into the image during
+exposure, and ties that signal to the OTP identity.
+
+\subsection{Lossy compression: JPEG and MPEG/H.26x}
+Captured media is almost never stored or transmitted losslessly. JPEG applies a
+block \mbox{DCT}, quantizes coefficients with a quality-dependent matrix that
+preferentially discards high-frequency energy, and entropy-codes the
+result~\cite{wallace1992jpeg}. Video codecs (MPEG-2, \mbox{H.264/AVC},
+\mbox{HEVC}) add motion-compensated inter-frame prediction, integer transforms,
+in-loop deblocking, and group-of-pictures (GOP)
+structure~\cite{wiegand2003h264,sullivan2012hevc}. All of these operations are
+\emph{lossy} and spatially redistributive, which is exactly why any embedded
+signal must be designed to survive quantization---an issue we analyze in
+\S\ref{sec:compression}.
+
+\subsection{Cryptographic and blockchain primitives}
+\pr{} relies on standard primitives: a collision-resistant hash
+(\mbox{SHA-256}~\cite{nist2015sha}) for commitments and PRNG seeding;
+Reed--Solomon codes~\cite{reed1960polynomial} for error correction over the
+embedded payload; Merkle trees~\cite{merkle1987digital} for batching many
+commitments into a single on-chain transaction; and a public, append-only
+ledger~\cite{nakamoto2008bitcoin,wood2014ethereum} as an immutable, publicly
+auditable timestamping witness. Large media artifacts are referenced---not
+stored---on-chain, optionally via content-addressed
+storage~\cite{benet2014ipfs}. Hardware attestation of the signing
+environment follows established trusted-computing
+practice~\cite{trustedcomputing,google2025c2pa}.
+
+%==============================================================
+\section{Related Work and Literature Survey}\label{sec:related}
+We organize prior art into five threads and then identify the gap \pr{} fills.
+
+\subsection{Deepfake generation and detection}
+Surveys by Verdoliva~\cite{verdoliva2020media}, Mirsky and
+Lee~\cite{mirsky2021creation}, and Croitoru \emph{et
+al.}~\cite{croitoru2024deepfake} chart the rapid progression from face-swap GANs
+to diffusion models and neural radiance fields across image, video, audio, and
+multimodal content. The recurring empirical finding is poor
+\emph{cross-generator generalization}: detectors trained on one family of fakes
+collapse on another~\cite{croitoru2024deepfake,deepfakevideo2024review}. The
+\mbox{Deepfake-Eval-2024} in-the-wild benchmark quantifies this, reporting
+$45$--$50\%$ AUC degradation versus curated academic
+sets~\cite{chandra2025deepfakeeval}. The community increasingly frames
+generation vs.\ detection as an adversarial co-evolution in which detectors
+provide gradient signal to the next generator~\cite{tugofwar2024}. \emph{Limitation:}
+detection is reactive, probabilistic, and structurally one step behind; it
+cannot offer affirmative, durable proof that a specific artifact is genuine.
+
+\subsection{Passive sensor forensics (PRNU)}
+PRNU-based source identification, introduced by Luk\'a\v{s} \emph{et
+al.}~\cite{lukas2006digital} and extended to integrity verification by Chen
+\emph{et al.}~\cite{chen2008determining}, estimates a camera fingerprint from
+residual noise and correlates it (e.g.\ via peak-to-correlation energy) with a
+questioned image; recent benchmarks track its accuracy on modern
+devices~\cite{prnubench2025}. Broader integrity surveys situate PRNU among
+splicing, copy-move, and double-compression
+detectors~\cite{korus2017digital,piva2013overview}. \emph{Limitations:} (i)
+PRNU is \emph{passive}---it requires a reference fingerprint and many images per
+device, and degrades on heavily compressed or low-resolution
+media~\cite{prnubench2025}; (ii) it is vulnerable to the
+\emph{fingerprint-copy} (PRNU-copy) attack, in which an adversary estimates a
+victim's fingerprint from public images and transplants it into a forged image.
+The triangle test and its successors detect na\"ive copies but are themselves
+defeated by improved, dispersed
+copy attacks~\cite{goljan2011defending}---a live cat-and-mouse. \pr{} differs by
+\emph{actively} embedding a \emph{chosen, keyed, error-corrected} payload bound
+to the OTP identity and a ledger timestamp, rather than relying on an
+involuntary, copyable noise pattern.
+
+\subsection{Active authentication: digital watermarking}
+Watermarking embeds a signal for authentication or copyright. Schemes are
+\emph{robust} (survive processing, for copyright), \emph{fragile} (break on any
+edit, for tamper localization), or \emph{semi-fragile} (tolerate benign
+operations such as JPEG but break on malicious
+edits)~\cite{begum2020digital,fragile2025hybrid}. Classic methods embed in
+DCT/DWT/SVD coefficients; recent work uses learned
+encoders/decoders~\cite{dlwatermarking2026}. Video-domain schemes embed in
+H.264/HEVC transform coefficients or motion vectors and must contend with
+quantization and motion-compensation
+drift~\cite{videowatermark2018survey,hevcwatermark2020,cstfmark2026}.
+\emph{Limitation:} watermarking alone provides no \emph{public, time-anchored}
+record and no \emph{hardware} root---a watermark embedded in software can be
+embedded by an attacker too. \pr{} treats its in-pixel payload as a
+\emph{semi-fragile, hardware-originated} watermark whose trust is bootstrapped
+by on-chain notarization and OTP identity.
+
+\subsection{Provenance standards and secure capture}
+C2PA Content Credentials define a signed manifest of assertions (capture
+device, time, edit history) bound to the asset by a hard hash, verifiable
+offline via a certificate chain~\cite{c2pa2024spec}. Hardware-backed signing has
+reached consumer devices---Google Pixel signs photos with keys in the Titan~M2
+secure element and an on-device timestamp
+authority~\cite{google2025c2pa}---and Leica, Sony, and Samsung ship C2PA in
+cameras and phones. Truepic's Controlled Capture verifies device integrity via
+attestation before signing on-device~\cite{truepic2024capture}; ProofMode
+captures sensor metadata, signs with per-capture keys, and registers hashes to
+public ledgers (OpenTimestamps/Bitcoin)~\cite{proofmode2023}.
+\emph{Limitations:} the binding lives in a \emph{detachable manifest}. If a
+platform strips metadata (as many do) or transcodes the asset, the credential
+is lost and the bare pixels are again unverifiable; certificate compromise
+revokes trust wholesale~\cite{c2pa2024spec}. \pr{} is complementary to
+C2PA---it can populate C2PA assertions---but additionally places a redundant
+proof \emph{inside the pixels}, surviving manifest loss.
+
+\subsection{Blockchain-based media integrity}
+A large body of work anchors media hashes (exact and perceptual) to smart
+contracts, storing the bulk content off-chain in
+IPFS~\cite{qureshi2021blockchain,benet2014ipfs}. Hasan and Salah propose using
+blockchain and smart contracts to trace deepfake video provenance back to a
+trusted original~\cite{hasan2019combating}; subsequent systems combine
+perceptual hashing, watermarking, and Ethereum/Polygon contracts for video
+copyright and
+integrity~\cite{videowmblockchain2024,frontiers2025videocopyright}.
+\emph{Limitations:} these systems hash media \emph{after} capture, typically in
+software at upload time, leaving a tampering window and no hardware root; and
+exact hashes are destroyed by any re-encoding while perceptual hashes trade away
+cryptographic guarantees. \pr{} narrows the window to the shutter event and adds
+a hardware-anchored in-pixel binding the ledger alone cannot provide.
+
+\subsection{Gap analysis}
+Table~\ref{tab:compare} summarizes the landscape. No prior approach
+simultaneously offers a hardware root of trust, survival of metadata stripping,
+\emph{and} public real-time notarization. \pr{} is, to our knowledge, the first
+design to combine sensor-level in-pixel embedding with capture-time blockchain
+notarization, explicitly targeting that intersection.
+
+\begin{table}[t]
+\centering
+\caption{Where prior art sits, and the gap \pr{} targets.}
+\label{tab:compare}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Approach} & \textbf{HW} & \textbf{Surv.} & \textbf{Public} & \textbf{Affirm.} & \textbf{Real-} \\
+ & \textbf{root} & \textbf{meta-strip} & \textbf{ledger} & \textbf{proof} & \textbf{time} \\
+\midrule
+Deepfake detectors~\cite{croitoru2024deepfake} & \ding{55} & --- & \ding{55} & \ding{55} & \ding{51} \\
+PRNU forensics~\cite{lukas2006digital}        & part. & \ding{51} & \ding{55} & part. & \ding{55} \\
+Watermarking~\cite{begum2020digital}          & \ding{55} & \ding{51} & \ding{55} & part. & \ding{51} \\
+C2PA / Truepic~\cite{c2pa2024spec,truepic2024capture} & \ding{51} & \ding{55} & opt. & \ding{51} & \ding{51} \\
+Blockchain hashing~\cite{hasan2019combating}  & \ding{55} & \ding{55} & \ding{51} & \ding{51} & part. \\
+\textbf{\pr{} (this work)}                    & \ding{51} & \ding{51} & \ding{51} & \ding{51} & \ding{51} \\
+\bottomrule
+\end{tabular}
+\\[2pt]
+\footnotesize HW root = hardware/sensor root of trust; Surv.\ meta-strip =
+survives metadata removal; Affirm.\ proof = affirmative proof of authenticity.
+\end{table}
+
+%==============================================================
+\section{Threat Model and Design Goals}\label{sec:threat}
+
+\subsection{Assumptions}
+We assume: (A1) the sensor's OTP identity and gain registers are written at
+manufacture and are not feasibly re-programmable in the field without
+specialized equipment; (A2) the capture-time signing/notarization environment is
+attested (e.g.\ via a secure element), as in current hardware-backed C2PA
+deployments~\cite{google2025c2pa,truepic2024capture}; (A3) the blockchain is
+append-only and its history is economically infeasible to rewrite within the
+relevant timeframe~\cite{nakamoto2008bitcoin}; (A4) standard cryptographic
+primitives are secure~\cite{nist2015sha}.
+
+\subsection{Adversary}
+The adversary may: forge or edit file metadata; generate a deepfake or
+Photoshop a real image; re-encode/transcode/compress media; re-photograph a
+screen (analog ``re-capture''); attempt to estimate and transplant a victim's
+sensor fingerprint (PRNU-copy~\cite{goljan2011defending}); and replay or
+back-date claims. The adversary cannot economically clone a specific physical
+CMOS die or rewrite ledger history.
+
+\subsection{Design goals}
+\textbf{G1 Affirmative authenticity:} produce verifiable evidence that media
+originated from a genuine sensor at a specific time/place.
+\textbf{G2 Hardware root:} bind the proof to physical sensor identity, not to
+software-only secrets.
+\textbf{G3 Metadata-independence:} retain evidentiary value even if the file
+container/metadata is stripped.
+\textbf{G4 Public verifiability:} allow any third party (platform, court,
+viewer) to verify without contacting the originator or possessing the camera.
+\textbf{G5 Minimal capture latency:} notarize within seconds of the shutter.
+\textbf{G6 Imperceptibility:} embedding must not visibly degrade the image.
+\textbf{G7 Standardizability:} be deployable as a cross-OEM interoperability
+standard.
+
+%==============================================================
+\section{The \pr{} Architecture}\label{sec:arch}
+
+\pr{} comprises a capture-time \emph{embed-and-notarize} pipeline and a
+\emph{verification} pipeline (Fig.~\ref{fig:arch} conceptually; described
+below).
+
+\subsection{Provenance payload}
+The payload $\mathbf{m}$ is a fixed-width record (\pr{}~v2: $128$ bits):
+\begin{equation}
+\mathbf{m} = \underbrace{\mathrm{ID}}_{48} \,\|\,
+             \underbrace{t}_{32} \,\|\,
+             \underbrace{(\phi,\lambda)}_{48},
+\end{equation}
+where $\mathrm{ID}$ is the sensor's OTP device identifier (modeled here as a
+MAC-style $48$-bit value), $t$ is a Unix timestamp from an attested
+RTC/NTP source, and $(\phi,\lambda)$ is a quantized latitude/longitude
+($24$ bits per coordinate, $\approx\!10^{-4}$ degree resolution). Location may be
+omitted or salted for privacy (\S\ref{sec:discussion}).
+
+\subsection{Keyed pixel selection}
+To make the embedding location unpredictable and content-spreading, the
+$n_b$ payload-carrying pixels are chosen by a PRNG seeded by the payload itself:
+\begin{equation}
+s = \mathrm{trunc}_{32}\big(\mathrm{SHA\text{-}256}(\mathbf{m})\big),
+\end{equation}
+and positions $\{(r_i,c_i)\}_{i=1}^{n_b}$ are drawn without repetition from the
+$H\times W$ sensor grid using a PRNG keyed by $s$. Because the seed is derived
+from $\mathbf{m}$, a verifier who is told the claimed $\mathbf{m}$ can regenerate
+the exact positions; an attacker who does not know $\mathbf{m}$ cannot localize
+the carriers. (A production deployment additionally mixes in an OEM secret key
+$k$, i.e.\ $s=\mathrm{trunc}_{32}(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}))$,
+so that carriers cannot be enumerated even given $\mathbf{m}$.)
+
+\subsection{Error-corrected encoding}
+The $128$ payload bits are expanded with a Reed--Solomon
+code~\cite{reed1960polynomial} into $n_b=128+r$ coded bits ($r\approx 30$
+parity bits in the prototype), tolerating burst errors from compression and
+mild edits. Let $b_i\in\{0,1\}$ be the $i$-th coded bit.
+
+\subsection{Sensor-level gain modulation (embedding)}
+During exposure, each selected photosite's analog gain is nudged
+multiplicatively:
+\begin{equation}
+g_i = 1 + \alpha\, b_i, \qquad \alpha \approx 0.02,
+\end{equation}
+so a ``1'' raises the pixel response by $\approx\!2\%$ ($\approx\!0.01$~EV) and a
+``0'' is left nominal. The perturbation is below the perceptual threshold and is
+spread across $\sim\!10^{2}$ pixels out of millions (goal~G6). This is an
+\emph{active}, hardware-rooted, semi-fragile watermark
+(cf.\ \S\ref{sec:related}-C), distinct from the involuntary PRNU pattern that
+passive forensics merely observes.
+
+\subsection{Commitment and notarization}
+Immediately after readout, the device computes a hard binding
+\begin{equation}
+h = \mathrm{SHA\text{-}256}\big(\,I \,\|\, \mathbf{m}\,\big),
+\end{equation}
+over the (lossless) image $I$ and payload, then submits $h$ (optionally with a
+device pseudonym and coarse time/location) to a notarization smart contract.
+For scale, many commitments are aggregated into a Merkle
+tree~\cite{merkle1987digital} and only the root is written on-chain, amortizing
+gas cost; the contract emits an event with a block timestamp that serves as the
+public ``proof of existence''~\cite{proofmode2023}. If connectivity is briefly
+unavailable, $h$ is queued in secure storage and submitted on reconnect, with
+the latency recorded.
+
+\begin{algorithm}[t]
+\caption{\pr{} capture-time embed-and-notarize}
+\label{alg:capture}
+\begin{algorithmic}[1]
+\STATE $\mathrm{ID}\!\gets\!\mathrm{readOTP}();\;
+        t\!\gets\!\mathrm{attestedClock}();\;
+        (\phi,\lambda)\!\gets\!\mathrm{gps}()$
+\STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,(\phi,\lambda)$
+\STATE $s\gets \mathrm{trunc}_{32}(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}))$
+\STATE $\mathbf{b}\gets \mathrm{ReedSolomonEncode}(\mathbf{m})$
+\STATE $P\gets \mathrm{PRNGselect}(s,\,|\mathbf{b}|,\,H,\,W)$
+       \quad\COMMENT{carrier pixels}
+\FORALL{$(r_i,c_i)\in P$}
+   \STATE $\mathrm{setGain}(r_i,c_i,\,1+\alpha\, b_i)$
+\ENDFOR
+\STATE $I\gets \mathrm{expose\&readout}()$
+\STATE $h\gets \mathrm{SHA\text{-}256}(I\,\|\,\mathbf{m})$
+\STATE $\mathrm{notarize}(h)$ \quad\COMMENT{Merkle-batched on-chain commit}
+\STATE \textbf{store} $I$ (lossless preferred) with $\mathbf{m}$ in C2PA manifest
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Verification}
+A verifier with a questioned image $I'$ and a claimed payload $\mathbf{m}'$
+(from the manifest, the on-chain record, or asserted by a party) performs two
+independent checks:
+
+\noindent\textbf{(V1) Hard binding / ledger check.} Recompute
+$h'=\mathrm{SHA\text{-}256}(I'\|\mathbf{m}')$ and confirm $h'$ appears in the
+ledger (directly or via a Merkle proof to the recorded root). A match proves
+$I'$ existed, bit-for-bit, at the recorded block time. This is conclusive but
+brittle: any re-encoding of $I'$ breaks it.
+
+\noindent\textbf{(V2) In-pixel binding check.} Regenerate $s$ and the carrier
+set $P$ from $\mathbf{m}'$ (and $k$), read back the relative gain at each
+carrier to recover noisy coded bits $\hat{\mathbf{b}}$, Reed--Solomon-decode to
+$\hat{\mathbf{m}}$, and test $\hat{\mathbf{m}}\stackrel{?}{=}\mathbf{m}'$. The
+\emph{bit-error rate} (BER) and the decode success constitute a soft authenticity
+score that degrades gracefully under compression
+(\S\ref{sec:compression}). Because $P$ is keyed and spread, an attacker who edits
+or splices the image without knowing $P$ corrupts the signature in a detectable
+way.
+
+\noindent A piece of media is accepted as authentic at the strongest level
+supported by the evidence: V1$\wedge$V2 (pristine original), V2 only
+(transcoded but pixel-consistent), or V1 only (exact copy, manifest intact).
+
+%==============================================================
+\section{Security Analysis}\label{sec:security}
+
+\textbf{Deepfake / synthetic substitution.} A fully AI-generated image was never
+exposed on a genuine sensor; it has no valid on-chain commitment (V1 fails) and
+cannot reproduce a payload-consistent, keyed in-pixel signature tied to a real
+OTP identity (V2 fails). The attacker would need to either forge a ledger entry
+(infeasible, A3) or embed a valid signature without the OEM key and sensor
+(infeasible, A1--A2).
+
+\textbf{Metadata forgery / stripping.} Editing or removing file metadata cannot
+manufacture a matching ledger commitment, and cannot create the in-pixel binding
+(goal~G3). Stripping metadata downgrades a credential-based scheme to
+``unverifiable,'' but \pr{} still recovers $\mathbf{m}$ from the pixels via V2.
+
+\textbf{Re-capture (photo-of-a-screen).} Re-photographing authentic media on a
+genuine \pr{} sensor produces a \emph{new} payload (new $\mathrm{ID}$, $t$,
+location) and a \emph{new} commitment; it does not reproduce the original's
+ledger entry. The semantic content is duplicated but the provenance correctly
+reflects the re-capture event and time, exposing back-dating attempts. Liveness
+heuristics (moir\'e, depth) as used by Truepic~\cite{truepic2024capture} can
+augment this.
+
+\textbf{Replay / back-dating.} Because notarization is bound to a block
+timestamp, an adversary cannot claim an artifact predates its true creation: the
+earliest provable existence is the block time. This is the property reactive
+detection fundamentally lacks.
+
+\textbf{PRNU fingerprint-copy.} The strongest hardware-targeted attack against
+passive forensics estimates a victim's PRNU from public images and transplants
+it~\cite{goljan2011defending}. \pr{} resists this for three reasons: (i) the
+\pr{} signature is an \emph{active, keyed} code, not the involuntary PRNU, so
+copying the passive noise does not reproduce the carrier bits without the OEM key
+$k$; (ii) even a perfectly transplanted signature must still match an on-chain
+commitment made at capture time by a genuine device (V1/A3); and (iii) the
+triangle-test family of countermeasures remains available as a forensic backstop
+on the passive PRNU channel. Thus \pr{} converts a soft, copyable fingerprint
+into a key-protected, ledger-witnessed credential.
+
+\textbf{Compression-laundering.} An attacker may aggressively re-encode media to
+erase the signal. Heavy compression indeed breaks V1 and, past a threshold, V2
+(\S\ref{sec:compression}); but this yields a \emph{negative} result
+(``cannot verify''), not a \emph{false positive} (``verified authentic''). \pr{}
+fails safe: it never certifies a manipulated artifact as genuine; it only
+declines to certify.
+
+%==============================================================
+\section{Robustness Under Compression}\label{sec:compression}
+
+The central engineering tension is that the hard binding (V1) is \emph{fragile}
+by design---ideal for a pristine original---while real-world distribution
+demands \emph{semi-fragile} survivability (V2). We therefore analyze the in-pixel
+channel under lossy coding.
+
+\subsection{JPEG}
+JPEG's quantization matrix scales with the quality factor $Q$ and most
+aggressively discards high-frequency DCT energy~\cite{wallace1992jpeg}. A
+$\sim\!2\%$ gain perturbation at isolated pixels manifests partly as
+high-frequency content and is therefore attenuated as $Q$ drops. To survive, the
+in-pixel channel should: (i) place carriers to influence \emph{mid-frequency}
+DCT coefficients of their $8\!\times\!8$ blocks rather than single pixels, as in
+semi-fragile DCT watermarking~\cite{begum2020digital,fragile2025hybrid}; (ii)
+rely on Reed--Solomon parity to absorb the residual bit errors; and (iii) use a
+soft, correlation-based read-back rather than a hard per-pixel threshold. We
+expect a monotonic BER--$Q$ relationship: near-zero BER at $Q\!\gtrsim\!90$,
+graceful rise through mid quality, and decode failure (safe ``cannot verify'')
+at low $Q$. The exact crossover is the key quantity to characterize empirically
+(\S\ref{sec:eval}).
+
+\subsection{Video: MPEG / H.264 / HEVC}
+Video adds motion-compensated prediction, integer transforms, in-loop
+deblocking, and GOP structure~\cite{wiegand2003h264,sullivan2012hevc}. The video
+watermarking literature shows that embedding survives best in mid-frequency
+transform coefficients and that I-frame perturbations propagate (``drift'')
+through a GOP, so embedding is often confined to portions of the
+GOP~\cite{videowatermark2018survey,hevcwatermark2020,cstfmark2026}. For \pr{},
+the practical design is: embed the per-frame (or per-keyframe) payload at
+capture, and commit a Merkle root over keyframe hashes so that
+\emph{frame-level} verification localizes tampering. Learned, codec-aware
+embedding has recently been shown to survive non-differentiable
+\mbox{H.264}~\cite{cstfmark2026} and is a natural upgrade path.
+
+\subsection{The semantic-authenticity boundary}
+A subtle limitation deserves emphasis. A benign platform filter may alter
+carrier pixels enough to fail V2 even though the image's \emph{meaning} is
+unchanged---a false alarm---while a malicious edit might, in principle, preserve
+carriers. \pr{} therefore certifies \emph{pixel-level integrity relative to a
+notarized original}, not semantic equivalence. We argue this is the right
+primitive: it cleanly separates ``bit-for-bit original'' (V1), ``faithfully
+transcoded'' (V2), and ``cannot establish provenance,'' and it composes with
+perceptual-hash and content-similarity layers~\cite{videowmblockchain2024} for
+softer ``same-scene'' judgments.
+
+%==============================================================
+\section{Applications: Human-in-the-Loop Trust}\label{sec:apps}
+
+\pr{} is designed so that a human or institutional verifier remains in the loop
+with hardware-rooted evidence rather than a model's opinion.
+
+\textbf{Legal and evidentiary.} Chain-of-custody for photographic/video evidence
+benefits from an immutable, independently timestamped commitment made at
+capture, reducing disputes over authenticity and time of
+creation~\cite{korus2017digital}.
+
+\textbf{Journalism and third-party (3P) verification.} Platforms and fact-checkers
+can verify an asset against the public ledger without contacting the
+source---valuable for conflict and human-rights documentation, where
+ProofMode-style field capture has already been deployed~\cite{proofmode2023}.
+
+\textbf{Life-saving / high-assurance.} Insurance inspections, telemedicine
+imagery, infrastructure monitoring, and emergency reporting need affirmative
+proof that an image is a real, current capture of a real scene---exactly the
+``prevent rather than detect'' posture argued by secure-capture
+vendors~\cite{truepic2024capture}.
+
+\textbf{Platform-scale screening.} Social platforms can perform an
+$O(1)$ ledger lookup at upload to label assets ``camera-original,''
+``transcoded-but-consistent,'' or ``unverified,'' shifting the default from
+``trust until debunked'' to ``label by provenance.''
+
+%==============================================================
+\section{Evaluation Plan and Reference Implementation}\label{sec:eval}
+
+\subsection{Reference implementation}
+We provide an open software prototype of the \pr{} core (payload layout, SHA-256
+seeding, PRNG carrier selection, gain-value generation, image hashing, and a
+register/verify service with simulated notarization). It implements both a
+legacy \mbox{v1} ($120$-bit) and the current \mbox{v2} ($128$-bit) payload, the
+latter fixing a coordinate-packing precision bug. The prototype lets us validate
+the encode/verify round-trip and the metadata$\rightarrow$seed$\rightarrow$
+position determinism end-to-end before silicon.
+
+\subsection{Proposed experiments}
+\begin{enumerate}
+\item \textbf{Imperceptibility (G6):} PSNR/SSIM of embedded vs.\ nominal capture
+across $\alpha\in[0.01,0.05]$ and carrier counts.
+\item \textbf{Compression robustness:} BER and Reed--Solomon decode-success of
+V2 vs.\ JPEG quality $Q\in[50,100]$ and vs.\ H.264/HEVC at varied QP/bitrate;
+report the safe ``cannot verify'' crossover.
+\item \textbf{Latency (G5):} shutter$\rightarrow$hash and
+hash$\rightarrow$on-chain confirmation on testnets, including offline-queue
+behavior.
+\item \textbf{Security:} empirical false-accept under deepfake substitution,
+metadata forgery, re-capture, and a simulated PRNU-copy attack; confirm zero
+false-accepts (fail-safe property).
+\item \textbf{Capacity/ECC trade-off:} payload size vs.\ parity vs.\ robustness.
+\item \textbf{Baselines:} compare against metadata-only C2PA (manifest stripped)
+and software upload-time hashing on survival of metadata removal and transcode.
+\end{enumerate}
+
+%==============================================================
+\section{Discussion: Limitations, Privacy, Standardization}\label{sec:discussion}
+
+\textbf{Hardware dependency.} \pr{}'s strongest guarantees require sensor and
+secure-element support; legacy devices can run a software-only, attested variant
+that still notarizes a capture-time hash (\`a la C2PA/ProofMode) but without the
+hardware-rooted in-pixel binding.
+
+\textbf{Privacy.} $\mathrm{ID}$, time, and location can constitute PII. We
+recommend on-chain pseudonyms, optional/omittable and salted location, and
+selective disclosure so that the public record proves \emph{existence and
+integrity} without revealing the photographer's identity or precise whereabouts.
+
+\textbf{Failure-safe semantics.} As emphasized, \pr{} declines rather than
+falsely certifies under heavy laundering; downstream policy must treat
+``unverified'' as ``unknown,'' not ``fake.''
+
+\textbf{Toward an OEM standard.} The historical lesson of JPEG~\cite{wallace1992jpeg}
+and 3GPP is that interoperability emerges from a shared standard, not point
+products. We propose \pr{} as a cross-OEM capture-provenance profile that (a)
+fixes payload layout, ECC, and the keyed selection function; (b) reuses C2PA
+manifests as the transport for assertions; and (c) standardizes the notarization
+contract interface, so any platform can verify any vendor's media. Consumer
+hardware-backed C2PA signing~\cite{google2025c2pa,truepic2024capture} shows the
+ecosystem is ready for the signing half; \pr{} adds the in-pixel, ledger-witnessed
+half.
+
+%==============================================================
+\section{Conclusion and Future Work}\label{sec:conclusion}
+Reactive deepfake detection cannot win a generator-vs-detector arms race, and
+metadata-only provenance breaks the moment a credential is stripped. \pr{}
+relocates the root of trust into the pixels and onto a public ledger: a
+hardware-anchored, error-corrected, keyed signature embedded by the CMOS sensor
+at capture, plus a real-time blockchain commitment. This dual binding gives
+affirmative, publicly verifiable, hardware-rooted proof of authenticity that
+survives metadata loss and fails safe under laundering. Future work includes
+silicon-level validation on sensors with per-region gain control, codec-aware
+learned embedding for video~\cite{cstfmark2026}, privacy-preserving selective
+disclosure, formal modeling of the V2 soft-authenticity score, and pursuing
+\pr{} as an open cross-OEM standard. We view this as a foundational---if not
+all-encompassing---step toward driving deepfake-driven disinformation toward
+practical irrelevance for media that matters.
+
+%==============================================================
+\section*{Reproducibility and Disclosure}
+The reference implementation is part of the open \pr{} project. The on-chain
+notarization in the current prototype is \emph{simulated} and labeled as such;
+results reported as ``planned'' are part of the evaluation roadmap
+(\S\ref{sec:eval}).
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
