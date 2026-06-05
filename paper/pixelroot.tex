@@ -108,10 +108,14 @@ payload (the sensor's factory-burned device identity, a trusted timestamp, and
 an optional quantized location) protected by error-correction. A \mbox{SHA-256}
 commitment over the frame is simultaneously notarized to a public blockchain
 within seconds of the shutter, closing the window in which a forgery could be
-substituted. We make the hardware ask concrete: rather than the per-pixel gain
-control that commercial sensors do \emph{not} expose, \pr{} needs only a
-modest, standardizable per-column/per-region gain capability, with a
-software-ISP fallback for legacy devices at an explicitly weaker trust level.
+substituted. We make the hardware ask concrete and tiered: \pr{}'s robust channel needs only
+a modest, standardizable per-column/per-region gain capability that today's
+column-parallel sensors can already approximate, with a software-ISP fallback
+for legacy devices at an explicitly weaker trust level; and we show that
+\emph{per-pixel} gain---the apex capability---is manufacturable rather than
+impossible, via three process technologies already in volume production
+(floating-diffusion conversion-gain selection, coded-exposure pixels, and
+3D-stacked per-pixel ADCs joined by Cu--Cu hybrid bonding).
 We contribute: (i) a structured survey unifying five disjoint threads---deepfake
 detection, PRNU forensics, watermarking, C2PA, and blockchain media
 integrity---with a gap analysis motivating a \emph{dual-binding} design; (ii) a
@@ -120,8 +124,11 @@ propositions (hard-binding soundness, key-protected carrier unpredictability,
 and a bounded soft false-accept); (iii) a \emph{measured} robustness study of
 the redesigned in-pixel channel using a faithful 8$\times$8-DCT JPEG model plus
 noise, rescaling, and cropping attacks---achieving $0\%$ payload bit-error
-through JPEG down to $Q\!=\!30$ at $40$\,dB PSNR, with $0/600$ wrong-key and
-forgery false-accepts; and (iv) privacy-preserving notarization (no raw PII
+through JPEG down to $Q\!=\!10$ at $40$\,dB PSNR, with $0/600$ wrong-key and
+forgery false-accepts; (iv) a CMOS-manufacturing feasibility analysis of
+per-pixel intensity control and the per-pixel tamper-localization layer it
+unlocks ($0.99$ true-positive, $0.02$ false-positive splice localization); and
+(v) privacy-preserving notarization (no raw PII
 on-chain, salted commitments, selective disclosure), a justification of
 blockchain over a single time-stamping authority, and a phased adoption path. We
 argue that, deployed as an OEM interoperability standard analogous to JPEG or
@@ -212,11 +219,18 @@ trust, (b) survival of metadata stripping, and (c) public, real-time
 notarization.
 \item \textbf{A formal architecture with a feasibility-grounded hardware ask}
 (\S\ref{sec:arch}): a sensor-gain \emph{feasibility spectrum} (global $\to$
-per-column $\to$ per-region $\to$ per-pixel) that reframes the embedding around
-the low-frequency, per-column/per-region gain control that column-parallel
+per-column $\to$ per-region $\to$ per-pixel) that grounds the embedding in the
+low-frequency, per-column/per-region gain control that column-parallel
 sensors can realistically provide, plus the $128$-bit payload, keyed
 spread-spectrum carrier selection, error-correction, and a smart-contract
 notarization protocol.
+\item \textbf{A CMOS-manufacturing feasibility analysis of per-pixel gain}
+(\S\ref{sec:mfg}): a survey-grounded argument that per-pixel intensity control is
+manufacturable---not a physics barrier---via floating-diffusion
+conversion-gain selection, coded-exposure pixels, and 3D-stacked per-pixel ADCs
+joined by Cu--Cu hybrid bonding, with an explicit cost/trade-off assessment and a
+concrete OEM ``provenance-write'' primitive; and the optional per-pixel
+tamper-localization layer this unlocks.
 \item \textbf{A threat model and security analysis} (\S\ref{sec:threat},
 \S\ref{sec:security}) with three propositions and a threat catalogue covering
 re-capture, metadata forgery, replay, compression-laundering, deepfake
@@ -225,8 +239,9 @@ substitution, splicing, and the PRNU fingerprint-copy attack.
 \S\ref{sec:eval}) of the redesigned in-pixel channel against a faithful JPEG
 (8$\times$8 DCT quantization) model, Gaussian noise, bilinear rescaling, and
 cropping with grid resynchronization---reporting real PSNR/SSIM, BER--quality
-curves, an amplitude operating curve, and wrong-key/forgery false-accept rates,
-together with an explicit account of the geometric limits.
+curves, an amplitude operating curve, wrong-key/forgery false-accept rates, and a
+per-pixel tamper-localization measurement, together with an explicit account of
+the geometric limits.
 \item \textbf{A deployable systems design} (\S\ref{sec:discussion}):
 privacy-preserving notarization that keeps \emph{no raw PII on-chain}
 (salted commitments, optional location, zero-knowledge selective disclosure,
@@ -248,10 +263,12 @@ forensic ``sensor fingerprint''~\cite{lukas2006digital,chen2008determining}.
 Crucially for \pr{}, modern column-parallel CMOS architectures already place a
 programmable-gain amplifier and ADC \emph{per column}, support per-region
 exposure/gain in high-dynamic-range and dual-conversion-gain modes, and embed a
-factory-burned identifier in one-time-programmable (OTP) memory. \pr{} does
-\emph{not} assume the per-pixel gain control that commercial sensors do not
-expose; instead it repurposes the coarse, low-frequency gain controls that are
-realistic today (or a modest standardizable extension of them, \S\ref{sec:hw}):
+factory-burned identifier in one-time-programmable (OTP) memory. \pr{}'s robust
+channel does \emph{not require} the per-pixel gain control that commercial
+sensors do not yet expose---though we show per-pixel control is manufacturable
+and unlocks an extra localization layer (\S\ref{sec:mfg}); instead it repurposes
+the coarse, low-frequency gain controls that are realistic today (or a modest
+standardizable extension of them, \S\ref{sec:hw}):
 rather than only \emph{reading} the passive PRNU after the fact, it
 \emph{actively writes} a chosen, error-corrected, low-frequency signal into the
 image during exposure and ties that signal to the OTP identity.
@@ -522,33 +539,119 @@ programmable-gain amplifier per column; per-column gain trim is routinely used
 for column fixed-pattern-noise correction. A per-column gain \emph{profile}
 directly imprints horizontal low-frequency content---exactly the carrier \pr{}
 uses.
-\item \textbf{Per-region / tiled gain (emerging).} Dual-conversion-gain and
-HDR-zone sensors already switch gain over regions; a coarse $K\times K$ gain
-tile map is a small, standardizable register extension.
-\item \textbf{Per-pixel gain (not available).} Arbitrary per-photosite gain is
-\emph{not} offered by commercial parts and \pr{} deliberately avoids depending
-on it.
+\item \textbf{Per-region / tiled gain (emerging).} Dual- and triple-conversion-gain
+and HDR-zone sensors already switch gain over regions by toggling
+floating-diffusion (FD) capacitance~\cite{hdrcis2024review,dcg_fdshared2020,tcg_sony2022};
+a coarse $K\times K$ gain tile map is a small, standardizable register extension.
+\item \textbf{Per-pixel gain (manufacturable, not yet productized).} Arbitrary
+per-photosite gain is not exposed by today's commodity parts, but it is
+\emph{not} a physics barrier---it is an integration-cost choice, and three
+process technologies already in volume manufacturing make it achievable
+(\S\ref{sec:mfg}). \pr{} therefore treats per-pixel control as the apex target
+to standardize, not an impossibility to avoid.
 \end{itemize}
 
-\noindent\textbf{The \pr{} ask.} We ask manufacturers for a modest, well-defined
-capability: a programmable \emph{per-column} gain vector (and, ideally, a coarse
-per-region gain tile map) addressable at capture, plus the OTP identity and an
-attested clock that hardware-backed C2PA pipelines already
-ship~\cite{google2025c2pa,truepic2024capture}. This is far cheaper to add than
-per-pixel control and reuses circuitry that exists for noise calibration. \pr{}
-encodes each payload bit as a \emph{low-frequency gain ramp over an image
-region} (\S\ref{sec:embed}); a per-column profile realizes the horizontal
-component, and a tile map the 2-D version.
+\noindent\textbf{The \pr{} ask (tiered).} We ask manufacturers for a
+\emph{provenance-write} capability, achievable at three increasing cost points:
+(1)~a programmable \emph{per-column} gain vector and a coarse \emph{per-region}
+tile map addressable at capture---realizable on conventional sensors today; and,
+as the apex, (2)~\emph{per-pixel} gain via the manufacturing routes of
+\S\ref{sec:mfg}. All tiers reuse the OTP identity and attested clock that
+hardware-backed C2PA pipelines already
+ship~\cite{google2025c2pa,truepic2024capture}. \pr{}'s robust carrier needs only
+a \emph{low-frequency gain ramp over an image region} (\S\ref{sec:embed}), which
+even per-column control realizes; per-pixel control is strictly more general---it
+\emph{subsumes} per-column and per-region patterns and additionally enables a
+fine-grained tamper-localization layer (\S\ref{sec:mfg}).
 
-\noindent\textbf{Software-ISP fallback (legacy).} Devices without the gain
-capability can apply the identical low-frequency modulation in the attested
-image-signal-processor (ISP) immediately after readout. This preserves the
-in-pixel binding and notarization but \emph{weakens the hardware root}: the
-modulation is now imposed in firmware rather than in the photo-electron domain,
-so it is only as trustworthy as the attested execution environment (comparable
-to today's secure-capture apps). We label such captures at a lower assurance
-tier (\S\ref{sec:discussion}) and never conflate them with true sensor-rooted
-captures.
+\noindent\textbf{Software-ISP fallback (legacy).} Devices without any gain
+capability can apply the identical modulation in the attested image-signal
+processor (ISP) immediately after readout. This preserves the in-pixel binding
+and notarization but \emph{weakens the hardware root}: the modulation is imposed
+in firmware rather than the photo-electron domain, so it is only as trustworthy
+as the attested execution environment (comparable to today's secure-capture
+apps). We label such captures at a lower assurance tier
+(\S\ref{sec:discussion}) and never conflate them with sensor-rooted captures.
+
+\subsection{Manufacturing per-pixel gain: a feasibility analysis}\label{sec:mfg}
+Because a reviewer (and an OEM) will ask \emph{exactly how} a fab would build
+per-pixel intensity control, we survey the silicon options and their cost. Three
+complementary, already-shipping process technologies make per-pixel gain
+achievable; \pr{} can use any of them, and they can be combined.
+
+\paragraph{(M1) Per-pixel conversion-gain selection (FD-capacitance).}
+Conversion gain---the volts-per-electron set at the floating-diffusion node---is
+already made \emph{switchable} per pixel in dual-/triple-conversion-gain (DCG/TCG)
+pixels by adding an in-pixel MOSFET that connects or isolates extra FD
+capacitance~\cite{hdrcis2024review,dcg_fdshared2020,baker_dcg_thesis}. Production
+mobile sensors switch among 2--3 discrete CG states per pixel (Sony's $16{:}4{:}1$
+triple-CG sensor reaches $82.4$\,dB single-exposure HDR at a $1.4\,\mu$m
+pitch~\cite{tcg_sony2022}). \emph{The provenance change is small}: drive the
+existing DCG/TCG select line from the keyed PRNG rather than only from a
+scene-adaptive HDR controller, so each carrier pixel is exposed at a chosen CG
+state. This imprints the payload \emph{in the analog photo-electron domain}
+(the strongest root) and reuses transistors that millions of sensors already
+ship; its limitation is quantization to a few discrete gain levels, which is
+ample for $1$--$2$ bits/pixel under \pr{}'s spread-spectrum coding.
+
+\paragraph{(M2) Per-pixel exposure/charge modulation (coded-exposure pixels).}
+A second, demonstrated route adds a per-pixel switch plus a one-bit code memory
+(e.g.\ in-pixel SRAM) so each pixel's integration can be gated independently---the
+basis of pixel-wise programmable exposure and coded-exposure imagers
+~\cite{pecmos2024,codedexposure_thesis,closedloop_hdr2019,svgain2025}. Modulating
+integration time is equivalent to modulating effective gain; a tiny keyed
+exposure delta on carrier pixels embeds the payload without any optical
+modulator. These designs have been fabricated in standard CMOS, confirming
+manufacturability; the cost is the extra in-pixel transistors/SRAM, which
+enlarge pixel pitch unless absorbed by stacking (M3).
+
+\paragraph{(M3) Stacked per-pixel processing (3D integration + hybrid bonding).}
+The decisive enabler is 3D stacking. Backside-illuminated (BSI) sensors put the
+photodiode on one wafer and move all circuitry to wafers bonded beneath it; with
+\emph{Cu--Cu hybrid bonding} the two wafers are joined by per-pixel vertical
+copper interconnects with no bumps. Sony shipped the first hybrid-bonded BI-CIS
+in 2016 and has since driven the interconnect pitch below $2\,\mu$m
+~\cite{cucu_hybridbond2025,sony_cucu2017}; research bonders reach a $400$\,nm
+pitch with $\sim\!10^{6}$ interconnects per mm$^2$~\cite{imec_w2w2024}. This
+makes \emph{digital pixel sensors} (DPS) practical: each pixel gets its own ADC
+and in-pixel memory on a stacked tier---e.g.\ a $3$-layer DPS with a 10-bit
+in-pixel SRAM and on-die ISP~\cite{dps_meta_brillnics2025,pixelparallel3layer2021,dps_review2024},
+and three-wafer sensors that place a DNN/ISP tier beneath the
+pixels~\cite{sony3wafer2024}. Once a per-pixel ADC, memory, and logic tier
+exist, \emph{per-pixel gain is essentially free}: the stacked logic multiplies
+each pixel's digitized value by a per-pixel factor read from the keyed code
+memory \emph{inside the attested sensor die}, before any output leaves the chip.
+This is stronger than the ISP fallback (the modulation never leaves trusted
+silicon) though still a digital---not photo-electron---operation; combining M3
+with M1 yields both a robust digital channel and an analog-domain root.
+
+\paragraph{Cost and trade-offs.} The honest costs are area, pixel pitch, yield,
+and power: extra in-pixel devices (M1/M2) compete with the photodiode for area
+unless moved to a stacked tier (M3), and stacking adds bonding-yield and
+thermal-management constraints~\cite{cucu_hybridbond2025}. Focal-plane
+sensor-processors that put a full processing element at every pixel pay for it
+with large pitch and low resolution~\cite{focalplane_carey2013,svgain2025};
+\pr{} avoids that extreme because it needs only a small per-pixel gain register,
+not a general processor. \emph{Net assessment:} per-pixel provenance gain is a
+modest, standardizable increment on top of the DCG/TCG, coded-exposure, and
+stacked-DPS technologies already in high-volume manufacturing---not a new device
+physics. We therefore recommend OEMs expose a keyed per-pixel (or, minimally,
+per-column) gain-write path as a first-class capture primitive.
+
+\paragraph{What per-pixel buys \pr{}: a two-layer mark.} Per-pixel control lets
+\pr{} carry \emph{two} bindings in the pixels at once: (i)~the robust,
+low-frequency spread-spectrum payload of \S\ref{sec:embed}, painted as a smooth
+per-region ramp, which carries the $128$-bit identity and survives JPEG and
+rescaling (measured in \S\ref{sec:robust}); and (ii)~an optional
+high-resolution per-pixel pattern keyed to the payload that acts as a spatial
+\emph{integrity map}. The robust layer answers ``is this from a genuine
+device?''; the per-pixel layer answers ``\emph{which pixels} were altered?'' by
+localizing splices at block granularity---a capability only per-pixel gain
+unlocks. In simulation this layer localizes a spliced region with a true-positive
+rate of $0.99$ and a false-positive rate of $0.02$ at $32$\,px granularity, and
+its matched-filter statistic degrades gracefully under recompression
+(\S\ref{sec:robust}), so it is intended for lightly-processed forensic media
+rather than as the primary identity channel.
 
 \subsection{Provenance payload}
 The payload $\mathbf{m}$ is a fixed-width record (\pr{}~v2: $128$ bits):
@@ -1126,6 +1229,41 @@ $1.0$ & $52.2$ & $0.006$ & $2/4$ \\
 $1.5$ & $48.7$ & $0.000$ & $4/4$ \\
 $2.0$ & $46.2$ & $0.000$ & $4/4$ \\
 $3.0$ & $42.7$ & $0.000$ & $4/4$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Optional per-pixel localization layer.} When the sensor
+supports per-pixel gain (\S\ref{sec:mfg}), \pr{} adds a second, keyed
+high-resolution pattern that serves as a spatial integrity map. We embed a
+keyed $\pm\delta$ ($\delta\!=\!4$ gray levels, PSNR $36.1$\,dB) per-pixel pattern,
+splice in a $96\times96$ foreign region, and detect tampering with a per-block
+matched-filter statistic (block $32$\,px). Across 8 trials this localizes the
+splice with a true-positive rate of $0.986$ and a false-positive rate of $0.022$
+(Table~\ref{tab:loc}). The statistic equals $\approx\!\delta$ on genuine blocks
+and $\approx\!0$ on spliced blocks; under JPEG~$Q90$ it falls from $3.98$ to
+$3.04$, i.e.\ it degrades gracefully rather than producing false alarms. This
+layer carries no identity bits---it complements, and does not replace, the robust
+payload channel---and is intended for lightly-processed forensic media.
+
+\begin{table}[t]
+\centering
+\caption{Per-pixel tamper-localization layer (8 trials, $96\times96$ splice).
+Localization is reported at $32$\,px block granularity.}
+\label{tab:loc}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{6pt}
+\footnotesize
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Embed PSNR / SSIM ($\delta\!=\!4$)        & $36.1$\,dB / $0.929$ \\
+Splice localization TPR                    & $0.986$ \\
+Splice localization FPR                    & $0.022$ \\
+Block matched-filter stat (genuine)        & $3.98 \approx \delta$ \\
+Block matched-filter stat (spliced)        & $\approx 0$ \\
+Stat after JPEG $Q90$ (graceful decay)     & $3.04$ \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -39,3 +39,10 @@ A=3.0                   PSNR 42.7dB  BER 0.0000  4/4
 (A) wrong-key accepts   0/300
 (B) forgery mean BER    0.4987  (ideal ~0.5)
 (B) forgery accepts     0/300
+
+=== optional per-pixel tamper-localization layer (needs per-pixel gain) ===
+Config                      N=512, block=32, delta=4, trials=8
+Embed PSNR / SSIM           36.09 dB / 0.9290
+Splice localization         TPR 0.986, FPR 0.022 (block 32px)
+Mean stat (pristine)        3.979  (~delta=4)
+Mean stat (after JPEG90)    3.044  -> degrades gracefully under recompression

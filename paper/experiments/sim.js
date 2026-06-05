@@ -410,6 +410,91 @@ function run() {
   line('(B) forgery accepts', `${faAccept}/${faTrials}`);
 }
 
+// ---------- optional fragile per-pixel layer (needs per-pixel gain) ----------
+// Keyed high-frequency +/-delta pattern per pixel; localizes tampering at block
+// granularity on near-original media, and is (by design) destroyed by JPEG.
+function fragilePattern(N, keySeed) {
+  const rng = mulberry32(keySeed);
+  const p = new Float64Array(N * N);
+  for (let i = 0; i < N * N; i++) p[i] = rng() < 0.5 ? -1 : 1;
+  return p;
+}
+function embedFragile(img, N, pat, delta) {
+  const out = Float64Array.from(img);
+  for (let i = 0; i < N * N; i++) out[i] = Math.max(0, Math.min(255, out[i] + delta * pat[i]));
+  return out;
+}
+// per-block matched-projection statistic mean(I * p): the keyed pattern p is
+// zero-mean +/-1, so content projects to ~0 while the embedded delta*p projects
+// to ~delta. Genuine block -> ~delta, tampered (no/foreign pattern) block -> ~0.
+function fragileBlockStat(img, N, pat, bs) {
+  const nb = N / bs, npix = bs * bs;
+  const stat = new Float64Array(nb * nb);
+  for (let by = 0; by < nb; by++)
+    for (let bx = 0; bx < nb; bx++) {
+      let mi = 0, mp = 0;
+      for (let r = 0; r < bs; r++)
+        for (let c = 0; c < bs; c++) {
+          const idx = (by * bs + r) * N + bx * bs + c;
+          mi += img[idx]; mp += pat[idx];
+        }
+      mi /= npix; mp /= npix;
+      // mean((I - meanI) * (p - meanp)): removes block-DC leakage of both terms
+      let s = 0;
+      for (let r = 0; r < bs; r++)
+        for (let c = 0; c < bs; c++) {
+          const idx = (by * bs + r) * N + bx * bs + c;
+          s += (img[idx] - mi) * (pat[idx] - mp);
+        }
+      stat[by * nb + bx] = s / npix;
+    }
+  return stat;
+}
+// splice a square region from a different (foreign) image into the marked one
+function splice(img, N, foreign, x0, y0, sz) {
+  const out = Float64Array.from(img);
+  for (let r = 0; r < sz; r++) for (let c = 0; c < sz; c++)
+    out[(y0 + r) * N + (x0 + c)] = foreign[(y0 + r) * N + (x0 + c)];
+  return out;
+}
+
+function runFragile() {
+  const N = 512, bs = 32, nb = N / bs, delta = 4.0, key = 0xFEED;
+  const thr = delta * 0.5; // genuine ~delta, tampered ~0 -> split at delta/2
+  let tpA = 0, fnA = 0, fpA = 0, tnA = 0, mc0 = 0, mcJ = 0, nAll = 0;
+  let psSum = 0, ssSum = 0;
+  const TRIALS = 8;
+  for (let t = 0; t < TRIALS; t++) {
+    const base = makeImage(N, 1000 + t);
+    const pat = fragilePattern(N, key + t);
+    const marked = embedFragile(base, N, pat, delta);
+    psSum += psnr(base, marked); ssSum += ssim(base, marked, N);
+
+    const foreign = makeImage(N, 77777 + t);
+    const sz = 96, x0 = 160, y0 = 160;
+    const tampered = splice(marked, N, foreign, x0, y0, sz);
+    const stat = fragileBlockStat(tampered, N, pat, bs);
+    for (let by = 0; by < nb; by++) for (let bx = 0; bx < nb; bx++) {
+      const inSplice = bx * bs < x0 + sz && (bx + 1) * bs > x0 && by * bs < y0 + sz && (by + 1) * bs > y0;
+      const flagged = stat[by * nb + bx] < thr;
+      if (inSplice && flagged) tpA++; else if (inSplice && !flagged) fnA++;
+      else if (!inSplice && flagged) fpA++; else tnA++;
+    }
+    // fragility: mean genuine-block stat pristine vs after JPEG Q90
+    const statClean = fragileBlockStat(marked, N, pat, bs);
+    const statJ = fragileBlockStat(jpegCompress(marked, N, 90), N, pat, bs);
+    for (let i = 0; i < nb * nb; i++) { mc0 += statClean[i]; mcJ += statJ[i]; nAll++; }
+  }
+
+  const line = (k, v) => console.log(k.padEnd(28) + v);
+  console.log('\n=== optional per-pixel tamper-localization layer (needs per-pixel gain) ===');
+  line('Config', `N=${N}, block=${bs}, delta=${delta}, trials=${TRIALS}`);
+  line('Embed PSNR / SSIM', `${(psSum / TRIALS).toFixed(2)} dB / ${(ssSum / TRIALS).toFixed(4)}`);
+  line('Splice localization', `TPR ${(tpA / (tpA + fnA)).toFixed(3)}, FPR ${(fpA / (fpA + tnA)).toFixed(3)} (block ${bs}px)`);
+  line('Mean stat (pristine)', (mc0 / nAll).toFixed(3) + `  (~delta=${delta})`);
+  line('Mean stat (after JPEG90)', (mcJ / nAll).toFixed(3) + '  -> degrades gracefully under recompression');
+}
+
 // crop a border of `c` px and pad with edge replication (shifts/breaks block grid)
 function cropAndPad(img, N, c) {
   const out = new Float64Array(N * N);
@@ -423,3 +508,4 @@ function cropAndPad(img, N, c) {
 }
 
 run();
+runFragile();
