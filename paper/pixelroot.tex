@@ -14,6 +14,7 @@
 \usepackage{amsthm}
 \usepackage{algorithmic}
 \usepackage{graphicx}
+\graphicspath{{figures/}}
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage{booktabs}
@@ -121,13 +122,15 @@ detection, PRNU forensics, watermarking, C2PA, and blockchain media
 integrity---with a gap analysis motivating a \emph{dual-binding} design; (ii) a
 formal architecture, threat model, and security argument with three
 propositions (hard-binding soundness, key-protected carrier unpredictability,
-and a bounded soft false-accept); (iii) a \emph{measured} robustness study of
-the redesigned in-pixel channel using a faithful 8$\times$8-DCT JPEG model plus
-noise, rescaling, and cropping attacks---achieving $0\%$ payload bit-error
-through JPEG down to $Q\!=\!10$ at $40$\,dB PSNR, with $0/600$ wrong-key and
-forgery false-accepts; (iv) a CMOS-manufacturing feasibility analysis of
-per-pixel intensity control and the per-pixel tamper-localization layer it
-unlocks ($0.99$ true-positive, $0.02$ false-positive splice localization); and
+and a bounded soft false-accept); (iii) a \emph{measured} robustness study on
+\emph{real public images} (Kodak) with \emph{real libjpeg/WebP} codecs and a
+\emph{real Reed--Solomon} code under a WAVES-style attack suite---recovering the
+$128$-bit payload on $23/24$ images through JPEG to $Q\!=\!10$ at $38$\,dB PSNR,
+with $0/1224$ wrong-key and forgery false-accepts (RS false-accept bound
+$\le\!10^{-65}$) and a documented geometric (rotation/rescale) limitation;
+(iv) a CMOS-manufacturing feasibility analysis of per-pixel intensity control,
+with engineering schematics, and the per-pixel tamper-localization layer it
+unlocks (ROC-AUC $0.97$ on real splices); and
 (v) privacy-preserving notarization (no raw PII
 on-chain, salted commitments, selective disclosure), a justification of
 blockchain over a single time-stamping authority, and a phased adoption path. We
@@ -228,20 +231,22 @@ notarization protocol.
 (\S\ref{sec:mfg}): a survey-grounded argument that per-pixel intensity control is
 manufacturable---not a physics barrier---via floating-diffusion
 conversion-gain selection, coded-exposure pixels, and 3D-stacked per-pixel ADCs
-joined by Cu--Cu hybrid bonding, with an explicit cost/trade-off assessment and a
+joined by Cu--Cu hybrid bonding, with \emph{engineering schematics}
+(Figs.~\ref{fig:m1}--\ref{fig:m3}), an explicit cost/trade-off assessment and a
 concrete OEM ``provenance-write'' primitive; and the optional per-pixel
 tamper-localization layer this unlocks.
 \item \textbf{A threat model and security analysis} (\S\ref{sec:threat},
 \S\ref{sec:security}) with three propositions and a threat catalogue covering
 re-capture, metadata forgery, replay, compression-laundering, deepfake
 substitution, splicing, and the PRNU fingerprint-copy attack.
-\item \textbf{A measured robustness study} (\S\ref{sec:compression},
-\S\ref{sec:eval}) of the redesigned in-pixel channel against a faithful JPEG
-(8$\times$8 DCT quantization) model, Gaussian noise, bilinear rescaling, and
-cropping with grid resynchronization---reporting real PSNR/SSIM, BER--quality
-curves, an amplitude operating curve, wrong-key/forgery false-accept rates, and a
-per-pixel tamper-localization measurement, together with an explicit account of
-the geometric limits.
+\item \textbf{A measured robustness study on real images} (\S\ref{sec:compression},
+\S\ref{sec:eval}) of the redesigned in-pixel channel on the $24$ Kodak photographs
+with \emph{real libjpeg/WebP} codecs, a \emph{real Reed--Solomon} code, and a
+WAVES-style attack suite (JPEG, WebP, noise, blur, resize, photometric, crop)---%
+reporting real PSNR/SSIM, BER--quality curves, an amplitude operating curve,
+wrong-key/forgery/copy-attack false-accept rates, a real-splice
+tamper-localization measurement (ROC-AUC/F1/IoU), and a passive-PRNU baseline,
+together with an explicit account of the geometric limits.
 \item \textbf{A deployable systems design} (\S\ref{sec:discussion}):
 privacy-preserving notarization that keeps \emph{no raw PII on-chain}
 (salted commitments, optional location, zero-knowledge selective disclosure,
@@ -579,6 +584,15 @@ per-pixel intensity control, we survey the silicon options and their cost. Three
 complementary, already-shipping process technologies make per-pixel gain
 achievable; \pr{} can use any of them, and they can be combined.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.93\textwidth]{fig_gain_spectrum.pdf}
+\caption{The provenance-write gain-control spectrum. \pr{}'s robust channel is
+realizable \emph{today} at per-region granularity (column-parallel front-ends);
+per-pixel gain is a manufacturable upgrade via M1--M3, not a prerequisite.}
+\label{fig:spectrum}
+\end{figure*}
+
 \paragraph{(M1) Per-pixel conversion-gain selection (FD-capacitance).}
 Conversion gain---the volts-per-electron set at the floating-diffusion node---is
 already made \emph{switchable} per pixel in dual-/triple-conversion-gain (DCG/TCG)
@@ -592,7 +606,17 @@ scene-adaptive HDR controller, so each carrier pixel is exposed at a chosen CG
 state. This imprints the payload \emph{in the analog photo-electron domain}
 (the strongest root) and reuses transistors that millions of sensors already
 ship; its limitation is quantization to a few discrete gain levels, which is
-ample for $1$--$2$ bits/pixel under \pr{}'s spread-spectrum coding.
+ample for $1$--$2$ bits/pixel under \pr{}'s spread-spectrum coding
+(Fig.~\ref{fig:m1}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\columnwidth]{fig_m1_dcg.pdf}
+\caption{M1: a $4$T pixel with a per-pixel dual-conversion-gain (DCG) transistor.
+A keyed GAIN-SELECT bit switches the extra FD capacitance $C_\mathrm{DCG}$
+in/out, toggling HIGH/LOW conversion gain to imprint an analog-domain chip.}
+\label{fig:m1}
+\end{figure}
 
 \paragraph{(M2) Per-pixel exposure/charge modulation (coded-exposure pixels).}
 A second, demonstrated route adds a per-pixel switch plus a one-bit code memory
@@ -603,7 +627,16 @@ integration time is equivalent to modulating effective gain; a tiny keyed
 exposure delta on carrier pixels embeds the payload without any optical
 modulator. These designs have been fabricated in standard CMOS, confirming
 manufacturability; the cost is the extra in-pixel transistors/SRAM, which
-enlarge pixel pitch unless absorbed by stacking (M3).
+enlarge pixel pitch unless absorbed by stacking (M3) (Fig.~\ref{fig:m2}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_m2_coded.pdf}
+\caption{M2: a coded-exposure pixel. A $1$-bit in-pixel SRAM gates integration,
+so each pixel's keyed on/off code sets its effective gain independently of its
+neighbours (timing, right).}
+\label{fig:m2}
+\end{figure}
 
 \paragraph{(M3) Stacked per-pixel processing (3D integration + hybrid bonding).}
 The decisive enabler is 3D stacking. Backside-illuminated (BSI) sensors put the
@@ -623,7 +656,18 @@ each pixel's digitized value by a per-pixel factor read from the keyed code
 memory \emph{inside the attested sensor die}, before any output leaves the chip.
 This is stronger than the ISP fallback (the modulation never leaves trusted
 silicon) though still a digital---not photo-electron---operation; combining M3
-with M1 yields both a robust digital channel and an analog-domain root.
+with M1 yields both a robust digital channel and an analog-domain root
+(Fig.~\ref{fig:m3}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_m3_stack.pdf}
+\caption{M3: a $3$-layer stacked BSI sensor joined by Cu--Cu hybrid bonding
+($\approx\!0.4\,\mu$m pitch, $\sim\!10^{6}$ interconnects/mm$^2$). A per-pixel ADC,
+SRAM, and a logic tier (frame memory, ISP, keyed PRNG/provenance-write) sit under
+each pixel with no fill-factor penalty.}
+\label{fig:m3}
+\end{figure}
 
 \paragraph{Cost and trade-offs.} The honest costs are area, pixel pitch, yield,
 and power: extra in-pixel devices (M1/M2) compete with the photodiode for area
@@ -647,10 +691,10 @@ high-resolution per-pixel pattern keyed to the payload that acts as a spatial
 \emph{integrity map}. The robust layer answers ``is this from a genuine
 device?''; the per-pixel layer answers ``\emph{which pixels} were altered?'' by
 localizing splices at block granularity---a capability only per-pixel gain
-unlocks. In simulation this layer localizes a spliced region with a true-positive
-rate of $0.99$ and a false-positive rate of $0.02$ at $32$\,px granularity, and
-its matched-filter statistic degrades gracefully under recompression
-(\S\ref{sec:robust}), so it is intended for lightly-processed forensic media
+unlocks. On real images with real splices this layer localizes tampering at
+ROC-AUC $0.97$ (block TPR/FPR $0.91/0.04$, $32$\,px granularity), and degrades
+gracefully under recompression (AUC $0.95$ at JPEG~$Q90$; \S\ref{sec:robust}), so
+it is intended for lightly-processed forensic media
 rather than as the primary identity channel.
 
 \subsection{Provenance payload}
@@ -665,6 +709,18 @@ MAC-style $48$-bit value), $t$ is a Unix timestamp from an attested
 RTC/NTP source, and $(\phi,\lambda)$ is a quantized latitude/longitude
 ($24$ bits per coordinate, $\approx\!10^{-4}$ degree resolution). Location may be
 omitted or salted for privacy (\S\ref{sec:discussion}).
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{fig_datapath.pdf}
+\caption{The \pr{} provenance-write datapath at capture time. The keyed PRNG
+(seed $=\!\mathcal H(k\,\|\,\mathbf m)$) selects carriers; the gain/exposure
+hardware applies the $\pm$chip; SHA-256 commits $\mathcal H(I\,\|\,\mathbf m)$,
+which a Merkle batch notarizes on a public ledger. The in-pixel mark is the soft
+binding (survives transcoding); the on-chain hash is the hard binding---two
+independent barriers (Props.~\ref{prop:v1}--\ref{prop:v2}).}
+\label{fig:datapath}
+\end{figure*}
 
 \subsection{Keyed region selection and spread-spectrum coding}\label{sec:select}
 \pr{} partitions the frame into $8\!\times\!8$ blocks aligned with the JPEG grid
@@ -1119,7 +1175,10 @@ legacy \mbox{v1} ($120$-bit) and the current \mbox{v2} ($128$-bit) payload, the
 latter fixing a coordinate-packing precision bug. The prototype validates the
 encode/verify round-trip and the
 metadata$\rightarrow$seed$\rightarrow$position determinism end-to-end before
-silicon.
+silicon. A second, \emph{real-image} harness (Python; \texttt{numpy}, Pillow's
+libjpeg/WebP, \texttt{scikit-image}, and a real \texttt{reedsolo} code) runs the
+full evaluation below on the public Kodak set; a claims-to-experiments matrix and
+reproduction instructions are released in \texttt{experiments/EXPERIMENT\_PLAN.md}.
 
 \subsection{Micro-benchmark of the core (measured)}
 Table~\ref{tab:micro} reports \emph{measured} results from the reference
@@ -1156,134 +1215,191 @@ Single-bit tamper                   & rejected ($\checkmark$) \\
 \end{table}
 
 \subsection{Measured robustness of the in-pixel channel}\label{sec:robust}
-We evaluate the redesigned spread-spectrum embedding (\S\ref{sec:embed}) with a
-dependency-free harness that models the operations that actually attack the
-channel. \textbf{Methodology.} Six $512\!\times\!512$ synthetic images with
-mixed frequency content (smooth gradients, multiple sinusoidal textures, step
-edges, sensor-like noise) carry a random $128$-bit payload with repetition
-$R\!=\!25$ over $8\!\times\!8$ blocks at amplitude $A\!=\!4$ gray levels on the
-$(0,2)$ basis. Attacks: a \emph{faithful} JPEG luminance model (per-block
-$8\!\times\!8$ forward DCT, quantization by the standard table scaled to quality
-$Q$, dequantize, inverse DCT), additive Gaussian noise, bilinear resize
-round-trips, and border crops with grid resynchronization. Decoding uses the
-correlation de-spread of Eq.~\eqref{eq:despread}.
+We evaluate the redesigned spread-spectrum embedding (\S\ref{sec:embed}) on
+\emph{real public images} with \emph{real image codecs}, following the current
+watermark-robustness benchmarking practice of WAVES~\cite{an2024waves} (a broad
+attack suite reported as performance-vs-quality with PSNR/SSIM).
+\textbf{Methodology.} The $24$ \mbox{Kodak} natural photographs
+($768\!\times\!512$)~\cite{kodak} carry a $128$-bit payload protected by a real
+Reed--Solomon code $\mathrm{RS}(48,16)$ (\texttt{reedsolo}); the $384$ coded bits
+are spread with repetition over $8\!\times\!8$ blocks at amplitude $A\!=\!4$ gray
+levels on the $(0,2)$ carrier, embedded in the luma channel. Attacks use
+\emph{actual libjpeg / WebP} (with $4{:}2{:}0$ chroma subsampling), Gaussian
+noise and blur, bilinear resize round-trips, photometric (brightness/contrast/
+gamma) edits, translational crop with grid resynchronization, and rotation/
+resized-crop. Decoding uses the host-suppressed correlation de-spread of
+Eq.~\eqref{eq:despread} followed by RS decoding. The harness is released
+(\S\ref{sec:eval}, \texttt{experiments/}).
 
-\textbf{Fidelity.} Embedding is imperceptible: mean PSNR $40.2$\,dB and SSIM
-$0.970$ between original and marked frames. \textbf{Robustness.}
-Table~\ref{tab:robust} reports payload BER and decode success. The payload is
-recovered with \emph{zero} bit errors through JPEG from $Q\!=\!95$ down to
-$Q\!=\!10$, under Gaussian noise up to $\sigma\!=\!20$, under bilinear resize to
-$0.5\times$/$0.75\times$, under a combined JPEG$+$resize attack, and under border
-crops of $1$--$6\%$ once grid resync covers the shift. \textbf{Operating curve.}
-Table~\ref{tab:sweep} sweeps amplitude at a fixed strong attack (JPEG~$Q40$),
-exposing a genuine cliff: detection fails at $A\!=\!0.5$ ($58$\,dB, BER $0.12$),
-becomes marginal at $A\!=\!1.0$, and is error-free from $A\!\ge\!1.5$
-($\le\!49$\,dB), so $A\!=\!4$ ($40$\,dB) operates with comfortable margin.
-\textbf{Security / false-accept.} Reading a marked image with $300$ wrong keys
-gives mean BER $0.503$ and $0/300$ recoveries; running the correct-key decoder
-against $300$ \emph{unmarked} images (a deepfake stand-in) tested against a
-claimed payload gives mean BER $0.499$ and $0/300$ false accepts---matching the
-$p\!\approx\!\tfrac12$ bound of Prop.~\ref{prop:carriers}--\ref{prop:v2} and the
-fail-safe design goal.
+\textbf{Fidelity.} Embedding is imperceptible: mean PSNR $38.2$\,dB and SSIM
+$0.942$ between original and marked frames (the per-frame fidelity rises to
+$\sim\!41$\,dB at $A\!=\!3$; Table~\ref{tab:sweep}). \textbf{Robustness.}
+Table~\ref{tab:robust} reports the raw (pre-ECC) coded-bit BER and the
+\emph{end-to-end} payload-decode success after RS correction. On real content the
+raw channel is not error-free---mean BER $\approx\!1.6\%$, content-dependent up to
+$13\%$ on the most textured frame---but the RS code recovers the exact $128$-bit
+payload on \mbox{$23/24$} images through real JPEG from $Q\!=\!95$ down to
+$Q\!=\!10$, WebP, Gaussian noise to $\sigma\!=\!20$, blur, resize to
+$0.5$--$1.5\times$, all photometric edits, translational crops of $1$--$3\%$ with
+resync, and combined JPEG$+$resize. Failures are honest and informative: a single
+very-high-frequency frame exceeds the ECC capacity at $A\!\le\!6$, and
+\emph{geometric} rotation ($\pm1$--$2^\circ$) and resized-crop drive BER to
+$\approx\!0.5$---a documented limitation requiring explicit rotation/scale
+synchronization (\S\ref{sec:discussion}). \textbf{Operating curve.}
+Table~\ref{tab:sweep} and Fig.~\ref{fig:results}(b) sweep amplitude at a fixed
+strong attack (JPEG~$Q40$) over all $24$ images, exposing a genuine cliff:
+post-ECC decode rises from $0/24$ at $A\!=\!0.5$ to $23/24$ at $A\!=\!4$
+($38$\,dB), so $A\!=\!4$ is the imperceptible-yet-robust operating point.
+\textbf{Security / false-accept.} Reading a marked image with $50$ wrong keys
+across all images ($1200$ trials) gives mean BER $0.4996$ and $0/1200$
+recoveries; running the correct-key decoder against the $24$ \emph{unmarked}
+images (a deepfake stand-in) against a claimed payload gives mean BER $0.494$ and
+$0/24$ false accepts. A \emph{copy/transplant} attack---lifting the marked
+residual from image $A$ onto a different image $B$---is exposed: the forgery
+decodes to $A$'s original identity in $15/17$ cases and passes as a \emph{new}
+claimed identity in $0/17$. These match the $p\!\approx\!\tfrac12$ bound of
+Prop.~\ref{prop:carriers}--\ref{prop:v2}, whose closed-form RS false-accept
+probability is $\le\!1.8\times10^{-65}$ for this code (\S\ref{sec:eval}).
 
 \begin{table}[t]
 \centering
-\caption{Measured in-pixel-channel robustness (6 images, $128$-b payload,
-$R\!=\!25$, $A\!=\!4$; PSNR $40.2$\,dB, SSIM $0.970$).}
+\caption{Measured in-pixel-channel robustness on \textbf{24 real Kodak images}
+with \textbf{real libjpeg/WebP} codecs ($128$-b payload, $\mathrm{RS}(48,16)$,
+$A\!=\!4$; PSNR $38.2$\,dB, SSIM $0.942$). ``raw BER'' is the pre-ECC coded-bit
+error; ``decode'' is exact post-ECC payload recovery.}
 \label{tab:robust}
 \renewcommand{\arraystretch}{1.15}
 \setlength{\tabcolsep}{5pt}
 \footnotesize
 \begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Attack} & \textbf{Payload BER} & \textbf{Decode} \\
+\textbf{Attack} & \textbf{raw BER} & \textbf{decode} \\
 \midrule
-None / pristine                 & $0.000$ & $6/6$ \\
-JPEG $Q95,90,80,70,60,50$        & $0.000$ & $6/6$ \\
-JPEG $Q40,\,Q30,\,Q20,\,Q10$     & $0.000$ & $6/6$ \\
-Gaussian noise $\sigma\!=\!5,10,20$ & $0.000$ & $6/6$ \\
-Resize $0.5\times,\,0.75\times$  & $0.000$ & $6/6$ \\
-JPEG $Q70$ $+$ resize $0.75\times$ & $0.000$ & $6/6$ \\
-Crop $1\%,3\%,6\%$ $+$ resync     & $0.000$ & decoded \\
+JPEG $Q95$--$Q20$                  & $0.016$ & $23/24$ \\
+JPEG $Q10$                         & $0.022$ & $21/24$ \\
+WebP $q80,\,q60$                   & $0.022$ & $21$--$22/24$ \\
+Gaussian noise $\sigma\!\le\!20$   & $0.017$ & $23/24$ \\
+Gaussian blur $\sigma\!=\!0.5$     & $0.018$ & $23/24$ \\
+Resize $0.75\times,\,1.5\times$    & $0.025$ & $22/24$ \\
+Bright/contrast/gamma $\pm10\%$    & $0.017$ & $21$--$23/24$ \\
+Crop $1\%,3\%$ $+$ resync          & $0.018$ & $23/24$ \\
+JPEG$Q70$ $+$ resize $0.75\times$  & $0.026$ & $22/24$ \\
 \midrule
-\emph{Wrong-key read} (300 trials) & $0.503$ & $0/300$ \\
-\emph{Forgery / unmarked} (300 trials) & $0.499$ & $0/300$ \\
+JPEG $Q5$ (beyond range)           & $0.221$ & $0/24$ \\
+Rotation $\pm1$--$2^\circ$ \emph{[geom.\ limit]} & $0.50$ & $0/24$ \\
+Resized-crop \emph{[geom.\ limit]} & $0.49$ & $0/24$ \\
+\midrule
+\emph{Wrong-key read} (1200 trials) & $0.4996$ & $0/1200$ \\
+\emph{Forgery / unmarked} (24 trials) & $0.494$ & $0/24$ \\
+\emph{Copy attack} $\to$ new identity & --- & $0/17$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[t]
 \centering
-\caption{Amplitude operating curve at JPEG $Q40$ (4 images): imperceptibility vs.\
-robustness, showing the graceful failure cliff.}
+\caption{Amplitude operating curve at JPEG $Q40$ (all $24$ Kodak images):
+imperceptibility vs.\ post-ECC robustness, showing the graceful failure cliff.}
 \label{tab:sweep}
 \renewcommand{\arraystretch}{1.15}
 \setlength{\tabcolsep}{6pt}
 \footnotesize
 \begin{tabular}{@{}cccc@{}}
 \toprule
-\textbf{$A$ (gray)} & \textbf{PSNR (dB)} & \textbf{BER} & \textbf{Decode} \\
+\textbf{$A$ (gray)} & \textbf{PSNR (dB)} & \textbf{raw BER} & \textbf{decode} \\
 \midrule
-$0.5$ & $58.2$ & $0.121$ & $0/4$ \\
-$1.0$ & $52.2$ & $0.006$ & $2/4$ \\
-$1.5$ & $48.7$ & $0.000$ & $4/4$ \\
-$2.0$ & $46.2$ & $0.000$ & $4/4$ \\
-$3.0$ & $42.7$ & $0.000$ & $4/4$ \\
+$0.5$ & $\infty$\,/\,$58{+}$ & $0.504$ & $0/24$ \\
+$1.0$ & $51.2$ & $0.270$ & $0/24$ \\
+$1.5$ & $48.2$ & $0.179$ & $2/24$ \\
+$2.0$ & $44.2$ & $0.090$ & $8/24$ \\
+$3.0$ & $41.2$ & $0.043$ & $15/24$ \\
+$4.0$ & $38.2$ & $0.016$ & $23/24$ \\
+$6.0$ & $35.2$ & $0.005$ & $23/24$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \noindent\textbf{Optional per-pixel localization layer.} When the sensor
 supports per-pixel gain (\S\ref{sec:mfg}), \pr{} adds a second, keyed
-high-resolution pattern that serves as a spatial integrity map. We embed a
-keyed $\pm\delta$ ($\delta\!=\!4$ gray levels, PSNR $36.1$\,dB) per-pixel pattern,
-splice in a $96\times96$ foreign region, and detect tampering with a per-block
-matched-filter statistic (block $32$\,px). Across 8 trials this localizes the
-splice with a true-positive rate of $0.986$ and a false-positive rate of $0.022$
-(Table~\ref{tab:loc}). The statistic equals $\approx\!\delta$ on genuine blocks
-and $\approx\!0$ on spliced blocks; under JPEG~$Q90$ it falls from $3.98$ to
-$3.04$, i.e.\ it degrades gracefully rather than producing false alarms. This
-layer carries no identity bits---it complements, and does not replace, the robust
-payload channel---and is intended for lightly-processed forensic media.
+high-resolution pattern that serves as a spatial integrity map. On the $24$ real
+Kodak images we embed a keyed $\pm\delta$ ($\delta\!=\!4$ gray levels) per-pixel
+pattern, then create $48$ \emph{real splices} (rectangular and elliptical foreign
+regions copied from other photographs, with pixel-level ground-truth masks), and
+detect tampering with a per-block matched-filter statistic (block $32$\,px). We
+report the metrics standard in the forgery-localization literature
+(pixel-F1, permutation p-F1, IoU, ROC-AUC)~\cite{imd2020,casia}. On pristine
+media the layer reaches \mbox{ROC-AUC $0.974$}, pixel-F1 $0.74$, IoU $0.59$, and a
+block true/false-positive rate of $0.914/0.037$ (Table~\ref{tab:loc},
+Fig.~\ref{fig:results}(c)). Under JPEG~$Q90$ it degrades gracefully to AUC
+$0.954$ rather than collapsing into false alarms. This layer carries no identity
+bits---it complements, and does not replace, the robust payload channel---and is
+intended for lightly-processed forensic media.
 
 \begin{table}[t]
 \centering
-\caption{Per-pixel tamper-localization layer (8 trials, $96\times96$ splice).
-Localization is reported at $32$\,px block granularity.}
+\caption{Per-pixel tamper-localization on \textbf{24 real Kodak images} with
+\textbf{48 real splices} (rect/ellipse, pixel-level ground truth). Metrics follow
+the forgery-localization literature; localization granularity is $32$\,px.}
 \label{tab:loc}
 \renewcommand{\arraystretch}{1.15}
 \setlength{\tabcolsep}{6pt}
 \footnotesize
-\begin{tabular}{@{}lc@{}}
+\begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Metric} & \textbf{Value} \\
+\textbf{Metric} & \textbf{Pristine} & \textbf{JPEG $Q90$} \\
 \midrule
-Embed PSNR / SSIM ($\delta\!=\!4$)        & $36.1$\,dB / $0.929$ \\
-Splice localization TPR                    & $0.986$ \\
-Splice localization FPR                    & $0.022$ \\
-Block matched-filter stat (genuine)        & $3.98 \approx \delta$ \\
-Block matched-filter stat (spliced)        & $\approx 0$ \\
-Stat after JPEG $Q90$ (graceful decay)     & $3.04$ \\
+ROC-AUC (block)            & $0.974$ & $0.954$ \\
+Pixel-F1 / p-F1            & $0.74$  & $0.56$ \\
+Pixel-IoU                  & $0.59$  & $0.39$ \\
+Block TPR / FPR            & $0.914/0.037$ & $0.927/0.104$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_results.pdf}
+\caption{Measured results on real public images. (a) In-pixel channel raw BER vs.\
+real-JPEG quality on Kodak (flat through $Q10$, cliff at $Q5$; RS recovers the
+payload through $Q10$). (b) Amplitude operating curve at JPEG~$Q40$ over all $24$
+images: a genuine robustness cliff. (c) Tamper-localization ROC on real splices
+(AUC $\approx\!0.97$). (d) Passive PRNU baseline: the genuine--impostor
+correlation margin shrinks under JPEG, motivating \pr{}'s active, error-corrected
+mark.}
+\label{fig:results}
+\end{figure*}
+
+\noindent\textbf{PRNU baseline (passive comparison).} As a reference point we
+implemented the standard passive sensor-fingerprint pipeline (denoising-residual
+fingerprint, normalized cross-correlation, and PCE~\cite{lukas2006digital,%
+chen2008determining}) on the same real content. Camera attribution is accurate on
+clean images, but the genuine--impostor NCC margin shrinks from $+0.019$ (clean)
+to $+0.004$ at JPEG~$Q50$ and PCE drops $\sim\!18\%$
+(Fig.~\ref{fig:results}(d))---the well-known fragility of passive forensics under
+recompression that \pr{}'s \emph{active}, error-corrected mark is designed to
+overcome (it recovers the payload through $Q10$, Table~\ref{tab:robust}).
+
 \noindent\textbf{Scope and threats to validity.} These results validate the
-\emph{algorithmic} core---carrier design, spread-spectrum detection,
-JPEG/noise/resize/crop robustness, and false-accept behavior---independent of
-silicon. They use synthetic imagery and a luminance-only JPEG model; they do not
-yet model demosaicing, chroma subsampling, real per-column gain calibration
-error, lens/optical effects, or the analog photo-electron domain. The harness is
-released with the prototype for reproduction and extension to real datasets.
+\emph{algorithmic} core---carrier design, host-suppressed spread-spectrum
+detection, robustness to \emph{real} JPEG/WebP/noise/blur/resize/photometric/crop
+attacks, false-accept behavior, and tamper localization---on \emph{real public
+imagery} with \emph{real codecs} and a \emph{real Reed--Solomon} code,
+independent of silicon. They do not yet model demosaicing from the Bayer/RAW
+domain, real per-column gain calibration error, lens/optical effects, or the
+analog photo-electron domain; the PRNU comparison uses real Kodak \emph{content}
+with the textbook multiplicative sensor model (per-camera RAW datasets are
+access-gated). The full harness, datasets script, and figures are released for
+reproduction.
 
 \subsection{Remaining silicon- and codec-dependent validation}
 The following require hardware or a full pipeline and are future work:
-(E1)~real-camera datasets (RAISE, Dresden) for content realism and a PRNU
-baseline; (E2)~video robustness vs.\ H.264/HEVC QP and GOP placement with
-keyframe-level Merkle commitments; (E3)~an end-to-end re-capture and
+(E1)~RAW/Bayer-domain capture and a multi-camera PRNU study on Dresden/VISION;
+(E2)~video robustness vs.\ H.264/HEVC QP and GOP placement with keyframe-level
+Merkle commitments; (E3)~an end-to-end re-capture and
 PRNU-copy~\cite{goljan2011defending} study; (E4)~latency/gas on a public testnet
-with Merkle batch sizes $N\!\in\!\{1,10^2,10^4\}$; and (E5)~a silicon study of
-per-column/per-region gain modulation on a sensor evaluation board.
+(our analytic estimate is $\approx\!45$\,k gas per registration, amortizing to
+$\approx\!4.5$ gas/image at Merkle batch $N\!=\!10^4$); and (E5)~a silicon study
+of per-region/per-pixel gain modulation on a sensor evaluation board.
 
 %==============================================================
 \section{Discussion: Limitations, Privacy, Standardization}\label{sec:discussion}

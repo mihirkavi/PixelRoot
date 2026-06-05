@@ -1,0 +1,135 @@
+PixelRoot — consolidated experimental results
+Generated: Thu Jun  4 23:53:02 PDT 2026
+
+########################################################################
+=== E1: imperceptibility + robustness on REAL images (Kodak), REAL codecs + RS ECC ===
+Images: 24  payload=128b  RS(48,16) nsym=32  coded=384b  A=4.0
+Mean embed PSNR: 38.20 dB (min 38.14)   SSIM: 0.9420 (min 0.9106)
+Mean clean coded-bit BER (pre-ECC): 0.0161  (max 0.1328)
+
+Attack                raw BER     payload decode
+JPEG Q95              0.0163      23/24
+JPEG Q90              0.0163      23/24
+JPEG Q80              0.0168      23/24
+JPEG Q70              0.0165      23/24
+JPEG Q60              0.0161      23/24
+JPEG Q50              0.0162      23/24
+JPEG Q40              0.0161      23/24
+JPEG Q30              0.0167      22/24
+JPEG Q20              0.0164      23/24
+JPEG Q10              0.0218      21/24
+JPEG Q5               0.2206      0/24
+WebP q80              0.0214      22/24
+WebP q60              0.0240      21/24
+Noise s2              0.0161      23/24
+Noise s5              0.0161      23/24
+Noise s10             0.0161      23/24
+Noise s20             0.0183      23/24
+Blur r0.5             0.0177      23/24
+Blur r1.0             0.0329      19/24
+Resize 0.5x           0.0419      16/24
+Resize 0.75x          0.0259      22/24
+Resize 1.5x           0.0237      22/24
+Brightness 0.9        0.0163      23/24
+Brightness 1.1        0.0180      21/24
+Contrast 0.9          0.0163      23/24
+Contrast 1.1          0.0181      22/24
+Gamma 0.9             0.0157      23/24
+Gamma 1.1             0.0174      22/24
+Crop 1%               0.0171      23/24
+Crop 2%               0.1117      20/24
+Crop 3%               0.0195      23/24
+Rotate 1deg [lim]     0.5036      0/24
+Rotate 2deg [lim]     0.5013      0/24
+ResizedCrop 3% [lim]  0.4898      0/24
+JPEG70+Resize0.75     0.0258      22/24
+JPEG50+Noise5         0.0166      23/24
+Resize0.75+JPEG40     0.0267      22/24
+
+Amplitude operating curve @ JPEG Q40 (all images): raw BER + post-ECC decode
+A       PSNR(dB)    raw BER   decode
+0.5     inf         0.5037    0/24
+1.0     51.21       0.2702    0/24
+1.5     48.20       0.1791    2/24
+2.0     44.22       0.0900    8/24
+3.0     41.21       0.0430    15/24
+4.0     38.20       0.0160    23/24
+6.0     35.20       0.0052    23/24
+
+########################################################################
+=== E2: security / false-accept on REAL images (Kodak) ===
+key='PIXELROOT-OEM-KEY-v2'  A=4.0  RS(48,16)
+
+(A) Wrong-key read: trials=1200 (50 keys x 24 imgs)
+    mean coded-bit BER = 0.4996  (ideal ~0.5)
+    false accepts (decoded true payload) = 0/1200
+
+(B) Forgery on UNMARKED images: trials=24
+    mean coded-bit BER vs claimed = 0.4937  (ideal ~0.5)
+    false accepts (claimed payload decoded) = 0/24
+
+(C) Copy/transplant attack: trials=17
+    forged image decodes to ORIGINAL (A) identity = 15/17  (copy exposed)
+    forged image passes as a NEW claimed (B) identity = 0/17  (must be 0)
+
+########################################################################
+=== E3: per-pixel tamper localization on REAL images (Kodak) ===
+delta=4.0, block=32px, trials=48 (rect+ellipse splices)
+metrics follow forgery-localization literature (pixel-F1, p-F1, IoU, AUC)
+
+[Pristine]
+   ROC-AUC (block)        = 0.9742
+   Pixel-F1               = 0.7395
+   p-F1 (permutation)     = 0.7395
+   Pixel-IoU              = 0.5866
+   Block TPR / FPR @thr   = 0.914 / 0.037
+
+[After JPEG Q90]
+   ROC-AUC (block)        = 0.9545
+   Pixel-F1               = 0.5624
+   p-F1 (permutation)     = 0.5624
+   Pixel-IoU              = 0.3912
+   Block TPR / FPR @thr   = 0.927 / 0.104
+
+
+########################################################################
+=== E4: PRNU passive-baseline pipeline (real Kodak content) ===
+fingerprint strength K_std=0.01, train=12 imgs/camera, test=12 imgs x 2 cameras
+standard pipeline: denoise-residual fingerprint + NCC attribution + PCE
+
+Condition     attr. acc   genuine NCC   impostor NCC  PCE
+clean         1.000       0.0855        0.0669        260.7
+JPEG Q95      1.000       0.0835        0.0657        257.5
+JPEG Q90      1.000       0.0792        0.0661        237.2
+JPEG Q70      1.000       0.0740        0.0677        214.8
+JPEG Q50      1.000       0.0737        0.0694        212.9
+
+Takeaway: passive PRNU attribution is accurate on clean images but its
+correlation/PCE degrades under JPEG -- the documented weakness PixelRoot's
+ACTIVE, error-corrected mark addresses (E1: payload survives to JPEG Q10).
+
+########################################################################
+=== E5: crypto micro-benchmarks, Merkle batching, RS false-accept bound ===
+Platform: Python 3.9.6 hashlib (OpenSSL SHA-NI if available)
+
+[C10] SHA-256 commitment timing (mean of 20 runs):
+   5.9 MB frame                       2.64 ms
+   6 MP RGB (2832x2122x3=18MB)        8.50 ms
+   1080p RGB (6.2MB)                  2.92 ms
+   seed derivation + carrier selection (128b x R=25, 32400 blocks): 0.430 ms
+
+[C11] Merkle batching (sorted-pair SHA-256, matches registry.sol):
+   N leaves    build (ms)    path len    proof bytes
+   1           0.002         0           0
+   100         0.059         7           224
+   10000       5.814         14          448
+   On-chain gas (analytic EVM):
+     batch=1      per-tx=44996 gas   amortized/image=44996.00 gas
+     batch=100    per-tx=44996 gas   amortized/image=449.96 gas
+     batch=10000  per-tx=44996 gas   amortized/image=4.50 gas
+   (verifyInclusion is a view call: 0 on-chain gas; proof verified off-chain)
+
+[C7] RS(48,16) soft false-accept bound (Prop. 3), per-bit p=1/2:
+   corrects t=16 byte errors; P[random read decodes to a claimed payload]
+   = 1.833e-65   (empirical E2: 0/1200 wrong-key, 0/24 forgery)
+

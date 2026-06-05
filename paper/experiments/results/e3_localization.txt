@@ -1,0 +1,18 @@
+=== E3: per-pixel tamper localization on REAL images (Kodak) ===
+delta=4.0, block=32px, trials=48 (rect+ellipse splices)
+metrics follow forgery-localization literature (pixel-F1, p-F1, IoU, AUC)
+
+[Pristine]
+   ROC-AUC (block)        = 0.9742
+   Pixel-F1               = 0.7395
+   p-F1 (permutation)     = 0.7395
+   Pixel-IoU              = 0.5866
+   Block TPR / FPR @thr   = 0.914 / 0.037
+
+[After JPEG Q90]
+   ROC-AUC (block)        = 0.9545
+   Pixel-F1               = 0.5624
+   p-F1 (permutation)     = 0.5624
+   Pixel-IoU              = 0.3912
+   Block TPR / FPR @thr   = 0.927 / 0.104
+

@@ -1,0 +1,23 @@
+=== E5: crypto micro-benchmarks, Merkle batching, RS false-accept bound ===
+Platform: Python 3.9.6 hashlib (OpenSSL SHA-NI if available)
+
+[C10] SHA-256 commitment timing (mean of 20 runs):
+   5.9 MB frame                       2.64 ms
+   6 MP RGB (2832x2122x3=18MB)        8.50 ms
+   1080p RGB (6.2MB)                  2.92 ms
+   seed derivation + carrier selection (128b x R=25, 32400 blocks): 0.430 ms
+
+[C11] Merkle batching (sorted-pair SHA-256, matches registry.sol):
+   N leaves    build (ms)    path len    proof bytes
+   1           0.002         0           0
+   100         0.059         7           224
+   10000       5.814         14          448
+   On-chain gas (analytic EVM):
+     batch=1      per-tx=44996 gas   amortized/image=44996.00 gas
+     batch=100    per-tx=44996 gas   amortized/image=449.96 gas
+     batch=10000  per-tx=44996 gas   amortized/image=4.50 gas
+   (verifyInclusion is a view call: 0 on-chain gas; proof verified off-chain)
+
+[C7] RS(48,16) soft false-accept bound (Prop. 3), per-bit p=1/2:
+   corrects t=16 byte errors; P[random read decodes to a claimed payload]
+   = 1.833e-65   (empirical E2: 0/1200 wrong-key, 0/24 forgery)

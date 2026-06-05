@@ -1,0 +1,14 @@
+=== E2: security / false-accept on REAL images (Kodak) ===
+key='PIXELROOT-OEM-KEY-v2'  A=4.0  RS(48,16)
+
+(A) Wrong-key read: trials=1200 (50 keys x 24 imgs)
+    mean coded-bit BER = 0.4996  (ideal ~0.5)
+    false accepts (decoded true payload) = 0/1200
+
+(B) Forgery on UNMARKED images: trials=24
+    mean coded-bit BER vs claimed = 0.4937  (ideal ~0.5)
+    false accepts (claimed payload decoded) = 0/24
+
+(C) Copy/transplant attack: trials=17
+    forged image decodes to ORIGINAL (A) identity = 15/17  (copy exposed)
+    forged image passes as a NEW claimed (B) identity = 0/17  (must be 0)

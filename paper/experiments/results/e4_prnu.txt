@@ -1,0 +1,14 @@
+=== E4: PRNU passive-baseline pipeline (real Kodak content) ===
+fingerprint strength K_std=0.01, train=12 imgs/camera, test=12 imgs x 2 cameras
+standard pipeline: denoise-residual fingerprint + NCC attribution + PCE
+
+Condition     attr. acc   genuine NCC   impostor NCC  PCE
+clean         1.000       0.0855        0.0669        260.7
+JPEG Q95      1.000       0.0835        0.0657        257.5
+JPEG Q90      1.000       0.0792        0.0661        237.2
+JPEG Q70      1.000       0.0740        0.0677        214.8
+JPEG Q50      1.000       0.0737        0.0694        212.9
+
+Takeaway: passive PRNU attribution is accurate on clean images but its
+correlation/PCE degrades under JPEG -- the documented weakness PixelRoot's
+ACTIVE, error-corrected mark addresses (E1: payload survives to JPEG Q10).

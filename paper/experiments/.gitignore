@@ -1,0 +1,2 @@
+# Downloaded datasets are reproducible via fetch_data.sh; do not commit the bytes.
+data/

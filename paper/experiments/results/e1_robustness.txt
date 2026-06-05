@@ -1,0 +1,53 @@
+=== E1: imperceptibility + robustness on REAL images (Kodak), REAL codecs + RS ECC ===
+Images: 24  payload=128b  RS(48,16) nsym=32  coded=384b  A=4.0
+Mean embed PSNR: 38.20 dB (min 38.14)   SSIM: 0.9420 (min 0.9106)
+Mean clean coded-bit BER (pre-ECC): 0.0161  (max 0.1328)
+
+Attack                raw BER     payload decode
+JPEG Q95              0.0163      23/24
+JPEG Q90              0.0163      23/24
+JPEG Q80              0.0168      23/24
+JPEG Q70              0.0165      23/24
+JPEG Q60              0.0161      23/24
+JPEG Q50              0.0162      23/24
+JPEG Q40              0.0161      23/24
+JPEG Q30              0.0167      22/24
+JPEG Q20              0.0164      23/24
+JPEG Q10              0.0218      21/24
+JPEG Q5               0.2206      0/24
+WebP q80              0.0214      22/24
+WebP q60              0.0240      21/24
+Noise s2              0.0161      23/24
+Noise s5              0.0161      23/24
+Noise s10             0.0161      23/24
+Noise s20             0.0183      23/24
+Blur r0.5             0.0177      23/24
+Blur r1.0             0.0329      19/24
+Resize 0.5x           0.0419      16/24
+Resize 0.75x          0.0259      22/24
+Resize 1.5x           0.0237      22/24
+Brightness 0.9        0.0163      23/24
+Brightness 1.1        0.0180      21/24
+Contrast 0.9          0.0163      23/24
+Contrast 1.1          0.0181      22/24
+Gamma 0.9             0.0157      23/24
+Gamma 1.1             0.0174      22/24
+Crop 1%               0.0171      23/24
+Crop 2%               0.1117      20/24
+Crop 3%               0.0195      23/24
+Rotate 1deg [lim]     0.5036      0/24
+Rotate 2deg [lim]     0.5013      0/24
+ResizedCrop 3% [lim]  0.4898      0/24
+JPEG70+Resize0.75     0.0258      22/24
+JPEG50+Noise5         0.0166      23/24
+Resize0.75+JPEG40     0.0267      22/24
+
+Amplitude operating curve @ JPEG Q40 (all images): raw BER + post-ECC decode
+A       PSNR(dB)    raw BER   decode
+0.5     inf         0.5037    0/24
+1.0     51.21       0.2702    0/24
+1.5     48.20       0.1791    2/24
+2.0     44.22       0.0900    8/24
+3.0     41.21       0.0430    15/24
+4.0     38.20       0.0160    23/24
+6.0     35.20       0.0052    23/24
