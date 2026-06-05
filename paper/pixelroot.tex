@@ -2,16 +2,21 @@
 %  PixelRoot: Hardware-Anchored, Sensor-Level Media Provenance
 %  with Real-Time Blockchain Notarization
 %
+%  Target venue: IEEE Transactions on Information Forensics and
+%  Security (TIFS).  Formatted with the standard IEEEtran journal
+%  class (two-column, 10pt).
+%
 %  Compile:  pdflatex pixelroot  ->  bibtex pixelroot
 %            ->  pdflatex pixelroot  ->  pdflatex pixelroot
-%  (Requires IEEEtran.cls; available by default on Overleaf.)
+%  (Requires IEEEtran.cls and IEEEtran.bst; available by default on
+%   Overleaf and in any full TeX Live / MiKTeX installation.)
 %==============================================================
-\documentclass[conference]{IEEEtran}
-\IEEEoverridecommandlockouts
+\documentclass[journal]{IEEEtran}
 
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{amsthm}
+\usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{graphicx}
 \graphicspath{{figures/}}
@@ -86,64 +91,56 @@
 \title{\pr{}: Hardware-Anchored, Sensor-Level Media Provenance with
 Real-Time Blockchain Notarization for Trustworthy Imaging}
 
-\author{\IEEEauthorblockN{Mihir Kavishwar}
-\IEEEauthorblockA{\textit{PixelRoot Project} \\
-\texttt{hello@mihirkavishwar.com}}}
+\author{Mihir~Kavishwar%
+\thanks{M.~Kavishwar is an independent researcher with the PixelRoot Project
+(e-mail: hello@mihirkavishwar.com).}%
+\thanks{Manuscript prepared June 2026. The author declares no conflict of
+interest. This work received no external funding.}}
+
+% Running headers for the journal page style.
+\markboth{IEEE Transactions on Information Forensics and Security,~Vol.~XX, No.~XX, 2026}%
+{Kavishwar: \pr{}: Hardware-Anchored, Sensor-Level Media Provenance}
 
 \maketitle
 
 %==============================================================
 \begin{abstract}
-The realism of AI-generated ``deepfake'' imagery has outpaced the ability of
-society to tell synthetic media from camera-captured reality. Reactive,
-detector-based defenses are locked in an adversarial arms race and fail to
-generalize to unseen generators, while existing provenance schemes bind trust
-to \emph{metadata} that can be stripped, edited, or transplanted. We present
-\pr{}, a media-authenticity framework that moves the root of trust from
-metadata into the \emph{pixels themselves}. At the instant of capture, a
-CMOS image sensor applies a keyed, spread-spectrum modulation to a set of
-image \emph{regions}---realized by a small, low-frequency \emph{per-column} or
-\emph{per-region} programmable-gain profile that today's column-parallel sensor
-architectures can already approximate---to embed a $128$-bit provenance
-payload (the sensor's factory-burned device identity, a trusted timestamp, and
-an optional quantized location) protected by error-correction. A \mbox{SHA-256}
-commitment over the frame is simultaneously notarized to a public blockchain
-within seconds of the shutter, closing the window in which a forgery could be
-substituted. We make the hardware ask concrete and tiered: \pr{}'s robust channel needs only
-a modest, standardizable per-column/per-region gain capability that today's
-column-parallel sensors can already approximate, with a software-ISP fallback
-for legacy devices at an explicitly weaker trust level; and we show that
-\emph{per-pixel} gain---the apex capability---is manufacturable rather than
-impossible, via three process technologies already in volume production
-(floating-diffusion conversion-gain selection, coded-exposure pixels, and
-3D-stacked per-pixel ADCs joined by Cu--Cu hybrid bonding).
-We contribute: (i) a structured survey unifying five disjoint threads---deepfake
-detection, PRNU forensics, watermarking, C2PA, and blockchain media
-integrity---with a gap analysis motivating a \emph{dual-binding} design; (ii) a
-formal architecture, threat model, and security argument with three
-propositions (hard-binding soundness, key-protected carrier unpredictability,
-and a bounded soft false-accept); (iii) a \emph{measured} robustness study on
-\emph{real public images} (Kodak) with \emph{real libjpeg/WebP} codecs and a
-\emph{real Reed--Solomon} code under a WAVES-style attack suite---recovering the
-$128$-bit payload on $23/24$ images through JPEG to $Q\!=\!10$ at $38$\,dB PSNR,
-with $0/1224$ wrong-key and forgery false-accepts (RS false-accept bound
-$\le\!10^{-65}$) and a documented geometric (rotation/rescale) limitation;
-(iv) a CMOS-manufacturing feasibility analysis of per-pixel intensity control,
-with engineering schematics, and the per-pixel tamper-localization layer it
-unlocks (ROC-AUC $0.97$ on real splices); and
-(v) privacy-preserving notarization (no raw PII
-on-chain, salted commitments, selective disclosure), a justification of
-blockchain over a single time-stamping authority, and a phased adoption path. We
-argue that, deployed as an OEM interoperability standard analogous to JPEG or
-\mbox{3GPP}, sensor-level provenance plus real-time notarization can give legal,
-journalistic, third-party (3P), and life-saving applications an affirmative,
-hardware-rooted proof of authenticity rather than a probabilistic guess.
+The realism of AI-generated ``deepfake'' imagery has outpaced society's ability
+to tell synthetic media from camera-captured reality. Detector-based defenses
+are locked in an adversarial arms race and generalize poorly to unseen
+generators, while existing provenance schemes bind trust to \emph{metadata} that
+can be stripped, edited, or transplanted. We present \pr{}, a framework that
+moves the root of trust from metadata into the \emph{pixels themselves}. At
+capture, a CMOS image sensor applies a keyed, spread-spectrum
+modulation---realized by a small, low-frequency per-column/per-region
+programmable-gain profile that today's column-parallel sensors can already
+approximate---to embed a $128$-bit, error-corrected provenance payload (device
+identity, trusted timestamp, optional location). A \mbox{SHA-256} commitment
+over the frame is simultaneously notarized to a public blockchain within seconds
+of the shutter, closing the window for substitution.
+We contribute: (i)~a structured survey unifying deepfake detection, PRNU
+forensics, watermarking, C2PA, and blockchain media integrity into a
+\emph{dual-binding} design; (ii)~a formal architecture, threat model, and
+security argument with three propositions; (iii)~a \emph{measured} robustness
+study on real public images (Kodak) with real \texttt{libjpeg}/WebP codecs and a
+real Reed--Solomon code under a WAVES-style attack suite---recovering the payload
+on $23/24$ images through JPEG to $Q\!=\!10$ at $38$\,dB PSNR, with $0/1224$
+false-accepts and a documented geometric limitation; (iv)~a CMOS-manufacturing
+feasibility analysis of per-pixel gain control, with engineering schematics, and
+the tamper-localization layer it unlocks (ROC-AUC $0.97$); and (v)~a
+privacy-preserving notarization design and a phased adoption path. Deployed as an
+OEM interoperability standard akin to JPEG, sensor-level provenance plus
+real-time notarization can give legal, journalistic, and safety-critical
+applications an affirmative, hardware-rooted proof of authenticity rather than a
+probabilistic guess.
 \end{abstract}
 
 \begin{IEEEkeywords}
 media provenance, deepfakes, blockchain, CMOS image sensor, PRNU, digital
 watermarking, content authenticity, C2PA, image forensics, JPEG.
 \end{IEEEkeywords}
+
+\IEEEpeerreviewmaketitle
 
 %==============================================================
 \section{Introduction}
@@ -1494,14 +1491,32 @@ all-encompassing---step toward driving deepfake-driven disinformation toward
 practical irrelevance for media that matters.
 
 %==============================================================
+\section*{Conflict of Interest}
+The author declares that there is no conflict of interest regarding the
+publication of this article. The work received no external funding, and the
+author has no financial or personal relationships that could have
+inappropriately influenced it.
+
+%==============================================================
 \section*{Reproducibility and Disclosure}
-The reference implementation and the robustness harness (a self-contained
-$8\!\times\!8$-DCT JPEG model, attacks, and the spread-spectrum embed/extract of
-\S\ref{sec:embed}) are part of the open \pr{} project; the measured numbers in
-\S\ref{sec:eval} (Tables~\ref{tab:robust}--\ref{tab:sweep}) are reproducible from
-it. The on-chain notarization in the current prototype is \emph{simulated} and
-labeled as such; the silicon- and codec-dependent items in \S\ref{sec:robust}
-are an explicit roadmap, not claimed results.
+The reference implementation and the evaluation harness---the keyed
+spread-spectrum embed/extract of \S\ref{sec:embed}, the Reed--Solomon
+error-correction layer, the WAVES-aligned attack suite, and the
+tamper-localization and PRNU pipelines---are part of the open \pr{} project.
+All measured numbers in \S\ref{sec:eval}
+(Tables~\ref{tab:robust}--\ref{tab:loc}) were produced on the public Kodak image
+set with production codecs (\texttt{libjpeg} JPEG and \texttt{libwebp} WebP) and
+are reproducible end-to-end from the released scripts and a
+\texttt{requirements.txt} pinning the exact dependencies. The on-chain
+notarization in the current prototype is \emph{simulated} and labeled as such
+throughout; the silicon-dependent per-pixel gain mechanisms of \S\ref{sec:mfg}
+are a feasibility analysis grounded in the cited fabrication literature, not
+fabricated results.
+
+\section*{Data Availability}
+The Kodak True\-Color image suite used in the experiments is publicly available.
+The provenance payloads are synthetic and contain no personal data. No human or
+animal subjects were involved in this work.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

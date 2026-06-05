@@ -1,0 +1,65 @@
+Mihir Kavishwar
+PixelRoot Project
+hello@mihirkavishwar.com
+
+June 2026
+
+To the Editor-in-Chief and Associate Editors,
+IEEE Transactions on Information Forensics and Security
+
+Dear Editors,
+
+I am pleased to submit the manuscript entitled "PixelRoot: Hardware-Anchored,
+Sensor-Level Media Provenance with Real-Time Blockchain Notarization for
+Trustworthy Imaging" for consideration as a regular paper in the IEEE
+Transactions on Information Forensics and Security.
+
+The proliferation of photorealistic AI-generated imagery has outpaced
+detector-based defenses, which remain locked in an adversarial arms race and
+generalize poorly to unseen generators. Existing provenance schemes (e.g.,
+C2PA) anchor trust in detachable metadata. This paper proposes an alternative:
+moving the root of trust into the pixels themselves at the moment of capture,
+combined with real-time blockchain notarization of a cryptographic commitment
+to the frame. We believe this directly addresses core concerns of TIFS readers
+in media forensics, watermarking, and content authenticity.
+
+The principal contributions of the work are:
+
+- a hardware-rooted, dual-binding provenance architecture that combines an
+  in-pixel keyed spread-spectrum signature (soft binding) with on-chain
+  notarization of a per-frame hash (hard binding), organized into explicit
+  assurance tiers with a software-ISP fallback for legacy devices;
+
+- a concrete, tiered hardware ask, including a deep manufacturing feasibility
+  analysis of per-pixel gain control (dual-conversion-gain pixels,
+  coded-exposure pixels, and 3D-stacked digital-pixel sensors with Cu-Cu hybrid
+  bonding), with engineering schematics grounded in the current fabrication
+  literature;
+
+- a formal security analysis (hard-binding soundness, carrier unpredictability,
+  soft-binding false-accept bounds) and a privacy-preserving notarization design
+  (salted commitments, selective disclosure, no raw PII on-chain); and
+
+- an empirical evaluation conducted entirely on public images (the Kodak suite)
+  with production codecs (libjpeg, libwebp) and a real Reed-Solomon
+  error-correction layer, evaluated under a WAVES-aligned attack suite. We
+  report imperceptibility (PSNR ~38 dB, SSIM ~0.94), payload recovery (23/24
+  images decoded down to JPEG Q10), a measured zero false-accept rate over 1224
+  wrong-key/unmarked trials, and tamper localization at ROC-AUC 0.97, and we
+  report the geometric-attack limitations honestly.
+
+I confirm that this manuscript is original, has not been published previously,
+and is not under consideration for publication elsewhere, in whole or in part.
+The work is the sole author's. There are no conflicts of interest to disclose,
+and the work received no external funding. The reference implementation and the
+evaluation harness are released openly so that all reported numbers are
+reproducible end-to-end.
+
+I would be grateful for the opportunity to have this work reviewed and am happy
+to provide any additional information the editors may require.
+
+Thank you for your time and consideration.
+
+Sincerely,
+Mihir Kavishwar
+PixelRoot Project

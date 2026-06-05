@@ -1,0 +1,17 @@
+CONFLICT OF INTEREST STATEMENT
+
+Manuscript: "PixelRoot: Hardware-Anchored, Sensor-Level Media Provenance with
+Real-Time Blockchain Notarization for Trustworthy Imaging"
+IEEE Transactions on Information Forensics and Security
+
+None of the authors have a conflict of interest to disclose.
+
+The author (Mihir Kavishwar) declares that there are no financial or personal
+relationships with other people or organizations that could inappropriately
+influence or bias the content of this manuscript. The work received no external
+funding.
+
+Mihir Kavishwar
+PixelRoot Project
+hello@mihirkavishwar.com
+June 2026
