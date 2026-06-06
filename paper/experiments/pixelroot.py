@@ -58,7 +58,11 @@ def rs_decode_bits(bits, nsym=RS_NSYM):
 # ----------------------------- keyed plan --------------------------------
 def keyed_plan(key, payload_bits, R, n_blocks, salt=b""):
     """Deterministic keyed assignment of R distinct blocks (+antipodal chip) per
-    payload bit. Seeded by SHA-256(key||salt) per the paper's s = trunc(H(k||m))."""
+    payload bit. The deployed design keys a CSPRNG with the full digest
+    s = SHA-256(key||salt) (see paper sec:select); this prototype reduces s to a
+    32-bit seed because NumPy's legacy RandomState caps seeds at 2^32. This does
+    not affect the measured robustness/false-accept results, which depend on key
+    mismatch (wrong key -> wrong carriers), not on seed width."""
     seed = int.from_bytes(hashlib.sha256(bytes(str(key), "utf8") + salt).digest()[:4], "big")
     rng = np.random.RandomState(seed)
     perm = rng.permutation(n_blocks)

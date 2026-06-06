@@ -94,11 +94,12 @@ Real-Time Blockchain Notarization for Trustworthy Imaging}
 \author{Mihir~Kavishwar%
 \thanks{M.~Kavishwar is an independent researcher with the PixelRoot Project
 (e-mail: hello@mihirkavishwar.com).}%
-\thanks{Manuscript prepared June 2026. The author declares no conflict of
-interest. This work received no external funding.}}
+\thanks{Manuscript prepared for submission, June 2026. The author declares no
+conflict of interest. This work received no external funding.}}
 
-% Running headers for the journal page style.
-\markboth{IEEE Transactions on Information Forensics and Security,~Vol.~XX, No.~XX, 2026}%
+% Running headers: this is a submission draft, not an accepted/published paper,
+% so we do not assert a volume/issue. We mark it as submitted for review.
+\markboth{Preprint --- Submitted to IEEE Transactions on Information Forensics and Security}%
 {Kavishwar: \pr{}: Hardware-Anchored, Sensor-Level Media Provenance}
 
 \maketitle
@@ -178,15 +179,19 @@ binding it, at creation time, to a trustworthy origin. This is the
 \emph{provenance} paradigm now embodied by the C2PA Content Credentials
 standard and by secure-capture products such as Truepic and
 ProofMode~\cite{c2pa2024spec,truepic2024capture,proofmode2023,google2025c2pa}.
-These systems are a major advance, but they share a common structural weakness:
-the authenticity claim is carried in a \emph{signed metadata container}
-attached to the file. Metadata can be deliberately stripped by platforms,
-lost in transcoding, or, worse, the binding itself can be attacked: in
-September 2025, a vulnerability in the Nikon Z6~III's C2PA implementation let a
-camera sign fabricated composites as authentic, forcing the vendor to suspend
-its authenticity service and revoke every certificate it had
-issued~\cite{c2pa2026security}. If the credential is removed, the
-pixels carry no inherent evidence of their origin.
+These systems are a major advance---C2PA supports hardware-backed signing, rich
+edit-history assertions, and ingredient hashes, and our goal is to
+\emph{complement} rather than replace it. But the authenticity claim is carried,
+in the common case, in a \emph{signed metadata container} attached to the file,
+and that container is a single point of failure: metadata can be deliberately
+stripped by platforms, lost in transcoding, or, worse, the binding itself can be
+attacked. In September 2025, a vulnerability in the Nikon Z6~III's C2PA
+implementation let a camera sign fabricated composites as authentic, forcing the
+vendor to suspend its authenticity service and revoke every certificate it had
+issued~\cite{c2pa2026security}. If the credential is removed, the pixels carry no
+inherent evidence of their origin. \pr{} targets exactly this gap, and can
+populate C2PA assertions while adding an in-pixel, ledger-witnessed binding that
+survives container loss.
 
 \subsection{The \pr{} thesis}
 We argue that a robust root of trust for visual media should live where the
@@ -464,8 +469,12 @@ originated from a genuine sensor at a specific time/place.
 software-only secrets.
 \textbf{G3 Metadata-independence:} retain evidentiary value even if the file
 container/metadata is stripped.
-\textbf{G4 Public verifiability:} allow any third party (platform, court,
-viewer) to verify without contacting the originator or possessing the camera.
+\textbf{G4 Public verifiability (hard binding) with delegated in-pixel
+verification:} the on-chain commitment is verifiable by \emph{any} third party
+(platform, court, viewer) without contacting the originator or possessing the
+camera; the in-pixel binding is checked by a key-holding verifier (the issuing
+OEM or a delegated verification service), with fully public-key/zero-knowledge
+in-pixel verification identified as future work (\S\ref{sec:discussion}).
 \textbf{G5 Minimal capture latency:} notarize within seconds of the shutter.
 \textbf{G6 Imperceptibility:} embedding must not visibly degrade the image.
 \textbf{G7 Standardizability:} be deployable as a cross-OEM interoperability
@@ -610,14 +619,14 @@ ship; its limitation is quantization to a few discrete gain levels, which is
 ample for $1$--$2$ bits/pixel under \pr{}'s spread-spectrum coding
 (Fig.~\ref{fig:m1}).
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.96\columnwidth]{fig_m1_dcg.pdf}
+\includegraphics[width=0.82\textwidth]{fig_m1_dcg.pdf}
 \caption{M1: a $4$T pixel with a per-pixel dual-conversion-gain (DCG) transistor.
 A keyed GAIN-SELECT bit switches the extra FD capacitance $C_\mathrm{DCG}$
 in/out, toggling HIGH/LOW conversion gain to imprint an analog-domain chip.}
 \label{fig:m1}
-\end{figure}
+\end{figure*}
 
 \paragraph{(M2) Per-pixel exposure/charge modulation (coded-exposure pixels).}
 A second, demonstrated route adds a per-pixel switch plus a one-bit code memory
@@ -630,14 +639,14 @@ modulator. These designs have been fabricated in standard CMOS, confirming
 manufacturability; the cost is the extra in-pixel transistors/SRAM, which
 enlarge pixel pitch unless absorbed by stacking (M3) (Fig.~\ref{fig:m2}).
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\columnwidth]{fig_m2_coded.pdf}
+\includegraphics[width=0.92\textwidth]{fig_m2_coded.pdf}
 \caption{M2: a coded-exposure pixel. A $1$-bit in-pixel SRAM gates integration,
 so each pixel's keyed on/off code sets its effective gain independently of its
 neighbours (timing, right).}
 \label{fig:m2}
-\end{figure}
+\end{figure*}
 
 \paragraph{(M3) Stacked per-pixel processing (3D integration + hybrid bonding).}
 The decisive enabler is 3D stacking. Backside-illuminated (BSI) sensors put the
@@ -660,15 +669,15 @@ silicon) though still a digital---not photo-electron---operation; combining M3
 with M1 yields both a robust digital channel and an analog-domain root
 (Fig.~\ref{fig:m3}).
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\columnwidth]{fig_m3_stack.pdf}
+\includegraphics[width=0.86\textwidth]{fig_m3_stack.pdf}
 \caption{M3: a $3$-layer stacked BSI sensor joined by Cu--Cu hybrid bonding
 ($\approx\!0.4\,\mu$m pitch, $\sim\!10^{6}$ interconnects/mm$^2$). A per-pixel ADC,
 SRAM, and a logic tier (frame memory, ISP, keyed PRNG/provenance-write) sit under
 each pixel with no fill-factor penalty.}
 \label{fig:m3}
-\end{figure}
+\end{figure*}
 
 \paragraph{Cost and trade-offs.} The honest costs are area, pixel pitch, yield,
 and power: extra in-pixel devices (M1/M2) compete with the photodiode for area
@@ -677,11 +686,20 @@ thermal-management constraints~\cite{cucu_hybridbond2025}. Focal-plane
 sensor-processors that put a full processing element at every pixel pay for it
 with large pitch and low resolution~\cite{focalplane_carey2013,svgain2025};
 \pr{} avoids that extreme because it needs only a small per-pixel gain register,
-not a general processor. \emph{Net assessment:} per-pixel provenance gain is a
-modest, standardizable increment on top of the DCG/TCG, coded-exposure, and
-stacked-DPS technologies already in high-volume manufacturing---not a new device
-physics. We therefore recommend OEMs expose a keyed per-pixel (or, minimally,
-per-column) gain-write path as a first-class capture primitive.
+not a general processor. \emph{A caution on image quality:} writing a keyed gain
+profile interacts with the very subsystems built to \emph{remove} spatial gain
+variation---fixed-pattern-noise and lens-shading correction, auto-exposure, HDR
+fusion, and demosaicing---so the modulation must be small, low-frequency, and
+either applied before or jointly calibrated with these blocks; quantifying that
+interaction (and the residual fixed-pattern-noise budget it consumes) is a
+silicon-validation item we flag as future work (E5), not a solved problem.
+\emph{Net assessment:} the building blocks of per-pixel provenance gain---DCG/TCG
+selection, coded exposure, and stacked DPS---are already in high-volume
+manufacturing, so the primitive is an \emph{evolutionary} increment rather than
+new device physics; what remains is a standardization and image-quality
+co-design effort, not a physics breakthrough. We therefore recommend OEMs
+explore exposing a keyed per-pixel (or, minimally, per-column) gain-write path as
+a capture primitive.
 
 \paragraph{What per-pixel buys \pr{}: a two-layer mark.} Per-pixel control lets
 \pr{} carry \emph{two} bindings in the pixels at once: (i)~the robust,
@@ -705,11 +723,16 @@ The payload $\mathbf{m}$ is a fixed-width record (\pr{}~v2: $128$ bits):
              \underbrace{t}_{32} \,\|\,
              \underbrace{(\phi,\lambda)}_{48},
 \end{equation}
-where $\mathrm{ID}$ is the sensor's OTP device identifier (modeled here as a
-MAC-style $48$-bit value), $t$ is a Unix timestamp from an attested
-RTC/NTP source, and $(\phi,\lambda)$ is a quantized latitude/longitude
-($24$ bits per coordinate, $\approx\!10^{-4}$ degree resolution). Location may be
-omitted or salted for privacy (\S\ref{sec:discussion}).
+where $\mathrm{ID}$ is, \emph{by default}, a per-device \emph{pseudonymous}
+attestation identifier issued by the secure element (a rotating $48$-bit token,
+not a global serial number, and unlinkable to the physical device without OEM
+cooperation), $t$ is a Unix timestamp from an attested RTC/NTP source, and
+$(\phi,\lambda)$ is an \emph{opt-in}, off-by-default quantized latitude/longitude
+($24$ bits per coordinate, $\approx\!10^{-4}$ degree resolution). To protect
+the journalists and activists \pr{} aims to serve, the recommended default is
+pseudonymous ID with \emph{no} location; precise location, when enabled, may be
+coarsened or replaced by a salted commitment disclosed only under subpoena
+(\S\ref{sec:discussion}).
 
 \begin{figure*}[t]
 \centering
@@ -725,20 +748,28 @@ independent barriers (Props.~\ref{prop:v1}--\ref{prop:v2}).}
 
 \subsection{Keyed region selection and spread-spectrum coding}\label{sec:select}
 \pr{} partitions the frame into $8\!\times\!8$ blocks aligned with the JPEG grid
-and treats \emph{blocks}, not single pixels, as carriers. The OEM-keyed seed
+and treats \emph{blocks}, not single pixels, as carriers. The OEM-keyed seed is
+the full keyed digest
 \begin{equation}
-s = \mathrm{trunc}_{32}\big(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m})\big)
+s = \mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}),
 \end{equation}
-drives a PRNG that, for each coded bit, draws $R$ distinct carrier blocks
-without repetition and assigns each an antipodal \emph{chip} $c_j\!\in\!\{\pm1\}$
-(spread spectrum). The $128$ payload bits are first protected by error
-correction (a Reed--Solomon code over $\mathrm{GF}(2^8)$~\cite{reed1960polynomial},
-or the repetition coding evaluated in \S\ref{sec:eval}); the repetition factor
-$R$ gives each bit redundancy across many spatially dispersed blocks. Because
-the seed is keyed by the secret $k$, an attacker who does not hold $k$ can
-neither localize the carrier blocks nor recover their chip signs even after
-observing many marked images (Prop.~\ref{prop:carriers}). A verifier holding $k$
-and the claimed $\mathbf{m}'$ regenerates the identical assignment.
+which keys a cryptographic PRNG (a stream/CTR-mode keyed generator); the seed
+entropy is therefore bounded by the key, not by a truncated word, so the carrier
+layout is not amenable to offline enumeration. (The released prototype seeds
+NumPy's legacy generator with a $32$-bit reduction of $s$ for convenience; this
+is an implementation detail that does not affect the measured robustness or
+false-accept behavior of \S\ref{sec:eval}, which depend on key \emph{mismatch},
+not seed width. A deployment uses the full-width keyed PRNG.) For each coded
+bit the PRNG draws $R$ distinct carrier blocks without repetition and assigns
+each an antipodal \emph{chip} $c_j\!\in\!\{\pm1\}$ (spread spectrum). The $128$
+payload bits are first protected by error correction (a Reed--Solomon code over
+$\mathrm{GF}(2^8)$~\cite{reed1960polynomial}, or the repetition coding evaluated
+in \S\ref{sec:eval}); the repetition factor $R$ gives each bit redundancy across
+many spatially dispersed blocks. Because the seed is keyed by the secret $k$, an
+attacker who does not hold $k$ can neither localize the carrier blocks nor
+recover their chip signs even after observing many marked images
+(Prop.~\ref{prop:carriers}). A verifier holding $k$ and the claimed
+$\mathbf{m}'$ regenerates the identical assignment.
 
 \subsection{Region-gain (spread-spectrum) embedding}\label{sec:embed}
 The single-pixel, $2\%$ gain perturbation of na\"ive designs is a poor carrier:
@@ -813,7 +844,7 @@ the latency recorded.
        \quad\COMMENT{$128$ bits}
 \STATE $\mathbf{b}\gets \mathrm{ECC\text{-}Encode}(\mathbf{m})$
        \quad\COMMENT{RS / repetition, coded bits $b_1{\dots}b_{n_c}$}
-\STATE $s\gets \mathrm{trunc}_{32}\!\big(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m})\big);\;\mathrm{prng}\gets\mathrm{seed}(s)$
+\STATE $s\gets \mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m});\;\mathrm{prng}\gets\mathrm{CSPRNG}(s)$
 \FORALL{coded bit $b_i$, $\sigma\gets 2b_i{-}1$}
    \STATE draw $R$ distinct blocks $\{B_j\}$, chips $c_j\!\in\!\{\pm1\}$ via prng
    \FORALL{$(B_j,c_j)$}
@@ -897,8 +928,8 @@ corrupts the signature detectably and cannot forge a consistent one.
 \REQUIRE questioned $I'$, claimed $\mathbf{m}'$, ledger handle, key $k$
 \STATE $h'\gets \mathrm{SHA\text{-}256}(I'\,\|\,\mathbf{m}')$
 \STATE $v_1\gets \mathrm{ledger.verifyInclusion}(\mathit{root},h',\pi)$
-\STATE $s\gets \mathrm{trunc}_{32}(\mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}'))$
-\STATE $(\{B_j\},\{c_j\})\gets \mathrm{PRNGselect}(s,n_c,R)$
+\STATE $s\gets \mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}')$
+\STATE $(\{B_j\},\{c_j\})\gets \mathrm{CSPRNGselect}(s,n_c,R)$
 \STATE $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$
        \quad\COMMENT{block-grid resync, \S\ref{sec:geom}}
 \FORALL{coded bit $i$}
@@ -960,8 +991,8 @@ correctly recovering the carrier-and-chip assignment is
 \Pr[\text{guess}] \;=\; \Big[\binom{N_B}{m}\,2^{m}\Big]^{-1},
 \end{equation}
 which for a $1920\times1080$ frame ($N_B\!=\!32400$ blocks), $m\!=\!3200$ is far
-below $10^{-3000}$. Moreover, since $s=\mathrm{trunc}_{32}(\mathcal H(k\|\mathbf
-m))$ is a pseudorandom function of $k$, distinct payloads induce computationally
+below $10^{-3000}$. Moreover, since $s=\mathcal H(k\|\mathbf
+m)$ keys a cryptographic PRNG, distinct payloads induce computationally
 independent carrier layouts, so observing signatures for many images leaks no
 usable information about the layout for a fresh $\mathbf{m}$. The empirical
 counterpart---reading a marked image with $300$ \emph{wrong} keys---yields mean
@@ -1417,6 +1448,23 @@ only up to the attestation; and \emph{Tier~C (software/notarize-only)}---a
 C2PA/ProofMode-style capture-time hash with no in-pixel binding. Verifiers and
 policies must not conflate tiers.
 
+\textbf{Verification trust model.} The two bindings have different verification
+trust requirements, which we state plainly. The \emph{hard binding} (V1) is
+\emph{fully public}: anyone can recompute $\mathrm{SHA\text{-}256}(I'\|\mathbf m')$
+and check Merkle inclusion against the ledger with no secret. The \emph{in-pixel
+binding} (V2), as specified here, uses a \emph{symmetric} OEM key $k$ to
+regenerate the carrier layout, so it is checked by a key-holding party---the
+issuing OEM or a delegated verification service / API---rather than by an
+arbitrary viewer; $k$ cannot be published without enabling forgery. This is an
+acceptable split for the near-term deployment (courts, platforms, and
+fact-checkers query an OEM-operated or federated verification oracle, exactly as
+they already rely on CAs), but it means ``public'' applies in full only to V1.
+Making the in-pixel check \emph{publicly} verifiable without a shared secret is
+an explicit direction for future work: an asymmetric construction (the device
+signs a commitment to its keyed carrier layout, verifiable with a public key) or
+a zero-knowledge proof that a held key reproduces the observed mark, so a third
+party can confirm V2 without learning $k$.
+
 \textbf{Privacy-preserving notarization.} A naive design that wrote sensor
 $\mathrm{ID}$, time, and precise GPS to a public, immutable ledger would be
 actively dangerous for the very journalists and activists \pr{} aims to protect,
@@ -1443,8 +1491,8 @@ only needs a trustworthy, append-only timestamp, which an RFC~3161 time-stamping
 authority (TSA) also provides. We anchor to a public blockchain for properties a
 single TSA lacks: \emph{no single point of trust or failure} (a compromised or
 coerced CA can back-date or deny service, and certificate compromise has already
-forced wholesale revocation in deployed C2PA
-pipelines~\cite{c2pa2024spec}); \emph{public, permissionless auditability} by any
+forced wholesale revocation in a deployed C2PA camera
+pipeline~\cite{c2pa2026security}); \emph{public, permissionless auditability} by any
 court, platform, or adversary without trusting the issuer; and
 \emph{censorship resistance}, important when the capturing party and the
 authority are adversaries (conflict zones, state actors). The cost---latency and
@@ -1486,9 +1534,16 @@ Reactive deepfake detection cannot win a generator-vs-detector arms race, and
 metadata-only provenance breaks the moment a credential is stripped. \pr{}
 relocates the root of trust into the pixels and onto a public ledger: a
 hardware-anchored, error-corrected, keyed signature embedded by the CMOS sensor
-at capture, plus a real-time blockchain commitment. This dual binding gives
-affirmative, publicly verifiable, hardware-rooted proof of authenticity that
-survives metadata loss and fails safe under laundering. Future work includes
+at capture, plus a real-time blockchain commitment. This dual binding gives an
+affirmative, hardware-rooted proof of authenticity---publicly verifiable on-chain
+and key-verifiable in-pixel---that survives metadata loss and fails safe under
+laundering. We are careful about what this paper establishes: the algorithmic
+core (keyed spread-spectrum embedding, host-suppressed detection, error-corrected
+recovery, and the SHA-256/Merkle commitment) is \emph{implemented and measured}
+on real public images with real codecs; the smart-contract notarization is
+\emph{prototyped} with an analytic gas/latency estimate (not yet a live-net
+deployment); and the sensor-level gain hardware is a \emph{feasibility analysis}
+grounded in shipping process technology, not a silicon result. Future work includes
 silicon-level validation on sensors with per-region gain control, codec-aware
 learned embedding for video~\cite{cstfmark2026}, privacy-preserving selective
 disclosure, formal modeling of the V2 soft-authenticity score, and pursuing
