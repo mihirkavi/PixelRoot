@@ -43,7 +43,7 @@ def arrow(ax, x0, y0, x1, y1, c=INK, lw=1.6, style="-|>", ls="-"):
 def wire(ax, pts, c=INK, lw=1.4):
     xs, ys = zip(*pts); ax.add_line(Line2D(xs, ys, color=c, lw=lw))
 
-def nmos(ax, x, y, label, scale=1.0, gate_left=True):
+def nmos(ax, x, y, label, scale=1.0, gate_left=True, label_below=False):
     """Draw a simple NMOS: vertical channel (drain top, source bottom), gate on side."""
     s = scale
     wire(ax, [(x, y + 0.18 * s), (x, y - 0.18 * s)], lw=2.2)            # channel
@@ -54,7 +54,10 @@ def nmos(ax, x, y, label, scale=1.0, gate_left=True):
     gx = x - 0.12 * s
     wire(ax, [(gx, y + 0.13 * s), (gx, y - 0.13 * s)], lw=2.0)          # gate plate
     wire(ax, [(gx, y), (gx - 0.16 * s, y)])                            # gate lead
-    ax.text(x + 0.26 * s, y, label, fontsize=10, va="center", color=INK)
+    if label_below:
+        ax.text(x, y - 0.52 * s, label, fontsize=10, ha="center", va="top", color=INK)
+    else:
+        ax.text(x + 0.42 * s, y, label, fontsize=10, va="center", ha="left", color=INK)
     return dict(d=(x + 0.16 * s, y + 0.30 * s), s=(x + 0.16 * s, y - 0.30 * s), g=(gx - 0.16 * s, y))
 
 # ---------------------------------------------------------------- Fig 1
@@ -87,12 +90,12 @@ def fig_gain_spectrum():
 
 # ---------------------------------------------------------------- Fig 2 (M1)
 def fig_m1_dcg():
-    fig, ax = plt.subplots(figsize=(8.4, 5.2)); ax.axis("off")
-    ax.set_xlim(0, 8.4); ax.set_ylim(0, 5.2)
-    ax.text(4.2, 5.0, "M1 \u2014 Per-pixel conversion-gain selection (dual conversion gain, DCG)",
+    fig, ax = plt.subplots(figsize=(9.2, 6.0)); ax.axis("off")
+    ax.set_xlim(0, 9.2); ax.set_ylim(0, 6.0)
+    ax.text(4.6, 5.72, "M1 \u2014 Per-pixel conversion-gain selection (dual conversion gain, DCG)",
             ha="center", fontsize=13.5, weight="bold", color=INK)
     # photodiode
-    pdx, pdy = 0.9, 2.0
+    pdx, pdy = 0.9, 2.85
     wire(ax, [(pdx, pdy), (pdx, pdy + 0.9)], lw=2.2)
     ax.add_patch(Polygon([(pdx - 0.22, pdy + 0.9), (pdx + 0.22, pdy + 0.9), (pdx, pdy + 0.55)], closed=True, fc=ACC, ec=INK))
     wire(ax, [(pdx - 0.25, pdy + 0.55), (pdx + 0.25, pdy + 0.55)], lw=2.2)
@@ -102,40 +105,49 @@ def fig_m1_dcg():
     wire(ax, [(pdx, pdy + 0.9), (pdx, pdy + 1.25)])
     txm = nmos(ax, 1.9, pdy + 1.25, "TX", gate_left=True)
     wire(ax, [(pdx, pdy + 1.25), (1.9 + 0.16, pdy + 1.25 + 0.30)])
-    # FD node
+    # FD node rail (top)
     fdx = 3.0; fdy = pdy + 1.25
     wire(ax, [(txm["s"][0], txm["s"][1]), (txm["s"][0], fdy)])
-    wire(ax, [(txm["s"][0], fdy), (fdx + 1.7, fdy)])
+    fd_end = 7.15
+    wire(ax, [(txm["s"][0], fdy), (fd_end, fdy)])
     ax.add_patch(Circle((fdx, fdy), 0.05, fc=INK))
-    ax.text(fdx, fdy + 0.22, "FD (floating diffusion)", ha="center", fontsize=10.5, color=RD, weight="bold")
+    ax.text(fdx - 0.12, fdy + 0.52, "FD node", ha="right", va="bottom", fontsize=10.5, color=RD, weight="bold")
+    ax.text(fdx - 0.12, fdy + 0.30, "(floating diffusion)", ha="right", va="bottom", fontsize=8.8, color=RD)
     # C_fd (intrinsic) to ground
     def cap(ax, x, y, label, col=INK):
         wire(ax, [(x, y), (x, y - 0.18)]); wire(ax, [(x - 0.18, y - 0.18), (x + 0.18, y - 0.18)], lw=2.4)
         wire(ax, [(x - 0.18, y - 0.30), (x + 0.18, y - 0.30)], lw=2.4)
         wire(ax, [(x, y - 0.30), (x, y - 0.5)]); wire(ax, [(x - 0.14, y - 0.5), (x + 0.14, y - 0.5)], lw=2.0)
-        ax.text(x + 0.3, y - 0.22, label, fontsize=10, va="center", color=col)
+        ax.text(x + 0.32, y - 0.22, label, fontsize=10, va="center", color=col)
     cap(ax, fdx, fdy, "C_FD")
     ax.text(fdx + 0.05, fdy - 0.78, "(small \u2192 HIGH gain)", fontsize=9.5, ha="center", color="#555")
-    # DCG transistor adding C_DCG
-    dgm = nmos(ax, 4.7, fdy, "DCG", gate_left=True)
+    # DCG transistor adding C_DCG — extra spacing before RST
+    dgm = nmos(ax, 4.35, fdy, "", gate_left=True)
+    ax.text(dgm["g"][0] + 0.05, fdy + 0.52, "DCG", ha="center", va="bottom", fontsize=10, color=INK, weight="bold")
     arrow(ax, dgm["g"][0] + 0.05, fdy + 0.65, dgm["g"][0], dgm["g"][1] + 0.02, c=ACC)
     ax.text(dgm["g"][0] + 0.05, fdy + 0.78, "GAIN SELECT", ha="center", va="bottom", fontsize=10, color=ACC, weight="bold")
-    cap(ax, dgm["s"][0], dgm["s"][1] + 0.02, "C_DCG  (added \u2192 LOW gain)", col=AMB)
+    cap_x = dgm["s"][0] - 0.55
+    wire(ax, [(dgm["s"][0], dgm["s"][1]), (cap_x, dgm["s"][1])])
+    cap(ax, cap_x, dgm["s"][1] + 0.02, "C_DCG", col=AMB)
+    ax.text(cap_x, dgm["s"][1] - 0.72, "(added \u2192 LOW gain)", fontsize=9.0, ha="center", color=AMB)
     # RST
-    rstm = nmos(ax, 6.4, fdy, "RST")
-    wire(ax, [(fdx + 1.7, fdy), (rstm["d"][0], rstm["d"][1])])
+    rstm = nmos(ax, 6.35, fdy, "RST", label_below=True)
+    wire(ax, [(fd_end, fdy), (rstm["d"][0], rstm["d"][1])])
     wire(ax, [(rstm["d"][0], rstm["d"][1]), (rstm["d"][0], rstm["d"][1] + 0.25)])
     ax.text(rstm["d"][0], rstm["d"][1] + 0.40, "VDD", ha="center", fontsize=10)
-    # SF + RS readout
-    sfm = nmos(ax, 5.2, 1.05, "SF")
-    wire(ax, [(fdx, fdy), (fdx, 1.05)]); wire(ax, [(fdx, 1.05), (sfm["g"][0], 1.05)])
+    # SF + RS readout — separate row, tap FD rail at far right via outside route
+    sfy = 1.75
+    sfm = nmos(ax, 5.35, sfy, "SF", label_below=True)
+    rsm = nmos(ax, 6.85, sfy, "RS", label_below=True)
+    route_x = 8.55
+    wire(ax, [(fd_end, fdy), (route_x, fdy), (route_x, sfy), (sfm["g"][0], sfy)])
     wire(ax, [(sfm["d"][0], sfm["d"][1]), (sfm["d"][0], sfm["d"][1] + 0.2)])
     ax.text(sfm["d"][0], sfm["d"][1] + 0.33, "VDD", ha="center", fontsize=10)
-    rsm = nmos(ax, 6.6, 1.05, "RS")
-    wire(ax, [(sfm["s"][0], sfm["s"][1]), (rsm["d"][0], rsm["d"][1])])
-    wire(ax, [(rsm["s"][0], rsm["s"][1]), (rsm["s"][0], 0.35)])
-    ax.text(rsm["s"][0], 0.2, "column bus", ha="center", fontsize=10, color=INK)
-    # callout (kept below the readout wire so it never collides; text wrapped to fit the box)
+    out_y = sfy - 0.55
+    wire(ax, [(sfm["s"][0], sfm["s"][1]), (sfm["s"][0], out_y), (rsm["d"][0], out_y), (rsm["d"][0], rsm["d"][1])])
+    wire(ax, [(rsm["s"][0], rsm["s"][1]), (rsm["s"][0], 0.62)])
+    ax.text(rsm["s"][0], 0.48, "column bus", ha="center", fontsize=10, color=INK)
+    # callout — bottom-left, clear of routed wires
     box(ax, 0.25, 0.08, 4.55, 1.02,
         "Provenance use: a per-pixel GAIN-SELECT bit\n"
         "(from the keyed PRNG of the payload) toggles\n"
@@ -146,50 +158,53 @@ def fig_m1_dcg():
 
 # ---------------------------------------------------------------- Fig 3 (M2)
 def fig_m2_coded():
-    fig, (ax, axt) = plt.subplots(1, 2, figsize=(11, 4.4), gridspec_kw={"width_ratios": [1.25, 1]})
+    fig = plt.figure(figsize=(12.2, 5.6))
+    gs = fig.add_gridspec(1, 2, width_ratios=[1.15, 1.0], wspace=0.42)
+    ax = fig.add_subplot(gs[0, 0]); axt = fig.add_subplot(gs[0, 1])
     for a in (ax, axt): a.axis("off")
-    ax.set_xlim(0, 6); ax.set_ylim(0, 5)
-    ax.text(2.8, 4.8, "M2 \u2014 Coded-exposure pixel\n(per-pixel integration gating)",
+    ax.set_xlim(0, 5.6); ax.set_ylim(0, 5.6)
+    ax.text(2.8, 5.35, "M2 \u2014 Coded-exposure pixel\n(per-pixel integration gating)",
             ha="center", fontsize=12, weight="bold", color=INK)
     # PD
-    wire(ax, [(1.0, 2.4), (1.0, 3.2)], lw=2.2)
-    ax.add_patch(Polygon([(0.78, 3.2), (1.22, 3.2), (1.0, 2.85)], closed=True, fc=ACC, ec=INK))
-    wire(ax, [(0.75, 2.85), (1.25, 2.85)], lw=2.2)
-    ax.text(1.0, 2.2, "PD", ha="center", fontsize=11, weight="bold")
+    wire(ax, [(1.0, 2.85), (1.0, 3.65)], lw=2.2)
+    ax.add_patch(Polygon([(0.78, 3.65), (1.22, 3.65), (1.0, 3.3)], closed=True, fc=ACC, ec=INK))
+    wire(ax, [(0.75, 3.3), (1.25, 3.3)], lw=2.2)
+    ax.text(1.0, 2.65, "PD", ha="center", fontsize=11, weight="bold")
     # gating switch
-    sw = nmos(ax, 2.3, 3.0, "GATE")
-    wire(ax, [(1.0, 3.2), (sw["d"][0], sw["d"][1])])
-    box(ax, 1.7, 1.0, 1.7, 0.8, "1-bit in-pixel\nSRAM cell", fc="#eef3ff", ec=ACC, fs=10)
-    arrow(ax, 2.55, 1.8, sw["g"][0] + 0.05, sw["g"][1] - 0.05, c=ACC)
-    ax.text(3.5, 1.4, "stores per-pixel\nexposure bit b_i", fontsize=9.5, color=ACC)
+    sw = nmos(ax, 2.3, 3.45, "GATE")
+    wire(ax, [(1.0, 3.65), (sw["d"][0], sw["d"][1])])
+    box(ax, 1.55, 1.55, 1.7, 0.8, "1-bit in-pixel\nSRAM cell", fc="#eef3ff", ec=ACC, fs=10)
+    arrow(ax, 2.4, 2.35, sw["g"][0] + 0.05, sw["g"][1] - 0.05, c=ACC)
+    ax.text(3.35, 1.95, "stores per-pixel\nexposure bit b_i", fontsize=9.5, color=ACC)
     # storage node / readout
-    wire(ax, [(sw["s"][0], sw["s"][1]), (sw["s"][0], 3.0), (4.2, 3.0)])
-    ax.add_patch(Circle((4.2, 3.0), 0.05, fc=INK))
-    ax.text(4.2, 3.55, "storage / FD", fontsize=10, ha="center", color=RD)
-    box(ax, 4.6, 2.6, 1.1, 0.8, "SF + RS\nreadout", fc="white", ec=INK, fs=10)
-    wire(ax, [(4.25, 3.0), (4.6, 3.0)])
-    box(ax, 0.3, 0.02, 5.4, 0.96,
+    wire(ax, [(sw["s"][0], sw["s"][1]), (sw["s"][0], 3.45), (4.05, 3.45)])
+    ax.add_patch(Circle((4.05, 3.45), 0.05, fc=INK))
+    ax.text(4.05, 4.02, "storage / FD", fontsize=10, ha="center", color=RD)
+    box(ax, 4.45, 3.05, 1.05, 0.8, "SF + RS\nreadout", fc="white", ec=INK, fs=10)
+    wire(ax, [(4.10, 3.45), (4.45, 3.45)])
+    box(ax, 0.25, 0.08, 5.15, 0.96,
         "GATE conducts only while b_i = 1, so each pixel\n"
         "integrates for a keyed sub-window \u2192 a per-pixel\n"
         "effective-gain chip, independent of its neighbours.",
         fc="#eef7ee", ec=GO, fs=8.8, tc=INK)
-    # timing diagram
-    axt.set_xlim(0, 10); axt.set_ylim(0, 6)
-    axt.text(5, 5.7, "Per-pixel coded exposure (timing)", ha="center", fontsize=11.5, weight="bold", color=INK)
-    def pulse(y, pattern, label, col):
-        axt.text(-0.2, y + 0.25, label, fontsize=10, ha="right", color=col)
-        x = 0.4; step = 0.9
-        prev = 0
+    # timing diagram — labels stay inside the right panel
+    axt.set_xlim(0, 10); axt.set_ylim(0, 5.6)
+    axt.text(5, 5.35, "Per-pixel coded exposure (timing)", ha="center", fontsize=11.5, weight="bold", color=INK)
+    def pulse(y, pattern, label, code, col):
+        axt.text(0.05, y + 0.55, label, fontsize=9.2, ha="left", color=col, weight="bold")
+        if code:
+            axt.text(0.05, y + 0.18, code, fontsize=8.0, ha="left", color=col, family="monospace")
+        x = 3.4; step = 0.62
         pts = [(x, y)]
         for b in pattern:
             lvl = y + 0.5 * b
             pts.append((x, lvl)); x += step; pts.append((x, lvl))
         axt.add_line(Line2D(*zip(*pts), color=col, lw=1.8))
-    axt.text(0.2, 4.9, "exposure window", fontsize=10, color="#666")
-    pulse(4.0, [1,1,1,1,1,1,1,1,1,1], "global shutter", "#999")
-    pulse(2.6, [1,0,1,1,0,1,0,1,1,0], "pixel A  (b=1011010110)", ACC)
-    pulse(1.2, [0,1,1,0,1,1,1,0,0,1], "pixel B  (b=0110111001)", GO)
-    axt.text(5, 0.4, "Each pixel's keyed on/off code sets its integration time \u2192 per-pixel gain.",
+    axt.text(3.4, 4.15, "exposure window", fontsize=9.5, color="#666")
+    pulse(3.55, [1,1,1,1,1,1,1,1,1,1], "global shutter", "", "#999")
+    pulse(2.35, [1,0,1,1,0,1,0,1,1,0], "pixel A", "b = 1011010110", ACC)
+    pulse(1.15, [0,1,1,0,1,1,1,0,0,1], "pixel B", "b = 0110111001", GO)
+    axt.text(5, 0.35, "Each pixel's keyed on/off code sets its integration time \u2192 per-pixel gain.",
              ha="center", fontsize=9.5, color=INK)
     save(fig, "fig_m2_coded")
 
@@ -280,7 +295,8 @@ def read_csv(name):
         return list(csv.reader(f))
 
 def fig_results():
-    fig, axs = plt.subplots(2, 2, figsize=(10.5, 7.2))
+    fig, axs = plt.subplots(2, 2, figsize=(11.0, 8.8))
+    title_fs = 9.5
     # (a) BER vs JPEG quality (parsed from e1 results text)
     qs = [95,90,80,70,60,50,40,30,20,10,5]
     bers = []
@@ -294,7 +310,7 @@ def fig_results():
     ax.plot(qs, bers, "o-", color=ACC, lw=2)
     ax.axhline(0, color="#999", lw=0.8)
     ax.set_xlabel("JPEG quality Q"); ax.set_ylabel("raw coded-bit BER")
-    ax.set_title("(a) In-pixel channel BER vs real-JPEG quality\n(Kodak, pre-ECC; RS recovers payload \u2265 Q10)")
+    ax.set_title("(a) In-pixel channel BER vs real-JPEG quality\n(Kodak, pre-ECC; RS recovers payload \u2265 Q10)", fontsize=title_fs, pad=10)
     ax.invert_xaxis(); ax.grid(alpha=0.3)
     # (b) amplitude operating curve
     ax = axs[0, 1]
@@ -309,7 +325,7 @@ def fig_results():
         ax2.plot(A, [d / n for d in dec], "^--", color=GO, lw=2, label="post-ECC decode")
         ax.set_xlabel("embedding amplitude A (gray levels)")
         ax.set_ylabel("raw BER", color=RD); ax2.set_ylabel("payload decode rate", color=GO)
-        ax.set_title("(b) Amplitude operating curve @ JPEG Q40\n(genuine robustness cliff on real images)")
+        ax.set_title("(b) Amplitude operating curve @ JPEG Q40\n(genuine robustness cliff on real images)", fontsize=title_fs, pad=10)
         ax.grid(alpha=0.3)
     # (c) localization ROC
     ax = axs[1, 0]
@@ -319,7 +335,7 @@ def fig_results():
         ax.plot(fpr, tpr, color=ACC, lw=2)
         ax.plot([0, 1], [0, 1], "--", color="#999", lw=1)
         ax.set_xlabel("false positive rate"); ax.set_ylabel("true positive rate")
-        ax.set_title("(c) Tamper-localization ROC (real splices)\nblock-level, AUC \u2248 0.97")
+        ax.set_title("(c) Tamper-localization ROC (real splices)\nblock-level, AUC \u2248 0.97", fontsize=title_fs, pad=10)
         ax.grid(alpha=0.3)
     # (d) PRNU NCC margin vs JPEG
     ax = axs[1, 1]
@@ -336,9 +352,9 @@ def fig_results():
         ax.plot(xx, imp, "s--", color=RD, lw=2, label="impostor NCC")
         ax.set_xticks(list(xx)); ax.set_xticklabels(cond, rotation=20, fontsize=7)
         ax.set_ylabel("PRNU NCC")
-        ax.set_title("(d) Passive PRNU baseline: genuine\u2013impostor\nmargin shrinks under JPEG (motivates active mark)")
+        ax.set_title("(d) Passive PRNU baseline: genuine\u2013impostor\nmargin shrinks under JPEG (motivates active mark)", fontsize=title_fs, pad=10)
         ax.legend(fontsize=7); ax.grid(alpha=0.3)
-    fig.tight_layout()
+    fig.subplots_adjust(left=0.10, right=0.94, top=0.93, bottom=0.12, hspace=0.55, wspace=0.40)
     save(fig, "fig_results")
 
 if __name__ == "__main__":
