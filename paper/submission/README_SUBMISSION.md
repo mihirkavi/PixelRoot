@@ -7,7 +7,8 @@ Manuscript formatted with the standard `IEEEtran` **journal** class (two-column,
 
 | Portal slot | Required? | What to upload | Source in this repo |
 |---|---|---|---|
-| **Main Manuscript** | Required | `pixelroot_submission.zip` (the LaTeX bundle) | built by `make_bundle.sh` |
+| **Main Manuscript (LaTeX)** | Required | `pixelroot_submission.zip` (the LaTeX bundle) | built by `make_bundle.sh` |
+| **Main Document – PDF** | Required | `pixelroot.pdf` (compiled, double-column) | `submission/pixelroot.pdf` |
 | **Conflict of Interest** | Required | `conflict_of_interest.pdf` | compile `submission/conflict_of_interest.tex` (or use `.txt`) |
 | Supplementary Material for Review | Optional | `pixelroot_supplementary.zip` (experiment scripts, plan, manufacturing notes) | built by `make_bundle.sh` |
 | Main Document – Tracked Changes | Optional | skip for a first/new submission (only for revisions) | — |
@@ -30,13 +31,19 @@ A single archive is acceptable for the Main Manuscript slot. It contains:
 system and Overleaf provide them. If you compile in a minimal local TeX install,
 run `tlmgr install ieeetran` first.
 
-### Compile order
+### Compile order (produces the required `pixelroot.pdf`)
 ```
 pdflatex pixelroot
 bibtex   pixelroot
 pdflatex pixelroot
 pdflatex pixelroot
 ```
+Or, with a self-contained engine (no system TeX needed):
+```
+tectonic -X compile pixelroot.tex   # runs BibTeX and all passes automatically
+```
+The portal has **two** required manuscript slots: upload the LaTeX bundle to
+*Main Manuscript* and the compiled `pixelroot.pdf` to *Main Document – PDF*.
 
 ## Formatting compliance notes
 

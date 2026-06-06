@@ -124,8 +124,8 @@ forensics, watermarking, C2PA, and blockchain media integrity into a
 security argument with three propositions; (iii)~a \emph{measured} robustness
 study on real public images (Kodak) with real \texttt{libjpeg}/WebP codecs and a
 real Reed--Solomon code under a WAVES-style attack suite---recovering the payload
-on $23/24$ images through JPEG to $Q\!=\!10$ at $38$\,dB PSNR, with $0/1224$
-false-accepts and a documented geometric limitation; (iv)~a CMOS-manufacturing
+on $23/24$ images down to JPEG $Q20$ ($21/24$ at $Q10$) at $38$\,dB PSNR, with
+$0/1224$ false-accepts and a documented geometric limitation; (iv)~a CMOS-manufacturing
 feasibility analysis of per-pixel gain control, with engineering schematics, and
 the tamper-localization layer it unlocks (ROC-AUC $0.97$); and (v)~a
 privacy-preserving notarization design and a phased adoption path. Deployed as an
@@ -480,6 +480,7 @@ consumes them.
 
 \begin{figure*}[t]
 \centering
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[node distance=5mm and 6.5mm]
 % --- capture pipeline (top) ---
 \node[hw] (sensor) {CMOS sensor\\$+$ OTP \textsf{ID}};
@@ -518,7 +519,8 @@ consumes them.
 % link chain to V1
 \draw[flow, dashed] (chain.south) |- ($(v1.east)+(1.6,-0.0)$) -- (v1.east);
 \draw[flow, dashed] (storeimg.south) -- (qimg.north);
-\end{tikzpicture}
+\end{tikzpicture}%
+}
 \caption{\pr{} architecture. \emph{Top:} the capture path emits a hard binding
 ($h$ on the public ledger) and a soft in-pixel binding (the keyed,
 error-corrected gain pattern carried inside $I$). \emph{Bottom:} verification
@@ -595,7 +597,7 @@ Conversion gain---the volts-per-electron set at the floating-diffusion node---is
 already made \emph{switchable} per pixel in dual-/triple-conversion-gain (DCG/TCG)
 pixels by adding an in-pixel MOSFET that connects or isolates extra FD
 capacitance~\cite{hdrcis2024review,dcg_fdshared2020,baker_dcg_thesis}. Production
-mobile sensors switch among 2--3 discrete CG states per pixel (Sony's $16{:}4{:}1$
+mobile sensors switch among 2--3 discrete CG states per pixel (Samsung's $16{:}4{:}1$
 triple-CG sensor reaches $82.4$\,dB single-exposure HDR at a $1.4\,\mu$m
 pitch~\cite{tcg_sony2022}). \emph{The provenance change is small}: drive the
 existing DCG/TCG select line from the keyed PRNG rather than only from a
@@ -821,7 +823,7 @@ the latency recorded.
 \STATE $h\gets \mathrm{SHA\text{-}256}(I\,\|\,\mathbf{m})$
 \STATE $\mathrm{leaf}\gets h;\;$ enqueue \textit{leaf} for Merkle batch
 \STATE \textbf{on flush:} $\mathit{root}\gets\mathrm{Merkle}(\{\mathit{leaf}\});\;
-        \mathrm{contract.register}(\mathit{root})$
+        \mathrm{register}(\mathit{root})$
 \STATE \textbf{store} $I$ (lossless preferred) $+$ $\mathbf{m}$ $+$ Merkle proof
         $\pi$ in C2PA manifest
 \end{algorithmic}
@@ -968,16 +970,17 @@ $p\!\approx\!\tfrac12$ random-guess model.
 \begin{proposition}[Soft-binding false-accept]\label{prop:v2}
 Model the read-back of \eqref{eq:residual} on an image that was \emph{not}
 \pr{}-marked at the claimed carriers as independent bit guesses with
-per-bit error $p\!\approx\!\tfrac12$. With a Reed--Solomon code correcting
-$t=\lfloor r/2\rfloor$ symbol errors over $n_s$ symbols, V2 falsely accepts with
-probability at most
+per-bit error $p\!\approx\!\tfrac12$, so a byte (symbol) matches the claimed
+codeword by chance with probability $q=(1-p)^{8}=2^{-8}$. With a Reed--Solomon
+code correcting $t=\lfloor r/2\rfloor$ symbol errors over $n_s$ symbols, V2
+falsely accepts with probability at most
 \begin{equation}
 \Pr[\text{V2 false-accept}] \;\le\; \sum_{j=0}^{t}\binom{n_s}{j}(1-q)^{\,j}\,q^{\,n_s-j},
-\quad q = (1-p)^{8},
 \label{eq:fa}
 \end{equation}
 the tail probability that at most $t$ of $n_s$ bytes happen to match by chance.
-For $n_s=20$, $t=15$ and $p=\tfrac12$ this is $\ll 2^{-100}$.
+For our \mbox{RS$(48,16)$} code ($n_s=48$, $t=16$), this is
+$\le 1.8\times10^{-65}$.
 \end{proposition}
 \begin{proof}[Proof sketch]
 A byte (symbol) matches the claimed codeword by chance with probability
@@ -1079,13 +1082,13 @@ the chosen coefficient $(u,v)\!=\!(0,2)$ sits in the lightly-quantized region of
 the luminance table and is preserved across a wide $Q$ range, while
 spread-spectrum de-spreading over $R$ blocks (Eq.~\ref{eq:despread}) suppresses
 both quantization noise and host content by a further $\sqrt{R}$. Our
-faithful $8\!\times\!8$-DCT JPEG model (standard luminance table scaled by $Q$)
-confirms the analysis: measured payload BER is \emph{zero} from $Q\!=\!95$ down
-to $Q\!=\!30$ (indeed to $Q\!=\!10$ at our operating amplitude), and the
-amplitude sweep in \S\ref{sec:eval} locates the graceful decode-failure cliff,
-below which \pr{} returns the safe \textsc{Unverified} rather than a false
-positive. The earlier fragile/semi-fragile tension is thus resolved by
-construction, not asserted.
+measurements with the production \texttt{libjpeg} codec (\S\ref{sec:eval})
+confirm the analysis: after RS correction the $128$-bit payload is recovered on
+$23/24$ Kodak images from $Q\!=\!95$ down to $Q\!=\!20$ and on $21/24$ at the
+extreme $Q\!=\!10$, and the amplitude sweep in \S\ref{sec:eval} locates the
+graceful decode-failure cliff, below which \pr{} returns the safe
+\textsc{Unverified} rather than a false positive. The earlier fragile/semi-fragile
+tension is thus resolved by construction, not asserted.
 
 \subsection{Geometric edits and synchronization}\label{sec:geom}
 Block-grid embedding is sensitive to operations that move the grid: cropping,
@@ -1236,7 +1239,8 @@ Table~\ref{tab:robust} reports the raw (pre-ECC) coded-bit BER and the
 raw channel is not error-free---mean BER $\approx\!1.6\%$, content-dependent up to
 $13\%$ on the most textured frame---but the RS code recovers the exact $128$-bit
 payload on \mbox{$23/24$} images through real JPEG from $Q\!=\!95$ down to
-$Q\!=\!10$, WebP, Gaussian noise to $\sigma\!=\!20$, blur, resize to
+$Q\!=\!20$ (and $21/24$ at the extreme $Q\!=\!10$), WebP, Gaussian noise to
+$\sigma\!=\!20$, blur, resize to
 $0.5$--$1.5\times$, all photometric edits, translational crops of $1$--$3\%$ with
 resync, and combined JPEG$+$resize. Failures are honest and informative: a single
 very-high-frequency frame exceeds the ECC capacity at $A\!\le\!6$, and
