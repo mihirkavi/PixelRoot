@@ -181,9 +181,11 @@ ProofMode~\cite{c2pa2024spec,truepic2024capture,proofmode2023,google2025c2pa}.
 These systems are a major advance, but they share a common structural weakness:
 the authenticity claim is carried in a \emph{signed metadata container}
 attached to the file. Metadata can be deliberately stripped by platforms,
-lost in transcoding, or, worse, the binding can be attacked
-(a 2025 camera firmware deployment had to revoke all certificates after a
-signing vulnerability~\cite{c2pa2024spec}). If the credential is removed, the
+lost in transcoding, or, worse, the binding itself can be attacked: in
+September 2025, a vulnerability in the Nikon Z6~III's C2PA implementation let a
+camera sign fabricated composites as authentic, forcing the vendor to suspend
+its authenticity service and revoke every certificate it had
+issued~\cite{c2pa2026security}. If the credential is removed, the
 pixels carry no inherent evidence of their origin.
 
 \subsection{The \pr{} thesis}

@@ -135,12 +135,13 @@ def fig_m1_dcg():
     wire(ax, [(sfm["s"][0], sfm["s"][1]), (rsm["d"][0], rsm["d"][1])])
     wire(ax, [(rsm["s"][0], rsm["s"][1]), (rsm["s"][0], 0.35)])
     ax.text(rsm["s"][0], 0.2, "column bus", ha="center", fontsize=8, color=INK)
-    # callout
-    box(ax, 0.5, 0.2, 3.2, 0.95,
-        "Provenance use: a per-pixel GAIN-SELECT bit (from the keyed PRNG\n"
-        "of the payload) toggles HIGH/LOW conversion gain, writing a faint\n"
-        "intensity chip into each carrier pixel at capture time.",
-        fc="#eef7ee", ec=GO, fs=7.6, tc=INK)
+    # callout (kept below the readout wire so it never collides; text wrapped to fit the box)
+    box(ax, 0.3, 0.12, 4.3, 0.86,
+        "Provenance use: a per-pixel GAIN-SELECT bit\n"
+        "(from the keyed PRNG of the payload) toggles\n"
+        "HIGH/LOW conversion gain, writing a faint\n"
+        "intensity chip into each carrier pixel.",
+        fc="#eef7ee", ec=GO, fs=7.4, tc=INK)
     save(fig, "fig_m1_dcg")
 
 # ---------------------------------------------------------------- Fig 3 (M2)
@@ -167,11 +168,11 @@ def fig_m2_coded():
     ax.text(4.2, 3.55, "storage / FD", fontsize=8, ha="center", color=RD)
     box(ax, 4.6, 2.6, 1.1, 0.8, "SF + RS\nreadout", fc="white", ec=INK, fs=8)
     wire(ax, [(4.25, 3.0), (4.6, 3.0)])
-    box(ax, 0.4, 0.1, 5.2, 0.7,
-        "GATE conducts only while b_i = 1 \u2192 each pixel integrates for a keyed sub-window,",
-        fc="#eef7ee", ec=GO, fs=7.8)
-    ax.text(3.0, 0.28, "imprinting a per-pixel effective-gain chip independent of its neighbours.",
-            ha="center", fontsize=7.8, color=INK)
+    box(ax, 0.4, 0.05, 5.2, 0.9,
+        "GATE conducts only while b_i = 1, so each pixel\n"
+        "integrates for a keyed sub-window \u2192 a per-pixel\n"
+        "effective-gain chip, independent of its neighbours.",
+        fc="#eef7ee", ec=GO, fs=7.4, tc=INK)
     # timing diagram
     axt.set_xlim(0, 10); axt.set_ylim(0, 6)
     axt.text(5, 5.7, "Per-pixel coded exposure (timing)", ha="center", fontsize=10, weight="bold", color=INK)
@@ -194,8 +195,8 @@ def fig_m2_coded():
 
 # ---------------------------------------------------------------- Fig 4 (M3)
 def fig_m3_stack():
-    fig, ax = plt.subplots(figsize=(9.2, 5.6)); ax.axis("off")
-    ax.set_xlim(0, 9.2); ax.set_ylim(0, 5.6)
+    fig, ax = plt.subplots(figsize=(10.4, 5.6)); ax.axis("off")
+    ax.set_xlim(0, 10.4); ax.set_ylim(0, 5.6)
     ax.text(4.6, 5.35, "M3 \u2014 3-layer stacked BSI sensor with Cu\u2013Cu hybrid bonding",
             ha="center", fontsize=11.5, weight="bold", color=INK)
     x0, w = 1.2, 6.0
@@ -224,7 +225,7 @@ def fig_m3_stack():
             cx = x0 + 0.45 + i * 0.55
             ax.add_patch(Rectangle((cx - 0.05, y - 0.06), 0.10, 0.12, fc="#b87333", ec=INK, lw=0.6))
     bonds(3.95); bonds(2.55)
-    ax.annotate("Cu\u2013Cu hybrid bond\npitch \u2248 0.4 \u00b5m (Sony 2024 / imec IEDM\u201923)\n~10^6 interconnects / mm\u00b2",
+    ax.annotate("Cu\u2013Cu hybrid bond\n(\u2248 0.4 \u00b5m pitch,\n~10^6 bonds / mm\u00b2)",
                 xy=(x0 + w + 0.05, 3.95), xytext=(x0 + w + 0.15, 3.55),
                 fontsize=7.8, color="#b87333",
                 arrowprops=dict(arrowstyle="->", color="#b87333"))
