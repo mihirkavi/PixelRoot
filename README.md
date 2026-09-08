@@ -23,7 +23,7 @@ PixelRoot is an operator-facing image authenticity console for provenance regist
 
 ```bash
 npm install
-cd client && npm install
+npm --prefix client install
 ```
 
 2. Start the app:
@@ -62,3 +62,7 @@ npm test
 
 - Ledger receipts are currently simulated. The UI labels them accordingly.
 - If geolocation is unavailable during registration, the app uses a neutral origin for the demo signature and reports that clearly in the interface.
+
+## License
+
+[Mozilla Public License 2.0](LICENSE).
