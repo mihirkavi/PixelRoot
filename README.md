@@ -1,5 +1,7 @@
 # PixelRoot
 
+<p><img src="assets/brand/logo.png" alt="PixelRoot logo" width="96" height="96"></p>
+
 PixelRoot is an operator-facing image authenticity console for provenance registration and verification. This version focuses on making the product professionally usable: a resilient backend, honest system status reporting, and a clearer workflow for registering and validating media.
 
 ## What changed
@@ -66,3 +68,11 @@ npm test
 ## License
 
 [Mozilla Public License 2.0](LICENSE).
+
+<!-- project-artwork:start -->
+## Project artwork
+
+![Conceptual artwork for PixelRoot](assets/brand/cover.png)
+
+Conceptual project artwork. [Asset files, design notes, and generation prompts](assets/brand/README.md).
+<!-- project-artwork:end -->
