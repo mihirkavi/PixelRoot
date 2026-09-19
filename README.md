@@ -39,6 +39,25 @@ npm run dev
 - Frontend: `http://localhost:5173`
 - Backend/API: `http://localhost:5000`
 
+## OpenAI Codex setup
+
+1. Install Codex CLI:
+
+```bash
+npm install -g @openai/codex
+```
+
+2. Configure authentication:
+
+- Recommended: run `codex` and select **Sign in with ChatGPT**.
+- API key option: copy `.env.example` to `.env` and set `OPENAI_API_KEY`.
+
+3. Start Codex from this project directory:
+
+```bash
+codex
+```
+
 ## Scripts
 
 ```bash
