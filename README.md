@@ -2,15 +2,20 @@
 
 <p><img src="assets/brand/logo.png" alt="PixelRoot logo" width="96" height="96"></p>
 
-PixelRoot is an operator-facing image authenticity console for provenance registration and verification. This version focuses on making the product professionally usable: a resilient backend, honest system status reporting, and a clearer workflow for registering and validating media.
+PixelRoot is an image provenance project with two parts: a working web console for registering images and verifying them against a provenance registry, and a research manuscript proposing hardware-anchored, sensor-level provenance with blockchain notarization.
 
-## What changed
+## Overview
 
-- The backend no longer hard-fails without `DATABASE_URL`. It now falls back to persistent local file storage automatically.
-- The health API exposes storage mode, upload limits, and the active signature algorithm.
-- The provenance algorithm now defaults to `v2`, which fixes the old lossy coordinate packing bug while preserving explicit support for legacy `v1` verification.
-- Upload handling is safer and cleaner: in-memory processing, async file writes, and cleanup on failed persistence.
-- The UI was redesigned into a more professional operations console with system status, clearer registry browsing, better mobile behavior, and explicit messaging that blockchain receipts are simulated.
+The console (React front end, Express API) lets an operator register an image, which creates a provenance record with a SHA-256-based signature, and later verify an uploaded image against stored records. The `paper/` directory contains the PixelRoot manuscript (IEEE-format LaTeX, plus a Markdown rendering) and the Python experiments that produce its measured results.
+
+## Features
+
+- Image registration and verification against a provenance registry, with a browsable list of recent entries and registry totals
+- Storage that falls back to persistent local file storage when `DATABASE_URL` is not set
+- A health API that reports storage mode, upload limits, and the active signature algorithm
+- Provenance algorithm `v2` by default, with explicit support for verifying legacy `v1` records
+- In-memory upload processing, async file writes, and cleanup on failed persistence
+- An operations-style UI with system status, mobile layout, and explicit labeling that blockchain receipts are simulated
 
 ## Stack
 
@@ -18,6 +23,17 @@ PixelRoot is an operator-facing image authenticity console for provenance regist
 - Backend: Express 5
 - Storage: PostgreSQL when `DATABASE_URL` is set, otherwise a local JSON-backed store
 - Media persistence: local `uploads/`
+
+## Project structure
+
+```text
+client/              React 19 + Vite front end
+server/              Express API, provenance algorithm, storage, tests
+paper/               Manuscript (pixelroot.tex, pixelroot.md, pixelroot.pdf), references, figures
+paper/experiments/   Python experiments, figure generation, and recorded results
+paper/submission/    Submission bundle materials
+assets/brand/        Logo and project artwork
+```
 
 ## Run locally
 
@@ -59,6 +75,22 @@ npm test
 
 - With `DATABASE_URL`: images and verifications are stored in PostgreSQL.
 - Without `DATABASE_URL`: records persist in `server/data/pixelroot-store.json`.
+
+## Configuration
+
+Environment variables (all optional): `DATABASE_URL`, `HOST` (default `127.0.0.1`), `PORT` (default `5000`).
+
+## Research experiments
+
+The experiments in `paper/experiments/` use the public Kodak image set. See [EXPERIMENT_PLAN.md](paper/experiments/EXPERIMENT_PLAN.md) for the claims they test.
+
+```bash
+cd paper/experiments
+pip install -r requirements.txt
+./fetch_data.sh          # download the Kodak images
+python3 e1_robustness.py # likewise e2_security.py ... e5_crypto.py
+python3 make_figures.py
+```
 
 ## Notes
 
