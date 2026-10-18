@@ -82,7 +82,7 @@ def main():
         R = R_FOR((H8 // 8) * (W8 // 8))
         marked, plan = pr.embed_rgb(rgb, coded, KEY, R, A)
         enc = di.jpeg_bytes(marked, 95)
-        anchor = (reg.now, hashlib.sha256(f"block-{reg.now}".encode()).digest())
+        anchor = (reg.now, reg.block_hash(reg.now))
         chip = chips[idx % len(chips)]
         t0 = time.perf_counter()
         rec = di.make_record(chip, payload, marked, enc, anchor)
@@ -214,7 +214,7 @@ def main():
     check("record with altered file hash", False, t_rec, root, proof)
     # uncertified sensor: a chip from a manufacturer that never registered its lot
     rogue = di.SensorChip("ROGUE"); rogue.lot_root = chips[0].lot_root; rogue.lot_proof = chips[0].lot_proof
-    r_rec = di.make_record(rogue, c0["payload"], c0["marked"], c0["enc"], (reg.now, b"\0" * 32))
+    r_rec = di.make_record(rogue, c0["payload"], c0["marked"], c0["enc"], (reg.now, reg.block_hash(reg.now)))
     reg.tick(); r_root = ledger.merkle_root([di.record_hash(r_rec)]); reg.register(r_root)
     check("uncertified sensor key (claims a real lot)", False, r_rec, r_root, [])
     # signature transplanted from a genuine record onto a forged core
@@ -222,10 +222,10 @@ def main():
     check("genuine signature on a forged record", False, f_rec, r_root, [])
     # revocation: capture before revocation stays valid, capture after fails
     victim = chips[1]
-    pre = di.make_record(victim, c0["payload"], c0["marked"], c0["enc"], (reg.now, b"\1" * 32))
+    pre = di.make_record(victim, c0["payload"], c0["marked"], c0["enc"], (reg.now, reg.block_hash(reg.now)))
     reg.tick(); pre_root = ledger.merkle_root([di.record_hash(pre)]); reg.register(pre_root)
     reg.tick(); oem.revoke(victim); reg.tick()
-    post = di.make_record(victim, c0["payload"], c0["marked"], c0["enc"], (reg.now, b"\2" * 32))
+    post = di.make_record(victim, c0["payload"], c0["marked"], c0["enc"], (reg.now, reg.block_hash(reg.now)))
     post_root = ledger.merkle_root([di.record_hash(post)]); reg.register(post_root)
     check("revoked sensor, sealed before revocation", True, pre, pre_root, [])
     check("revoked sensor, sealed after revocation", False, post, post_root, [])
@@ -233,6 +233,10 @@ def main():
     late = di.make_record(chips[2], c0["payload"], c0["marked"], c0["enc"], (reg.now + 10_000, b"\3" * 32))
     reg.tick(); late_root = ledger.merkle_root([di.record_hash(late)]); reg.register(late_root)
     check("anchor block later than seal (time inconsistency)", False, late, late_root, [])
+    # pre-dated record: claims an old anchor block but cannot know its hash in advance
+    pre_dated = di.make_record(chips[3], c0["payload"], c0["marked"], c0["enc"], (1, b"\4" * 32))
+    reg.tick(); pd_root = ledger.merkle_root([di.record_hash(pre_dated)]); reg.register(pd_root)
+    check("anchor hash not the chain's (forged early anchor)", False, pre_dated, pd_root, [])
     check("record not notarized", False, caps[3]["rec"], ledger.sha256(b"unsealed"), [])
 
     # ---------------- (6) cost ----------------

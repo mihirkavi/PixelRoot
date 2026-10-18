@@ -34,7 +34,7 @@
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
-\newcommand{\pr}{\textsc{PixelRoot}}
+\newcommand{\pr}{\textup{\textsc{PixelRoot}}}
 
 % --- Lightweight theorem environments (IEEEtran-compatible) ---
 \newtheorem{proposition}{Proposition}
@@ -94,7 +94,7 @@ Real-Time Blockchain Notarization for Trustworthy Imaging}
 \author{Mihir~Kavishwar%
 \thanks{M.~Kavishwar is an independent researcher with the PixelRoot Project
 (e-mail: hello@mihirkavishwar.com).}%
-\thanks{Manuscript prepared for submission, June 2026. The author declares no
+\thanks{Manuscript prepared for submission, October 2026. The author declares no
 conflict of interest. This work received no external funding.}}
 
 % Running headers: this is a submission draft, not an accepted/published paper,
@@ -107,33 +107,26 @@ conflict of interest. This work received no external funding.}}
 %==============================================================
 \begin{abstract}
 The realism of AI-generated ``deepfake'' imagery has outpaced society's ability
-to tell synthetic media from camera-captured reality. Detector-based defenses
-are locked in an adversarial arms race and generalize poorly to unseen
-generators, while existing provenance schemes bind trust to \emph{metadata} that
-can be stripped, edited, or transplanted. We present \pr{}, a framework that
-moves the root of trust from metadata into the \emph{pixels themselves}. At
-capture, a CMOS image sensor applies a keyed, spread-spectrum
-modulation---realized by a small, low-frequency per-column/per-region
-programmable-gain profile that today's column-parallel sensors can already
-approximate---to embed a $128$-bit, error-corrected provenance payload (device
-identity, trusted timestamp, optional location). A \mbox{SHA-256} commitment
-over the frame is simultaneously notarized to a public blockchain within seconds
-of the shutter, closing the window for substitution.
-We contribute: (i)~a structured survey unifying deepfake detection, PRNU
-forensics, watermarking, C2PA, and blockchain media integrity into a
-\emph{dual-binding} design; (ii)~a formal architecture, threat model, and
-security argument with three propositions; (iii)~a \emph{measured} robustness
-study on real public images (Kodak) with real \texttt{libjpeg}/WebP codecs and a
-real Reed--Solomon code under a WAVES-style attack suite---recovering the payload
-on $22$--$23/24$ images down to JPEG $Q20$ ($21/24$ at $Q10$) at $38$\,dB PSNR, with
-$0/1224$ false-accepts and a documented geometric limitation; (iv)~a CMOS-manufacturing
-feasibility analysis of per-pixel gain control, with engineering schematics, and
-the tamper-localization layer it unlocks (ROC-AUC $0.97$); and (v)~a
-privacy-preserving notarization design and a phased adoption path. Deployed as an
-OEM interoperability standard akin to JPEG, sensor-level provenance plus
-real-time notarization can give legal, journalistic, and safety-critical
-applications an affirmative, hardware-rooted proof of authenticity rather than a
-probabilistic guess.
+to tell synthetic media from camera-captured reality. Detectors generalize poorly
+to unseen generators, and provenance schemes that bind trust to \emph{metadata}
+fail once the metadata is stripped. We present \pr{}, which moves the root of
+trust into the \emph{pixels} and onto a public blockchain. At capture, a CMOS
+sensor embeds a $128$-bit, Reed--Solomon-coded provenance payload through a keyed,
+low-frequency per-region gain modulation. Each sensor holds a signing key
+generated on-die and certified on the blockchain by its manufacturer; it signs a
+capture record that binds the payload to the frame's hashes and to a robust
+content fingerprint, and the record is notarized on the same blockchain, which
+also records time-scoped revocation. We contribute a survey and gap analysis; a
+formal architecture, threat model, and five security propositions; a measured
+robustness study on the Kodak images with real codecs, recovering the payload on $22$--$23/24$ images down to JPEG $Q20$ ($21/24$ at
+$Q10$) at $38$\,dB PSNR with $0/1224$ false accepts; a device-identity evaluation
+showing that the in-pixel mark alone can be copied without any key ($78\%$ of
+trials) and that the content-bound record stops it ($0$ of $240$ copy,
+transplant, and splice forgeries accepted on held-out images); a tested registry
+contract ($46.6$\,k gas per batch, $O(1)$ per image); a CMOS-manufacturing
+feasibility analysis of per-pixel gain and the tamper-localization layer it
+enables; and a privacy-preserving notarization design with a
+phased adoption path toward a cross-OEM interoperability standard.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -211,6 +204,13 @@ tied to the sensor's factory identity that travels \emph{with the pixels} even
 if the file container and its metadata are destroyed.
 \end{itemize}
 
+\noindent Both bindings are anchored to the \textbf{sensor's own identity}: a
+signing key generated inside the sensor at manufacture, never exported (not even
+to the manufacturer), and certified on the same blockchain. The sensor signs a
+capture record that ties the in-pixel payload to the frame's hashes and to a
+robust fingerprint of its content, so a payload copied onto other content no
+longer verifies (\S\ref{sec:identity}).
+
 \noindent The two bindings are complementary: the hard binding gives
 cryptographic non-repudiation but is destroyed by any re-encoding; the in-pixel
 binding tolerates mild processing and survives metadata stripping, but is
@@ -239,10 +239,18 @@ joined by Cu--Cu hybrid bonding, with \emph{engineering schematics}
 (Figs.~\ref{fig:m1}--\ref{fig:m3}), an explicit cost/trade-off assessment and a
 concrete OEM ``provenance-write'' primitive; and the optional per-pixel
 tamper-localization layer this unlocks.
+\item \textbf{A device-identity layer on the ledger} (\S\ref{sec:identity}):
+manufacturer-certified production lots of on-die sensor keys, time-scoped device
+and manufacturer revocation, chip-signed capture records bound to a content
+fingerprint, and a block anchor that brackets capture time from below---with a
+tested smart contract (\S\ref{sec:contract}) and an end-to-end evaluation
+showing that the in-pixel mark alone is copyable and that the content-bound
+record stops identity transplant (\S\ref{sec:e6}).
 \item \textbf{A threat model and security analysis} (\S\ref{sec:threat},
-\S\ref{sec:security}) with three propositions and a threat catalogue covering
+\S\ref{sec:security}) with five propositions and a threat catalogue covering
 re-capture, metadata forgery, replay, compression-laundering, deepfake
-substitution, splicing, and the PRNU fingerprint-copy attack.
+substitution, splicing, the watermark copy attack, sensor-key compromise, and the
+PRNU fingerprint-copy attack.
 \item \textbf{A measured robustness study on real images} (\S\ref{sec:compression},
 \S\ref{sec:eval}) of the redesigned in-pixel channel on the $24$ Kodak photographs
 with \emph{real libjpeg/WebP} codecs, a \emph{real Reed--Solomon} code, and a
@@ -354,14 +362,27 @@ Watermarking embeds a signal for authentication or copyright. Schemes are
 edit, for tamper localization), or \emph{semi-fragile} (tolerate benign
 operations such as JPEG but break on malicious
 edits)~\cite{begum2020digital,fragile2025hybrid}. Classic methods embed in
-DCT/DWT/SVD coefficients; recent work uses learned
-encoders/decoders~\cite{dlwatermarking2026}. Video-domain schemes embed in
+DCT/DWT/SVD coefficients, and the keyed spread-spectrum construction that
+\pr{}'s carrier follows goes back to Cox \emph{et al.}~\cite{cox1997secure} and,
+for video, Hartung and Girod~\cite{hartung1998watermarking}; recent work uses
+learned encoders/decoders~\cite{dlwatermarking2026}, and production systems now
+mark generated content at scale (SynthID~\cite{gowal2025synthid}, Video
+Seal~\cite{fernandez2024videoseal}, TrustMark~\cite{bui2023trustmark}). The attack
+literature is equally mature: an adversary can estimate a mark from a single
+marked image and paste it onto another (the \emph{copy attack}~\cite{kutter2000copy}),
+average many images to recover a fixed pattern~\cite{yang2024steganalysis}, or
+regenerate an image with a diffusion model to remove pixel-level marks
+altogether~\cite{zhao2024invisible,saberi2024robustness}. Watermarking inside the
+camera has also been proposed before: Blythe and Fridrich's \emph{secure digital
+camera} embeds a lossless, keyed authentication mark at capture~\cite{blythe2004secure}. Video-domain schemes embed in
 H.264/HEVC transform coefficients or motion vectors and must contend with
 quantization and motion-compensation
 drift~\cite{videowatermark2018survey,hevcwatermark2020,cstfmark2026}.
 \emph{Limitation:} watermarking alone provides no \emph{public, time-anchored}
 record and no \emph{hardware} root---a watermark embedded in software can be
-embedded by an attacker too. \pr{} treats its in-pixel payload as a
+embedded by an attacker too---and a mark that encodes an identity can be copied
+with it~\cite{kutter2000copy}, which \pr{} must and does address
+(\S\ref{sec:identity}). \pr{} treats its in-pixel payload as a
 \emph{semi-fragile, hardware-originated} watermark whose trust is bootstrapped
 by on-chain notarization and OTP identity.
 
@@ -402,7 +423,8 @@ a hardware-anchored in-pixel binding the ledger alone cannot provide.
 Table~\ref{tab:compare} summarizes the landscape. Each ingredient exists in
 isolation: watermarking embeds recoverable signals in pixels; PRNU ties images
 to a physical sensor; C2PA provides hardware-backed signed provenance; and prior
-systems anchor media hashes to a blockchain~\cite{hasan2019combating}. Our claim
+systems anchor media hashes to a blockchain~\cite{hasan2019combating}; even
+in-camera watermarking has precedent~\cite{blythe2004secure}. Our claim
 is therefore \emph{not} that any single component is new. The specific,
 defensible novelty of \pr{} is their \emph{co-design}: a \textbf{(i)
 hardware-rooted, key-protected, error-corrected signal embedded by the sensor's
@@ -411,7 +433,10 @@ silicon rather than a software key---that is \textbf{(ii) bound at the shutter t
 a public-ledger commitment}, yielding two independent failure-disjoint bindings,
 \textbf{(iii) realized through a \emph{feasibility-grounded} per-column/per-region
 gain primitive} we ask manufacturers to standardize rather than the per-pixel
-control prior ``sensor-embedding'' sketches assumed. No prior approach occupies
+control prior ``sensor-embedding'' sketches assumed, and \textbf{(iv) bound to a
+sensor key certified and revocable on the same public ledger}, through a signed,
+content-bound record that makes the in-pixel identity non-transferable. No prior
+approach occupies
 the intersection of hardware root, metadata-strip survival, and public real-time
 notarization. We claim contributions at the level of architecture, the concrete
 hardware ask, the measured robustness of the carrier, and the privacy design---not
@@ -431,7 +456,7 @@ the invention of watermarking or blockchains.
 Deepfake detectors~\cite{croitoru2024deepfake} & \ding{55} & --- & \ding{55} & \ding{55} & \ding{51} \\
 PRNU forensics~\cite{lukas2006digital}        & part. & \ding{51} & \ding{55} & part. & \ding{55} \\
 Watermarking~\cite{begum2020digital}          & \ding{55} & \ding{51} & \ding{55} & part. & \ding{51} \\
-C2PA / Truepic~\cite{c2pa2024spec,truepic2024capture} & \ding{51} & \ding{55} & opt. & \ding{51} & \ding{51} \\
+C2PA / Truepic~\cite{c2pa2024spec,truepic2024capture} & \ding{51} & part.$^\dagger$ & opt. & \ding{51} & \ding{51} \\
 Blockchain hashing~\cite{hasan2019combating}  & \ding{55} & \ding{55} & \ding{51} & \ding{51} & part. \\
 \textbf{\pr{} (this work)}                    & \ding{51} & \ding{51} & \ding{51} & \ding{51} & \ding{51} \\
 \bottomrule
@@ -439,6 +464,8 @@ Blockchain hashing~\cite{hasan2019combating}  & \ding{55} & \ding{55} & \ding{51
 \\[2pt]
 \footnotesize HW root = hardware/sensor root of trust; Surv.\ meta-strip =
 survives metadata removal; Affirm.\ proof = affirmative proof of authenticity.
+$^\dagger$C2PA~2.x can recover a stripped manifest through a registered
+watermark or fingerprint (soft binding) when one is used.
 \end{table}
 
 %==============================================================
@@ -452,15 +479,21 @@ attested (e.g.\ via a secure element), as in current hardware-backed C2PA
 deployments~\cite{google2025c2pa,truepic2024capture}; (A3) the blockchain is
 append-only and its history is economically infeasible to rewrite within the
 relevant timeframe~\cite{nakamoto2008bitcoin}; (A4) standard cryptographic
-primitives are secure~\cite{nist2015sha}.
+primitives are secure~\cite{nist2015sha,fips186-5}; (A5) each sensor generates
+its signing key on-die at manufacture and the private key cannot be exported
+without an invasive attack on that physical device; manufacturers admitted to the
+registry certify only keys produced on their lines.
 
 \subsection{Adversary}
 The adversary may: forge or edit file metadata; generate a deepfake or
 Photoshop a real image; re-encode/transcode/compress media; re-photograph a
 screen (analog ``re-capture''); attempt to estimate and transplant a victim's
 sensor fingerprint (PRNU-copy~\cite{goljan2011defending}); and replay or
-back-date claims. The adversary cannot economically clone a specific physical
-CMOS die or rewrite ledger history.
+back-date claims; read any published capture record; estimate and copy an
+in-pixel mark from images it obtains (with or without the original); and
+extract the key of a device it physically possesses. The adversary cannot
+economically clone a specific physical CMOS die, extract keys from devices it
+does not hold, or rewrite ledger history.
 
 \subsection{Design goals}
 \textbf{G1 Affirmative authenticity:} produce verifiable evidence that media
@@ -475,7 +508,10 @@ verification:} the on-chain commitment is verifiable by \emph{any} third party
 camera; the in-pixel binding is checked by a key-holding verifier (the issuing
 OEM or a delegated verification service), with fully public-key/zero-knowledge
 in-pixel verification identified as future work (\S\ref{sec:discussion}).
-\textbf{G5 Minimal capture latency:} notarize within seconds of the shutter.
+\textbf{G5 Minimal capture latency:} submit the commitment at capture, so the
+sealing delay is the batch interval plus the chain's block time (seconds on
+low-latency chains and rollups); we measure gas but leave public-network latency
+to future work (E4).
 \textbf{G6 Imperceptibility:} embedding must not visibly degrade the image.
 \textbf{G7 Standardizability:} be deployable as a cross-OEM interoperability
 standard.
@@ -494,19 +530,19 @@ consumes them.
 \resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[node distance=5mm and 6.5mm]
 % --- capture pipeline (top) ---
-\node[hw] (sensor) {CMOS sensor\\$+$ OTP \textsf{ID}};
+\node[hw] (sensor) {CMOS sensor\\OTP \textsf{ID} $+$ on-die $\mathit{sk}$};
 \node[stage, right=of sensor] (payload) {Payload $\mathbf{m}$\\\textsf{ID}$\|t\|$GPS};
 \node[stage, right=of payload] (rs) {RS encode\\$\mathbf{m}\!\to\!\mathbf{b}$};
 \node[stage, right=of rs] (sel) {Keyed PRNG\\select regions};
 \node[hw, right=of sel] (gain) {Per-region\\gain ramp};
 \node[hw, right=of gain] (read) {Expose \&\\readout $I$};
-\node[stage, right=of read] (hash) {$h{=}$SHA-256\\$(I\,\|\,\mathbf{m})$};
+\node[hw, right=of read] (hash) {Sign record $r$\\$h{=}$SHA-256$(r\|\sigma)$};
 % key input
-\node[stage, above=7mm of sel, fill=gray!12] (key) {OEM secret $k$\\(secure elem.)};
+\node[stage, above=7mm of sel, fill=gray!12] (key) {OEM carrier\\key $k$};
 % storage + chain
 \node[store, below=9mm of read] (storeimg) {Store $I$ $+$\\C2PA manifest};
 \node[chain, below=9mm of hash] (merkle) {Merkle batch\\$\to$ root};
-\node[chain, right=of merkle] (chain) {Public ledger\\(block $t_b$, event)};
+\node[chain, right=of merkle] (chain) {Public ledger\\(lots, revocation,\\sealed roots)};
 % arrows capture
 \foreach \a/\b in {sensor/payload,payload/rs,rs/sel,sel/gain,gain/read,read/hash}
   \draw[flow] (\a) -- (\b);
@@ -515,10 +551,10 @@ consumes them.
 \draw[flow] (hash) -- (merkle);
 \draw[flow] (merkle) -- (chain);
 % --- verification (bottom) ---
-\node[stage, below=14mm of storeimg, fill=blue!4] (qimg) {Questioned\\$I',\mathbf{m}'$};
-\node[dec, right=12mm of qimg] (v1) {V1\\$h'\!\in\!$ledger?};
-\node[dec, below=8mm of v1] (v2) {V2\\RS-decode\\$\hat{\mathbf m}{=}\mathbf m'$?};
-\node[good, right=12mm of v1] (orig) {\textbf{Camera-original}\\(V1$\wedge$V2)};
+\node[stage, below=14mm of storeimg, fill=blue!4] (qimg) {Questioned\\file $(E',I')$};
+\node[dec, right=12mm of qimg] (v1) {V1\\file hash\\in record?};
+\node[dec, below=8mm of v1] (v2) {V2\\decode $\hat{\mathbf m}$;\\record \&\\$d(F){\le}\tau$?};
+\node[good, right=12mm of v1] (orig) {\textbf{Camera-original}\\(V1)};
 \node[good, right=12mm of v2, fill=green!8] (trans) {\textbf{Transcoded-}\\\textbf{consistent} (V2)};
 \node[term, below=7mm of trans] (unv) {\textbf{Unverified}\\(fail-safe)};
 \draw[flow] (qimg) -- (v1);
@@ -533,11 +569,12 @@ consumes them.
 \end{tikzpicture}%
 }
 \caption{\pr{} architecture. \emph{Top:} the capture path emits a hard binding
-($h$ on the public ledger) and a soft in-pixel binding (the keyed,
-error-corrected gain pattern carried inside $I$). \emph{Bottom:} verification
-checks V1 (ledger membership of $h'$) and V2 (in-pixel payload recovery) and
-returns the strongest supported authenticity level, failing safe to
-``unverified''.}
+(the hash of a sensor-signed capture record, sealed on the public ledger) and a
+soft in-pixel binding (the keyed, error-corrected gain pattern carried inside
+$I$); the same ledger certifies and revokes sensor keys. \emph{Bottom:}
+verification checks V1 (the file's hash is committed in a valid record) and V2
+(the decoded payload resolves to a valid record whose content fingerprint matches)
+and returns the strongest supported level, failing safe to ``unverified''.}
 \label{fig:arch}
 \end{figure*}
 
@@ -552,8 +589,12 @@ Too coarse to carry a spatial payload.
 \item \textbf{Per-column gain (today).} Column-parallel readout places a
 programmable-gain amplifier per column; per-column gain trim is routinely used
 for column fixed-pattern-noise correction. A per-column gain \emph{profile}
-directly imprints horizontal low-frequency content---exactly the carrier \pr{}
-uses.
+directly imprints horizontal low-frequency content---the shape of \pr{}'s
+carrier. A static profile, however, applies the same gain to every row of a
+column and so gives every block in a block-column the same chip sign; the
+block-keyed layout additionally needs the column gains to be re-programmed as
+readout advances, i.e.\ at row (line) rate in a rolling-shutter sensor, which
+column front-ends must be shown to support.
 \item \textbf{Per-region / tiled gain (emerging).} Dual- and triple-conversion-gain
 and HDR-zone sensors already switch gain over regions by toggling
 floating-diffusion (FD) capacitance~\cite{hdrcis2024review,dcg_fdshared2020,tcg_sony2022};
@@ -575,7 +616,8 @@ as the apex, (2)~\emph{per-pixel} gain via the manufacturing routes of
 hardware-backed C2PA pipelines already
 ship~\cite{google2025c2pa,truepic2024capture}. \pr{}'s robust carrier needs only
 a \emph{low-frequency gain ramp over an image region} (\S\ref{sec:embed}), which
-even per-column control realizes; per-pixel control is strictly more general---it
+per-region control realizes, as does per-column control re-programmed at line
+rate; per-pixel control is strictly more general---it
 \emph{subsumes} per-column and per-region patterns and additionally enables a
 fine-grained tamper-localization layer (\S\ref{sec:mfg}).
 
@@ -738,40 +780,45 @@ coarsened or replaced by a salted commitment disclosed only under subpoena
 \centering
 \includegraphics[width=0.96\textwidth]{fig_datapath.pdf}
 \caption{The \pr{} provenance-write datapath at capture time. The keyed PRNG
-(seed $=\!\mathcal H(k\,\|\,\mathbf m)$) selects carriers; the gain/exposure
-hardware applies the $\pm$chip; SHA-256 commits $\mathcal H(I\,\|\,\mathbf m)$,
-which a Merkle batch notarizes on a public ledger. The in-pixel mark is the soft
-binding (survives transcoding); the on-chain hash is the hard binding---two
-independent barriers (Props.~\ref{prop:v1}--\ref{prop:v2}).}
+(seed $\mathcal H(k\,\|\,W\|H)$) selects carriers; the gain/exposure hardware
+applies the RS-coded payload as $\pm$chips; after readout the sensor signs a
+capture record with its on-die key, and the record hash is batched into a Merkle
+tree sealed on the public ledger. The in-pixel payload is the soft binding
+(survives transcoding); the sensor-signed record on the ledger is the hard
+binding; the record's content fingerprint ties the two together
+(Props.~\ref{prop:v1},~\ref{prop:identity}).}
 \label{fig:datapath}
 \end{figure*}
 
 \subsection{Keyed region selection and spread-spectrum coding}\label{sec:select}
 \pr{} partitions the frame into $8\!\times\!8$ blocks aligned with the JPEG grid
-and treats \emph{blocks}, not single pixels, as carriers. The OEM-keyed seed is
-the full keyed digest
+and treats \emph{blocks}, not single pixels, as carriers. The carrier layout is
+derived from the OEM \emph{carrier key} $k$ and the frame geometry,
 \begin{equation}
-s = \mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}),
+s = \mathrm{SHA\text{-}256}(k\,\|\,W\,\|\,H),
 \end{equation}
-which keys a cryptographic PRNG (a stream/CTR-mode keyed generator); the seed
-entropy is therefore bounded by the key, not by a truncated word, so the carrier
-layout is not amenable to offline enumeration. (The released prototype departs
-from this specification in two ways: it derives the layout from the key alone,
-$\mathrm{SHA\text{-}256}(k)$, not from $k\|\mathbf{m}$, and it seeds NumPy's
-legacy generator with a $32$-bit reduction of that digest. Neither affects the
-measured robustness or false-accept behavior of \S\ref{sec:eval}, which depend
-on key \emph{mismatch}, not on seed width or payload dependence; but a $32$-bit
-seed is enumerable offline, so a deployment must use the full-width keyed PRNG.) For each coded
+which keys a cryptographic PRNG (a stream/CTR-mode keyed generator). The layout
+deliberately does \emph{not} depend on the payload $\mathbf{m}$: a verifier that
+holds only the pixels must be able to locate the carriers and \emph{read}
+$\mathbf{m}$, which is what lets the in-pixel binding survive metadata
+stripping. (The released prototype seeds NumPy's legacy generator with a $32$-bit
+reduction of $\mathrm{SHA\text{-}256}(k)$; a deployment uses the full-width
+keyed PRNG.) For each coded
 bit the PRNG draws $R$ distinct carrier blocks without repetition and assigns
 each an antipodal \emph{chip} $c_j\!\in\!\{\pm1\}$ (spread spectrum). The $128$
 payload bits are first protected by error correction (a Reed--Solomon code over
 $\mathrm{GF}(2^8)$~\cite{reed1960polynomial}, or the repetition coding evaluated
 in \S\ref{sec:eval}); the repetition factor $R$ gives each bit redundancy across
-many spatially dispersed blocks. Because the seed is keyed by the secret $k$, an
-attacker who does not hold $k$ can neither localize the carrier blocks nor
-recover their chip signs even after observing many marked images
-(Prop.~\ref{prop:carriers}). A verifier holding $k$ and the claimed
-$\mathbf{m}'$ regenerates the identical assignment.
+many spatially dispersed blocks. A party without $k$ that \emph{reads} a marked
+image obtains a random bit string (Prop.~\ref{prop:carriers}). The layout is,
+however, the same for every frame of a given size, and the detector's
+statistic is computable from public information, so an attacker \emph{can}
+estimate the mark from marked images and copy or subtract it (\S\ref{sec:e6}).
+\pr{} therefore does not rely on the secrecy of $k$ for authenticity: the
+in-pixel payload is a \emph{pointer} whose meaning is fixed by a sensor-signed,
+content-bound record on the ledger (\S\ref{sec:identity}). Copying the pointer
+onto other content yields a verdict of \textsc{Unverified}, and removing it yields
+the same fail-safe result.
 
 \subsection{Region-gain (spread-spectrum) embedding}\label{sec:embed}
 The single-pixel, $2\%$ gain perturbation of na\"ive designs is a poor carrier:
@@ -780,7 +827,7 @@ cannot be read back reliably against textured scene content. \pr{} instead
 embeds each bit as a \emph{low-frequency gain ramp over its carrier blocks}. Let
 $\Phi_{u,v}(x,y)=\cos\!\frac{(2x{+}1)u\pi}{16}\cos\!\frac{(2y{+}1)v\pi}{16}$ be a
 low-order $8\!\times\!8$ DCT basis (we use a low horizontal frequency,
-$(u,v)\!=\!(0,2)$, which a per-column gain profile produces directly). For a
+$(u,v)\!=\!(0,2)$, whose shape a per-column gain profile produces). For a
 carrier block $B_j$ with chip $c_j$ carrying bit $b\!\in\!\{0,1\}$ with sign
 $\sigma=2b{-}1$, the sensor adds
 \begin{equation}
@@ -823,117 +870,212 @@ BER in \S\ref{sec:eval} near $2\%$ through aggressive JPEG---low enough for the
 error-correcting code to recover the payload.
 
 \subsection{Commitment and notarization}
-Immediately after readout, the device computes a hard binding
+Immediately after readout, the sensor forms and signs a \emph{capture record}
+(\S\ref{sec:identity}) that commits, among other fields, to the raw frame
+$\mathcal H(I)$, to the camera's own encoded file $\mathcal H(E(I))$, and to the
+payload $\mathbf{m}$. The hard binding is the record hash
 \begin{equation}
-h = \mathrm{SHA\text{-}256}\big(\,I \,\|\, \mathbf{m}\,\big),
+h = \mathrm{SHA\text{-}256}\big(\,r \,\|\, \sigma\,\big),
 \end{equation}
-over the (lossless) image $I$ and payload, then submits $h$ (optionally with a
-device pseudonym and coarse time/location) to a notarization smart contract.
-For scale, many commitments are aggregated into a Merkle
-tree~\cite{merkle1987digital} and only the root is written on-chain, amortizing
-gas cost; the contract emits an event with a block timestamp that serves as the
-public ``proof of existence''~\cite{proofmode2023}. If connectivity is briefly
-unavailable, $h$ is queued in secure storage and submitted on reconnect, with
-the latency recorded.
+where $r$ is the record and $\sigma$ the sensor's signature on it. For scale,
+many record hashes are aggregated into a Merkle tree~\cite{merkle1987digital}
+and only the root is written on-chain, amortizing gas cost; the contract records
+the block timestamp, which serves as the public ``proof of
+existence''~\cite{proofmode2023}. If connectivity is briefly unavailable, $h$ is
+queued in secure storage and submitted on reconnect, with the latency recorded.
 
 \begin{algorithm}[t]
-\caption{\pr{} capture-time embed-and-notarize}
+\caption{\pr{} capture-time embed, sign, and notarize}
 \label{alg:capture}
 \begin{algorithmic}[1]
-\REQUIRE OEM secret $k$, amplitude $A$, repetition $R$, basis $\Phi_{u,v}$
+\REQUIRE carrier key $k$, amplitude $A$, repetition $R$, basis $\Phi_{u,v}$;
+         on-die key $\mathit{sk}$ with certified $\mathit{pk}\in$ lot $\lambda$
+\STATE $\beta\gets$ (number, hash) of a recent block
+       \quad\COMMENT{capture-time lower bound}
 \STATE $\mathrm{ID}\gets\mathrm{readOTP}()$
-       \quad\COMMENT{48-bit factory identity}
-\STATE $t\gets\mathrm{attestedClock}();\;(\phi,\lambda)\gets\mathrm{gps}()$
-\STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda)$
+       \quad\COMMENT{48-bit pseudonymous handle}
+\STATE $t\gets\mathrm{attestedClock}();\;(\phi,\lambda_{\mathrm{geo}})\gets\mathrm{gps}()$
+\STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda_{\mathrm{geo}})$
        \quad\COMMENT{$128$ bits}
 \STATE $\mathbf{b}\gets \mathrm{ECC\text{-}Encode}(\mathbf{m})$
-       \quad\COMMENT{RS / repetition, coded bits $b_1{\dots}b_{n_c}$}
-\STATE $s\gets \mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m});\;\mathrm{prng}\gets\mathrm{CSPRNG}(s)$
-\FORALL{coded bit $b_i$, $\sigma\gets 2b_i{-}1$}
+       \quad\COMMENT{RS, coded bits $b_1{\dots}b_{n_c}$}
+\STATE $\mathrm{prng}\gets\mathrm{CSPRNG}(\mathrm{SHA\text{-}256}(k\,\|\,W\,\|\,H))$
+\FORALL{coded bit $b_i$, $\sigma_i\gets 2b_i{-}1$}
    \STATE draw $R$ distinct blocks $\{B_j\}$, chips $c_j\!\in\!\{\pm1\}$ via prng
    \FORALL{$(B_j,c_j)$}
-     \STATE set per-region gain ramp on $B_j$: add $A\,\sigma c_j\,\Phi_{u,v}$
-       \quad\COMMENT{per-column / per-region register}
+     \STATE set per-region gain ramp on $B_j$: add $A\,\sigma_i c_j\,\Phi_{u,v}$
    \ENDFOR
 \ENDFOR
-\STATE $I\gets \mathrm{expose\_and\_readout}()$
-\STATE $h\gets \mathrm{SHA\text{-}256}(I\,\|\,\mathbf{m})$
-\STATE $\mathrm{leaf}\gets h;\;$ enqueue \textit{leaf} for Merkle batch
-\STATE \textbf{on flush:} $\mathit{root}\gets\mathrm{Merkle}(\{\mathit{leaf}\});\;
+\STATE $I\gets \mathrm{expose\_and\_readout}()$;\; $E\gets\mathrm{encode}(I)$
+\STATE $r\gets(\mathit{pk},\lambda,\mathbf{m},\mathcal H(I),\mathcal H(E),F(I),\beta)$;\;
+       $\sigma\gets\mathrm{Sign}_{\mathit{sk}}(r)$
+\STATE $h\gets \mathrm{SHA\text{-}256}(r\,\|\,\sigma)$;\; enqueue $h$ for Merkle batch
+\STATE \textbf{on flush:} $\mathit{root}\gets\mathrm{Merkle}(\{h\});\;
         \mathrm{register}(\mathit{root})$
-\STATE \textbf{store} $I$ (lossless preferred) $+$ $\mathbf{m}$ $+$ Merkle proof
-        $\pi$ in C2PA manifest
+\STATE \textbf{store} $E$ with $(r,\sigma,\pi)$ in a C2PA manifest; publish
+       $(r,\sigma,\pi)$ to the record store when $E$ is published
 \end{algorithmic}
 \end{algorithm}
 
 \subsubsection*{Step-by-step}
-(1)~\textbf{Acquire identity \& context}: the sensor's $48$-bit OTP identity is
-read from on-die fuses; the attested clock and GPS provide $t$ and
-$(\phi,\lambda)$. (2)~\textbf{Form payload} $\mathbf{m}$ ($128$\,b).
-(3)~\textbf{Derive seed} $s$ by hashing $k\|\mathbf{m}$; the secret $k$ ensures
-carriers are unpredictable even to a party who learns $\mathbf{m}$.
-(4)~\textbf{Channel-code}: error correction (RS over $\mathrm{GF}(2^8)$, or
-repetition) expands $\mathbf{m}$ into $n_c$ coded bits.
-(5)~\textbf{Select carriers}: a keyed PRNG assigns each coded bit $R$ distinct
-$8\!\times\!8$ blocks with antipodal chips. (6)~\textbf{Modulate}: the sensor
-adds a low-frequency gain ramp $A\sigma c_j\Phi_{u,v}$ to each carrier block
-\emph{during} exposure (Eq.~\ref{eq:embed}), so the bit is imprinted physically
-in the photo-electron domain (per-column/per-region gain), not added in
-software. (7)~\textbf{Read out} the frame
-$I$. (8)~\textbf{Commit}: hash $I\|\mathbf{m}$. (9)~\textbf{Notarize}: the leaf is
-batched into a Merkle tree and the root is registered on-chain in one
-transaction, yielding a block-timestamped proof of existence. (10)~\textbf{Persist}
-$I$ with $\mathbf{m}$ and the Merkle inclusion proof $\pi$ in a C2PA manifest for
-convenience (the manifest is \emph{not} required for V2).
+(1)~\textbf{Anchor}: note a recent block $\beta$. (2)~\textbf{Acquire identity \&
+context}: the $48$-bit OTP handle, the attested clock $t$, and optional location.
+(3)~\textbf{Form payload} $\mathbf{m}$ ($128$\,b) and (4)~\textbf{channel-code} it
+with RS over $\mathrm{GF}(2^8)$ into $n_c$ coded bits. (5)~\textbf{Select
+carriers}: the keyed PRNG assigns each coded bit $R$ distinct $8\!\times\!8$
+blocks with antipodal chips. (6)~\textbf{Modulate}: the sensor adds a
+low-frequency gain ramp $A\sigma_i c_j\Phi_{u,v}$ to each carrier block
+\emph{during} exposure (Eq.~\ref{eq:embed}), in the photo-electron domain
+(per-region gain) rather than in software. (7)~\textbf{Read out} the frame $I$
+and encode the file $E$. (8)~\textbf{Sign}: the sensor signs the capture record
+with its on-die key. (9)~\textbf{Notarize}: the record hash is batched into a
+Merkle tree and the root is registered on-chain in one transaction.
+(10)~\textbf{Persist} the record, signature and inclusion proof $\pi$ in a C2PA
+manifest, and publish them to the record store when the image is published. The
+manifest is a convenience: V2 needs only the pixels, the record store, and the
+ledger.
 
-\subsection{Smart-contract notarization}\label{sec:contract}
-On-chain state is intentionally minimal: a registry maps each Merkle root to its
-block timestamp and emits an event for off-chain indexers. Batching $N$
-captures under one root makes per-image gas cost $O(1)$ amortized, and inclusion
-is later proven off-chain with a $\log_2 N$-length Merkle path.
-Listing~\ref{lst:sol} sketches the contract.
+\subsection{Device identity and content-bound records}\label{sec:identity}
+The OTP identifier inside $\mathbf{m}$ names a sensor, but it proves nothing: it
+is a public number, and the in-pixel mark that carries it can be estimated from
+a single shared image and pasted onto other content without the carrier key
+(the classic copy attack~\cite{kutter2000copy}; \S\ref{sec:e6} measures a $78\%$
+success rate at the watermark level). Identity must therefore rest on a secret
+that only the sensor holds and that the ledger can vouch for. \pr{} adds four
+elements, all anchored on the same blockchain as the captures.
 
-\lstinputlisting[style=solidity,caption={\pr{}Registry: batched commitment
-and inclusion verification (sketch).},label={lst:sol},float=t]{registry.sol}
+\paragraph{An on-die sensor key}
+At manufacture each sensor generates an ECDSA P-256 key pair~\cite{fips186-5}
+inside the die---in a secure element on the stacked logic tier (M3,
+\S\ref{sec:mfg}) or derived from a physically unclonable function---so the
+private key $\mathit{sk}$ never leaves the sensor, not even to its manufacturer.
+The OTP identifier becomes a pseudonymous handle; the public key $\mathit{pk}$ is
+the credential. Because every key is unique to one die, physically extracting a
+key compromises one device, not a fleet.
 
-\noindent A capture is \emph{notarized} once \texttt{register} mines; a verifier
-later calls \texttt{verifyInclusion(root, leaf, proof)} (a pure function, no gas)
-to confirm that a specific commitment $h$ was sealed under a root at a known
-block time. Device pseudonyms (rotating per-epoch public keys attested by the
-secure element) may optionally sign the \texttt{register} call so that a court
-can, with the OEM's cooperation, bind a root to a device class without exposing
-the photographer.
+\paragraph{Certification and revocation on the ledger}
+Manufacturers are admitted to the registry by its governance (in a standard, a
+consortium multisignature). A manufacturer certifies a production lot by
+registering the Merkle root $\lambda$ of $\{\mathrm{SHA\text{-}256}(\mathit{pk}_i)\}$;
+each sensor stores its inclusion path, so a lot of $10^5$ sensors costs one
+transaction. A manufacturer can revoke one of its sensor keys (a stolen or
+physically attacked device), and governance can revoke a manufacturer. Both are
+\emph{time-scoped}: the ledger records the revocation block, captures sealed
+before it remain valid, and later ones fail. Revocation is enforced by the
+contract's own verification call, not left to validator policy---the gap that let
+revoked certificates keep validating after the Nikon incident~\cite{c2pa2026security}.
+
+\paragraph{A signed, content-bound capture record}
+After readout the sensor forms
+\begin{equation}
+r = \big(\mathit{pk},\,\lambda,\,\mathbf{m},\,\mathcal H(I),\,\mathcal H(E(I)),\,F(I),\,\beta\big)
+\label{eq:record}
+\end{equation}
+and signs it, $\sigma=\mathrm{Sign}_{\mathit{sk}}(r)$. Committing $\mathcal H(E(I))$,
+the hash of the camera's own encoded file, makes the hard binding checkable on the
+file people actually receive; $\mathcal H(I)$ keeps raw-domain forensics possible.
+$F(I)$ is a robust content fingerprint: the frame is divided into $4\times4$
+tiles, each tile's luma is box-downsampled to $32\times32$, and its $63$ lowest
+non-DC DCT coefficients are kept ($1{,}072$ bytes after per-tile int8
+quantization). The fingerprint distance is the largest per-tile relative error,
+\begin{equation}
+d(F,F') = \max_{t}\;\frac{\lVert f_t - f'_t\rVert_2}{\lVert f_t\rVert_2+\varphi},
+\label{eq:fpdist}
+\end{equation}
+with an energy floor $\varphi$ so that flat tiles do not dominate. Compression,
+noise, mild filtering, rescaling and photometric edits leave the coarse
+structure of every tile nearly unchanged; different content, or a foreign region
+spliced into a tile, does not. The record ($\approx\!3$\,KB) is published by the
+capturing party, the OEM, or a content-addressed store when the image is
+published; only its hash reaches the chain.
+
+\paragraph{A capture-time bracket}
+$\beta$ is the number and hash of a block the device observed before exposure.
+A record whose anchor is later than its sealing block is rejected, and a valid
+anchor proves the record was formed after block $\beta$---a \emph{lower} bound on
+capture time that complements the upper bound of Prop.~\ref{prop:v1}
+(Prop.~\ref{prop:bracket}).
+
+\paragraph{Why not ask the manufacturer to sign each capture}
+An online, per-capture signature by the manufacturer would add no security over
+the sensor's own certified key, and it would cost a great deal: capture would
+fail offline (conflict zones, aircraft, courtrooms); the manufacturer would learn
+who captured what, when and where; and a breached, coerced, or defunct
+manufacturer would stop or forge its whole fleet's provenance. \pr{} therefore
+confines the manufacturer to certifying keys once and revoking them on the
+ledger; an optional manufacturer co-signature of batch roots can serve as a
+higher assurance tier, never as a requirement.
+
+\paragraph{The role of the carrier key}
+With identity carried by the signed record, the carrier key $k$ protects the
+robustness of the channel, not its authenticity: a forger who knows $k$ can read
+or copy a payload but still cannot produce a record that a certified sensor
+signed for the forged content. An OEM may therefore publish its carrier key,
+which makes V2 verifiable by anyone---closing the gap between the publicly
+verifiable hard binding and the key-holder-verified soft binding (goal G4).
+
+\subsection{Smart-contract registry}\label{sec:contract}
+On-chain state is intentionally minimal and holds only ledger facts: admitted
+manufacturers, certified lots of sensor keys, revocation times, and the block
+time at which each batch root was sealed. Every Merkle tree (lots and capture
+batches) uses the same domain-separated construction,
+$\mathrm{leaf}=\mathrm{SHA\text{-}256}(\texttt{0x00}\|x)$ and
+$\mathrm{node}=\mathrm{SHA\text{-}256}(\texttt{0x01}\|\min(a,b)\|\max(a,b))$, with an
+odd node promoted rather than duplicated; the prefix stops an internal node from
+being presented as a leaf, and promotion rules out the duplicate-last-node
+mutation. Batching $N$ captures under one root makes per-image gas $O(1)$
+amortized, and inclusion is proven with a $\lceil\log_2 N\rceil$-length path.
+Sealing is deliberately permissionless---any device, app, or batcher may submit,
+so no party can censor a capture---and the submitter carries no trust:
+authenticity comes from the sensor signature inside each record, checked against
+the certified lots. Listing~\ref{lst:sol} shows the notarization and verification
+calls; the full contract, a $16$-case test suite, and the measured gas
+(\S\ref{sec:e6}) are released.
+
+\lstinputlisting[style=solidity,caption={\pr{}Registry (v2): permissionless
+batch sealing and the verification calls (excerpt).},label={lst:sol},
+linerange=@listing-begin-@listing-end,rangeprefix=//\ ,includerangemarker=false]{contracts/src/PixelRootRegistry.sol}
+
+\noindent A capture is \emph{notarized} once \texttt{register} mines. A verifier
+later calls \texttt{verifyCapture} (a view call, no gas) with the batch root, the
+record hash and its path, and the sensor's lot root, key hash and path; it
+learns whether the record is sealed, at what block time, and whether that sensor
+was certified and unrevoked at that time.
 
 \subsection{Verification}
-A verifier with a questioned image $I'$ and a claimed payload $\mathbf{m}'$
-(from the manifest, the on-chain record, or asserted by a party) runs
-Algorithm~\ref{alg:verify}, performing two independent checks.
+A verifier holds a questioned file (bytes $E'$, pixels $I'$), the public ledger,
+the record store, and the carrier key $k$. It needs no claimed payload and no
+manifest, and it runs Algorithm~\ref{alg:verify}. Both checks end in the same
+record test: a record is \emph{valid} if its signature verifies under its
+$\mathit{pk}$; its hash is included under a sealed root at block time $t_b$; the
+sensor was certified in $\lambda$ and unrevoked at $t_b$
+(\texttt{verifyCapture}); and its anchor precedes $t_b$.
 
-\noindent\textbf{(V1) Hard binding / ledger check.} Recompute
-$h'=\mathrm{SHA\text{-}256}(I'\|\mathbf{m}')$ and confirm $h'$ is included under a
-registered root (via $\pi$). A match proves $I'$ existed, bit-for-bit, at the
-recorded block time. Conclusive but brittle: any re-encoding of $I'$ breaks it.
+\noindent\textbf{(V1) Hard binding.} Look up $\mathcal H(E')$ among valid records'
+$\mathcal H(E(I))$ or $\mathcal H(I)$. A match proves that this exact file came
+from a certified sensor and existed at $t_b$. It is conclusive but brittle: any
+re-encoding breaks it.
 
-\noindent\textbf{(V2) In-pixel binding check.} Regenerate $s$, the carrier
-blocks, and the chips from $\mathbf{m}'$ and $k$; after a short block-grid
-\emph{resynchronization} search (\S\ref{sec:geom}) to undo translation/crop,
-project each carrier block onto $\Phi_{u,v}$ (Eq.~\ref{eq:residual}), de-spread
-and combine (Eq.~\ref{eq:despread}), soft-decode the error-correcting code to
-$\hat{\mathbf{m}}$, and test $\hat{\mathbf{m}}\stackrel{?}{=}\mathbf{m}'$. The
-bit-error rate (BER) and decode margin form a soft authenticity score that
-degrades gracefully under compression (\S\ref{sec:compression}). Because the
-carriers and chips are keyed, an attacker who edits or splices without $k$
-corrupts the signature detectably and cannot forge a consistent one.
+\noindent\textbf{(V2) In-pixel binding.} Regenerate the carrier layout from $k$
+and the frame size; after a block-grid \emph{resynchronization} search
+(\S\ref{sec:geom}), project each carrier block onto $\Phi_{u,v}$
+(Eq.~\ref{eq:residual}), de-spread and combine (Eq.~\ref{eq:despread}), and
+RS-decode $\hat{\mathbf{m}}$. Resolve the record whose payload is $\hat{\mathbf{m}}$,
+check that it is valid, and accept only if the questioned content matches the
+record's fingerprint, $d(F(r),F(I'_{\delta^\star}))\le\tau$
+(Eq.~\ref{eq:fpdist}), computed on the image re-aligned by the resync offset
+$\delta^\star$ and ignoring the tiles that a crop removed. The fingerprint test
+is what makes the payload non-transferable: a payload copied onto other content
+resolves to a record describing different content.
 
 \begin{algorithm}[t]
-\caption{\pr{} verification of $(I',\mathbf{m}')$}
+\caption{\pr{} verification of a questioned file $(E',I')$}
 \label{alg:verify}
 \begin{algorithmic}[1]
-\REQUIRE questioned $I'$, claimed $\mathbf{m}'$, ledger handle, key $k$
-\STATE $h'\gets \mathrm{SHA\text{-}256}(I'\,\|\,\mathbf{m}')$
-\STATE $v_1\gets \mathrm{ledger.verifyInclusion}(\mathit{root},h',\pi)$
-\STATE $s\gets \mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}')$
-\STATE $(\{B_j\},\{c_j\})\gets \mathrm{CSPRNGselect}(s,n_c,R)$
+\REQUIRE ledger, record store, carrier key $k$, threshold $\tau$
+\STATE \textbf{if} $\exists$ valid $r$ with $\mathcal H(E')\in\{\mathcal H(E(I)),\mathcal H(I)\}$
+       \textbf{return} \textsc{Camera-original}
+\STATE $(\{B_j\},\{c_j\})\gets \mathrm{CSPRNGselect}(\mathrm{SHA\text{-}256}(k\|W\|H),n_c,R)$
 \STATE $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$
        \quad\COMMENT{block-grid resync, \S\ref{sec:geom}}
 \FORALL{coded bit $i$}
@@ -941,148 +1083,201 @@ corrupts the signature detectably and cannot forge a consistent one.
   \STATE $\hat b_i\gets \mathbf{1}[D_i>0];\; w_i\gets |D_i|$ \COMMENT{soft conf.}
 \ENDFOR
 \STATE $\hat{\mathbf{m}}\gets \mathrm{ECC\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$
-\STATE $v_2\gets (\hat{\mathbf{m}}=\mathbf{m}')$
-\IF{$v_1\wedge v_2$} \RETURN \textsc{Camera-original}
-\ELSIF{$v_2$} \RETURN \textsc{Transcoded-consistent}
-\ELSIF{$v_1$} \RETURN \textsc{Exact-copy}
-\ELSE \RETURN \textsc{Unverified} \COMMENT{fail-safe}
+\STATE $r\gets\mathrm{store.lookup}(\hat{\mathbf{m}})$
+\IF{$r$ valid \textbf{and} $d(F(r),F(I'_{\delta^\star}))\le\tau$}
+  \RETURN \textsc{Transcoded-consistent}
 \ENDIF
+\RETURN \textsc{Unverified} \COMMENT{fail-safe}
 \end{algorithmic}
 \end{algorithm}
 
-\noindent Media is accepted at the strongest level supported by the evidence:
-V1$\wedge$V2 (pristine original), V2 only (transcoded but pixel-consistent), or
-V1 only (exact copy, manifest intact); otherwise the result is the safe
+\noindent Media is accepted at the strongest level the evidence supports:
+\textsc{Camera-original} (the exact file a certified sensor committed),
+\textsc{Transcoded-consistent} (re-encoded or lightly processed, but carrying a
+payload whose sensor-signed record matches this content), or the safe
 \textsc{Unverified}.
 
 %==============================================================
 \section{Security Analysis}\label{sec:security}
 
-We first state the formal guarantees of the two bindings, then walk through the
-threat catalogue of \S\ref{sec:threat}.
+We first state the formal guarantees, then walk through the threat catalogue of
+\S\ref{sec:threat}.
 
 \subsection{Formal guarantees}
 
 \begin{definition}[Forgery]
-A forgery is a pair $(I^\star,\mathbf{m}^\star)$ that the verifier
-(Alg.~\ref{alg:verify}) accepts as \textsc{Camera-original} or
-\textsc{Transcoded-consistent}, yet $I^\star$ was not produced by a genuine
-\pr{} sensor executing Alg.~\ref{alg:capture} with payload $\mathbf{m}^\star$.
+A forgery is a file that the verifier (Alg.~\ref{alg:verify}) accepts as
+\textsc{Camera-original} or \textsc{Transcoded-consistent}, yet whose content was
+not produced by a certified \pr{} sensor executing Alg.~\ref{alg:capture}, up to
+the transformations the verifier is designed to tolerate.
 \end{definition}
 
 \begin{proposition}[Hard-binding soundness]\label{prop:v1}
 Under a collision-resistant hash $\mathcal{H}$ \emph{(A4)} and an immutable
-ledger \emph{(A3)}, passing V1 implies that the exact bitstring
-$I^\star\|\mathbf{m}^\star$ existed at or before the block time of its sealing
-root. Producing a distinct $I^\star\neq I$ that passes V1 against a root sealed
-for $I$ requires a second preimage of $\mathcal{H}$ (generic work $\approx\!2^{256}$
-for \mbox{SHA-256}); an adversary who also controls the original capture needs
-only a collision (generic work $\approx\!2^{128}$).
+ledger \emph{(A3)}, passing V1 implies that the exact file $E^\star$ was committed
+in a record sealed at block time $t_b$, i.e.\ it existed at or before $t_b$.
+Producing a distinct $E^\star\neq E$ that passes V1 against a record sealed for
+$E$ requires a second preimage of $\mathcal{H}$ (generic work $\approx\!2^{256}$ for
+\mbox{SHA-256}); an adversary who also controls the original capture needs only a
+collision (generic work $\approx\!2^{128}$).
 \end{proposition}
 \begin{proof}[Proof sketch]
-$h=\mathcal{H}(I\|\mathbf{m})$ is a Merkle leaf; \texttt{verifyInclusion}
-recomputes the root from $(h,\pi)$ and compares to the sealed value. A different
-$I^\star$ yielding the same leaf is a collision of $\mathcal{H}$; a different leaf
-yielding the same root is a collision of the tree's compression function.
-Rewriting the sealed root violates A3. The $2^{256}$ figure is the generic
-second-preimage cost of a 256-bit digest; the $2^{128}$ figure is its birthday
-(collision) bound.
+The leaf is $\mathcal H(\texttt{0x00}\|\mathcal H(r\|\sigma))$ and $r$ contains
+$\mathcal H(E)$; \texttt{verifyCapture} recomputes the root from the leaf and its
+path and compares it with the sealed value. A different $E^\star$ with the same
+digest is a second preimage (or a collision); a different leaf with the same
+root is a collision of the domain-separated node hash; rewriting the sealed root
+violates A3.
 \end{proof}
 
-\begin{proposition}[Carrier unpredictability]\label{prop:carriers}
+\begin{proposition}[Wrong-key read]\label{prop:carriers}
 Let the frame contain $N_B$ blocks and let $m=n_cR$ carrier blocks each carry a
-secret antipodal chip. Without the OEM key $k$, an adversary's probability of
-correctly recovering the carrier-and-chip assignment is
+secret antipodal chip. A party without the carrier key $k$ that guesses the
+carrier-and-chip assignment succeeds with probability
 \begin{equation}
 \Pr[\text{guess}] \;=\; \Big[\binom{N_B}{m}\,2^{m}\Big]^{-1},
 \end{equation}
-which for the evaluated setting ($768\times512$ Kodak frames, $N_B\!=\!6144$
-blocks, $n_c\!=\!384$ RS-coded bits, $R\!=\!16$, so $m\!=\!N_B$ and every block is
-a carrier) is $2^{-6144}\!<\!10^{-1849}$: all of the protection then comes from
-the secret chip signs. Moreover, since $s=\mathcal H(k\|\mathbf
-m)$ keys a cryptographic PRNG, distinct payloads induce computationally
-independent carrier layouts, so observing signatures for many images leaks no
-usable information about the layout for a fresh $\mathbf{m}$. The empirical
-counterpart---reading each of the $24$ marked images with $50$ \emph{wrong} keys
-($1200$ trials)---yields mean BER $0.4996$ and $0/1200$ correct recoveries
-(\S\ref{sec:eval}), matching the
-$p\!\approx\!\tfrac12$ random-guess model.
+which for the evaluated setting ($768\times512$ frames, $N_B\!=\!6144$, $n_c\!=\!384$,
+$R\!=\!16$, so $m\!=\!N_B$) is $2^{-6144}\!<\!10^{-1849}$. Empirically, reading
+each of the $24$ marked Kodak images with $50$ wrong keys ($1200$ trials) gives
+mean BER $0.4996$ and $0/1200$ correct recoveries.
 \end{proposition}
 
+\noindent\emph{Remark.} Prop.~\ref{prop:carriers} bounds \emph{reading} without
+the key; it does not bound \emph{estimating} the mark. The detector statistic
+uses only the public basis $\Phi_{u,v}$, so an adversary can estimate the
+embedded signal from a single marked image and copy or subtract it without
+knowing $k$ (\S\ref{sec:e6}). \pr{}'s authenticity therefore rests on
+Prop.~\ref{prop:identity}, not on the secrecy of the layout.
+
 \begin{proposition}[Soft-binding false-accept]\label{prop:v2}
-Model the read-back of \eqref{eq:residual} on an image that was \emph{not}
-\pr{}-marked at the claimed carriers as independent bit guesses with
-per-bit error $p\!\approx\!\tfrac12$, so a byte (symbol) matches the claimed
-codeword by chance with probability $q=(1-p)^{8}=2^{-8}$. With a Reed--Solomon
-code correcting $t=\lfloor r/2\rfloor$ symbol errors over $n_s$ symbols, V2
-falsely accepts with probability at most
+Model the read-back of \eqref{eq:residual} on content that was \emph{not}
+\pr{}-marked as independent bit guesses with per-bit error $p\!\approx\!\tfrac12$,
+so a byte (symbol) matches a given codeword by chance with probability
+$q=(1-p)^{8}=2^{-8}$. With a Reed--Solomon code correcting $t=\lfloor r/2\rfloor$
+symbol errors over $n_s$ symbols, the decoder outputs a given payload with
+probability at most
 \begin{equation}
-\Pr[\text{V2 false-accept}] \;\le\; \sum_{j=0}^{t}\binom{n_s}{j}(1-q)^{\,j}\,q^{\,n_s-j},
+\Pr[\text{false decode}] \;\le\; \sum_{j=0}^{t}\binom{n_s}{j}(1-q)^{\,j}\,q^{\,n_s-j},
 \label{eq:fa}
 \end{equation}
-the tail probability that at most $t$ of the $n_s$ bytes differ, i.e.\ that at
-least $n_s-t$ bytes match by chance.
-For our \mbox{RS$(48,16)$} code ($n_s=48$, $t=16$), this is
+the probability that at most $t$ of the $n_s$ bytes differ, i.e.\ that at least
+$n_s-t$ bytes match by chance. For \mbox{RS$(48,16)$} ($n_s=48$, $t=16$) this is
 $\le 1.8\times10^{-65}$.
 \end{proposition}
 \begin{proof}[Proof sketch]
-A byte (symbol) matches the claimed codeword by chance with probability
-$q=(1/2)^8$. The decoder outputs $\mathbf{m}'$ only if $\le t$ symbols differ;
-the number of chance matches is $\mathrm{Binom}(n_s,q)$, giving \eqref{eq:fa}.
-Since the claimed $\mathbf{m}'$ is itself committed in V1 for the strongest
-verdict, V2's residual false-accept is further gated by
-Prop.~\ref{prop:v1}.
+The number of chance byte matches is $\mathrm{Binom}(n_s,q)$, and the decoder
+returns the payload only if at least $n_s-t$ match, giving \eqref{eq:fa}.
 \end{proof}
 
-\noindent\textbf{Take-away.} Prop.~\ref{prop:v1}--\ref{prop:v2} give two
-\emph{independent} exponential barriers; an attacker must defeat \emph{both} the
-ledger (Prop.~\ref{prop:v1}) and either the key-protected carrier layout
-(Prop.~\ref{prop:carriers}) or the error-correcting code (Prop.~\ref{prop:v2}).
-We now show each catalogued attack reduces to violating one of these.
+\begin{proposition}[Identity non-transferability]\label{prop:identity}
+Assume an EUF-CMA-secure signature scheme \emph{(A4)}, an immutable ledger
+\emph{(A3)}, and on-die sensor keys \emph{(A5)}. If the verifier returns
+\textsc{Transcoded-consistent} for a file $I^\star$, then some record $r$ exists
+that (i) was signed by a sensor certified on the ledger and unrevoked when $r$
+was sealed, and (ii) commits a fingerprint with $d(F(r),F(I^\star))\le\tau$. An
+adversary holding no unrevoked sensor key therefore obtains acceptance only by
+forging a signature (negligible probability), or by presenting content within
+fingerprint distance $\tau$ of a genuinely captured frame.
+\end{proposition}
+\begin{proof}[Proof sketch]
+Alg.~\ref{alg:verify} returns \textsc{Transcoded-consistent} only for a valid
+record, whose signature verifies under a key whose hash \texttt{verifyCapture}
+places in a certified lot and finds unrevoked at the sealing time. Without that
+key, a valid $(r,\sigma)$ for a new $r$ is an existential forgery. Reusing a
+genuine $(r,\sigma)$ requires passing the fingerprint test against $F(r)$, which
+$r$ fixes and the signature protects.
+\end{proof}
+
+\noindent The second escape route in Prop.~\ref{prop:identity}, content within
+$\tau$ of a genuine frame, is the semantic boundary of any tolerant binding
+(\S\ref{sec:semantic}): $\tau$ is set to admit the transformations of the benign
+suite and reject foreign content. \S\ref{sec:e6} measures both sides of this
+boundary on held-out images.
+
+\begin{proposition}[Capture-time bracket]\label{prop:bracket}
+If a record with anchor $\beta=(n_\beta,\mathrm{hash}_\beta)$ is accepted, sealed
+at block $n_s$, and $\mathrm{hash}_\beta$ equals the canonical hash of block
+$n_\beta$, then the sensor signed the record after block $n_\beta$ was produced
+and before block $n_s$: its capture time lies in
+$(\mathrm{time}(n_\beta),\mathrm{time}(n_s)]$.
+\end{proposition}
+\begin{proof}[Proof sketch]
+The upper bound is Prop.~\ref{prop:v1}. For the lower bound, $\mathrm{hash}_\beta$
+is unpredictable before block $n_\beta$ exists (A3, A4), so a record that
+contains it, signed by an on-die key (A5), cannot have been signed earlier.
+\end{proof}
+
+\noindent\textbf{Take-away.} Each accepted verdict rests on exponential
+barriers: the ledger and hash (Prop.~\ref{prop:v1}) for the exact file; the
+sensor's signature, its on-ledger certification, and the content binding
+(Prop.~\ref{prop:identity}) for transcoded media; and the RS code
+(Prop.~\ref{prop:v2}) against chance decodes. We now map each catalogued attack
+to these guarantees.
 
 \subsection{Threat catalogue}
-\textbf{Deepfake / synthetic substitution.} A fully AI-generated image was never
-exposed on a genuine sensor; it has no valid on-chain commitment (V1 fails) and
-cannot reproduce a payload-consistent, keyed in-pixel signature tied to a real
-OTP identity (V2 fails). The attacker would need to either forge a ledger entry
-(infeasible, A3) or embed a valid signature without the OEM key and sensor
-(infeasible, A1--A2).
+\textbf{Deepfake / synthetic substitution.} A fully generated image was never
+exposed on a certified sensor, so no valid record commits its file or its
+content. V1 fails, and any payload it carries (decoded by chance, copied, or
+forged) resolves to no record or to a record whose fingerprint does not match
+(Prop.~\ref{prop:identity}).
 
-\textbf{Metadata forgery / stripping.} Editing or removing file metadata cannot
-manufacture a matching ledger commitment, and cannot create the in-pixel binding
-(goal~G3). Stripping metadata downgrades a credential-based scheme to
-``unverifiable,'' but \pr{} still recovers $\mathbf{m}$ from the pixels via V2.
+\textbf{Watermark copy and transplant.} An adversary estimates the in-pixel mark
+from a published image---without the carrier key, from a recompressed copy---and
+pastes it onto other content~\cite{kutter2000copy}. At the watermark level this
+succeeds ($78\%$ of keyless attempts decode the source payload, \S\ref{sec:e6});
+end to end it fails, because the payload resolves to the source's record, whose
+fingerprint describes different content ($0/156$ accepted). Blending the source's
+coarse structure into the forgery does not help until the forgery has become
+the source image ($0/60$ accepted).
 
-\textbf{Re-capture (photo-of-a-screen).} Re-photographing authentic media on a
-genuine \pr{} sensor produces a \emph{new} payload (new $\mathrm{ID}$, $t$,
-location) and a \emph{new} commitment; it does not reproduce the original's
-ledger entry. The semantic content is duplicated but the provenance correctly
-reflects the re-capture event and time, exposing back-dating attempts. Liveness
-heuristics (moir\'e, depth) as used by Truepic~\cite{truepic2024capture} can
-augment this.
+\textbf{Metadata forgery / stripping.} Editing or removing metadata cannot create
+a valid record. Stripping downgrades a credential-only scheme to
+``unverifiable,'' but \pr{} reads $\mathbf{m}$ from the pixels and resolves the
+record from the ledger-anchored store (goal~G3).
 
-\textbf{Replay / back-dating.} Because notarization is bound to a block
-timestamp, an adversary cannot claim an artifact predates its true creation: the
-earliest provable existence is the block time. This is the property reactive
-detection fundamentally lacks.
+\textbf{Re-capture (photo-of-a-screen).} Re-photographing a screen with a certified
+sensor produces a \emph{new}, valid record for the re-capture event, with its
+own time, location and fingerprint; it does not inherit the original's ledger
+entry, and back-dating it is prevented (Props.~\ref{prop:v1},~\ref{prop:bracket}).
+What \pr{} attests is that a certified sensor recorded this light at this time,
+not that the scene in front of it was real. Capture-time liveness signals---depth
+or time-of-flight maps, focus distance---can be committed as additional record
+fields so verifiers can flag flat, screen-like scenes; we leave their evaluation
+to future work.
 
-\textbf{PRNU fingerprint-copy.} The strongest hardware-targeted attack against
-passive forensics estimates a victim's PRNU from public images and transplants
-it~\cite{goljan2011defending}. \pr{} resists this for three reasons: (i) the
-\pr{} signature is an \emph{active, keyed} code, not the involuntary PRNU, so
-copying the passive noise does not reproduce the carrier bits without the OEM key
-$k$; (ii) even a perfectly transplanted signature must still match an on-chain
-commitment made at capture time by a genuine device (V1/A3); and (iii) the
-triangle-test family of countermeasures remains available as a forensic backstop
-on the passive PRNU channel. Thus \pr{} converts a soft, copyable fingerprint
-into a key-protected, ledger-witnessed credential.
+\textbf{Replay, back-dating, and pre-staging.} The sealing block bounds capture
+time from above (an artifact cannot be claimed to predate it), and the anchor
+block bounds it from below (footage prepared earlier cannot be passed off as
+captured during a later event) (Prop.~\ref{prop:bracket}).
 
-\textbf{Compression-laundering.} An attacker may aggressively re-encode media to
-erase the signal. Heavy compression indeed breaks V1 and, past a threshold, V2
-(\S\ref{sec:compression}); but this yields a \emph{negative} result
-(``cannot verify''), not a \emph{false positive} (``verified authentic''). \pr{}
-fails safe: it never certifies a manipulated artifact as genuine; it only
-declines to certify.
+\textbf{PRNU fingerprint-copy.} Transplanting a victim's passive sensor noise
+pattern~\cite{goljan2011defending} gains nothing: \pr{}'s identity is the
+sensor's signature over a content-bound record, not its PRNU, and a copied
+noise pattern carries no signature.
+
+\textbf{Splice / inpaint.} A splice leaves most carriers intact, so the payload
+usually still decodes; the tile fingerprint rejects it when the foreign region
+changes any tile's coarse content ($24/24$ splices covering $6$--$12\%$ of the
+frame rejected, \S\ref{sec:e6}). Edits smaller than a tile's tolerance remain
+inside the semantic boundary; for forensic media, the per-pixel localization
+layer (\S\ref{sec:mfg}, \S\ref{sec:robust}) localizes them.
+
+\textbf{Sensor-key extraction.} An invasive attack on a device the adversary
+owns yields that one sensor's key. The manufacturer revokes it on the ledger;
+captures sealed before the revocation stand, later ones fail. The window between
+extraction and revocation is a residual risk, bounded per device.
+
+\textbf{Rogue or compromised manufacturer.} Governance revokes the manufacturer;
+its sensors fail for captures sealed afterwards. A lot certified after a capture
+cannot validate it retroactively, and a hostile manufacturer cannot revoke
+another manufacturer's sensors (both enforced by the contract and tested).
+
+\textbf{Compression-laundering and regeneration.} Aggressive re-encoding,
+mark subtraction (which needs no key, \S\ref{sec:e6}), or regeneration with a
+diffusion model~\cite{zhao2024invisible} can remove the in-pixel payload. The
+result is \textsc{Unverified}---a negative result, never a false positive: \pr{}
+declines to certify; it does not certify a manipulated artifact.
 
 \begin{table}[t]
 \centering
@@ -1095,17 +1290,21 @@ declines to certify.
 \toprule
 \textbf{Attack} & \textbf{Why it fails} & \textbf{Assump.} & \textbf{Guar.} \\
 \midrule
-Deepfake / synth.  & no ledger entry; no keyed signature & A1--A3 & P1,P2 \\
-Metadata forge/strip & V2 recovers $\mathbf{m}$ from pixels & A1 & P3 \\
-Re-capture (screen) & new payload/commit; back-date exposed & A2,A3 & P1 \\
-Replay / back-date & earliest proof $=$ block time & A3 & P1 \\
-PRNU copy~\cite{goljan2011defending} & keyed code $\neq$ passive PRNU; ledger still needed & A1--A3 & P2,P1 \\
-Splice / inpaint   & corrupts unknown carriers; breaks $h$ & A1,A4 & P2,P3 \\
-Compress-launder   & fails \emph{safe} to \textsc{Unverified} & A4 & P1,P3 \\
+Deepfake / synth.  & no valid record; fingerprint mismatch & A3--A5 & P1,P4 \\
+Mark copy / transplant & record's fingerprint $\neq$ new content & A3--A5 & P4 \\
+Metadata forge/strip & V2 reads $\mathbf{m}$; record resolves & A3,A4 & P3,P4 \\
+Re-capture (screen) & new record; no back-dating & A2,A3 & P1,P5 \\
+Replay / pre-stage & bracket $(\mathrm{time}(n_\beta),\mathrm{time}(n_s)]$ & A3,A4 & P1,P5 \\
+PRNU copy~\cite{goljan2011defending} & identity is a signature, not PRNU & A4,A5 & P4 \\
+Splice / inpaint   & tile fingerprint mismatch & A4 & P4 \\
+Sensor-key theft   & time-scoped revocation, one device & A3 & P4 \\
+Rogue manufacturer & governance revocation; no retro-lots & A3 & P4 \\
+Launder / regenerate & fails \emph{safe} to \textsc{Unverified} & --- & P2,P3 \\
 \bottomrule
 \end{tabular}
 \\[2pt]
-P1=Prop.\ref{prop:v1}, P2=Prop.\ref{prop:carriers}, P3=Prop.\ref{prop:v2}.
+P1--P5 = Props.~\ref{prop:v1}, \ref{prop:carriers}, \ref{prop:v2},
+\ref{prop:identity}, \ref{prop:bracket}.
 \end{table}
 
 %==============================================================
@@ -1142,14 +1341,17 @@ largely preserves it, though not losslessly: under a bilinear resize round-trip
 the raw BER rises from $0.016$ to $0.026$ at $0.75\times$ and $0.042$ at
 $0.5\times$, and RS decoding recovers the payload on $22/24$ and $16/24$ images
 respectively ($22/24$ for a combined JPEG\,$Q70$\,$+$\,$0.75\times$ attack;
-\S\ref{sec:eval}). (ii)~\textbf{Translation/crop}: the verifier searches a small
+\S\ref{sec:eval}). (ii)~\textbf{Translation/crop}: the verifier searches a
 range of block-grid offsets $\delta$ and keeps the most confident decode
-(line~5 of Alg.~\ref{alg:verify}); since the genuine layout produces a sharp
-correlation peak (Eq.~\ref{eq:despread}) while wrong offsets give noise, the
-search usually recovers the payload: for top-left border crops of $1\%$, $2\%$,
-and $3\%$ (shifts of up to $23$\,px, within the $\pm28$\,px search range) RS
-decoding succeeds on $23/24$, $20/24$, and $23/24$ images. The $2\%$ case raises
-the raw BER to $0.11$, so resynchronization is not uniformly reliable; larger
+(line~3 of Alg.~\ref{alg:verify}). The search must respect the carrier's shape:
+$\Phi_{0,2}$ is constant down each column, so the confidence peak is several
+pixels wide vertically but only one pixel wide horizontally. \pr{} therefore
+searches every horizontal offset on a vertical stride of $4$, then refines
+vertically around the best ($15\times57+7=862$ decodes for $\pm28$\,px). (An
+earlier search on a stride of $4$ in both axes could step over the horizontal
+peak; on $2\%$ crops it decoded only $20/24$ images at raw BER $0.11$.) With the
+separable search, top-left border crops of $1\%$, $2\%$ and $3\%$ (shifts of up
+to $23$\,px) are recovered on $23/24$ images each at raw BER $\le\!0.020$; larger
 crops were not tested. A known synchronization
 template (a fixed low-frequency pattern) can extend this to scale/anchor
 estimation, as in the watermarking-sync literature. (iii)~\textbf{Limits}:
@@ -1174,13 +1376,16 @@ capture, and commit a Merkle root over keyframe hashes so that
 embedding has recently been shown to survive non-differentiable
 \mbox{H.264}~\cite{cstfmark2026} and is a natural upgrade path.
 
-\subsection{The semantic-authenticity boundary}
+\subsection{The semantic-authenticity boundary}\label{sec:semantic}
 A subtle limitation deserves emphasis. A benign platform filter may alter
 carrier pixels enough to fail V2 even though the image's \emph{meaning} is
 unchanged---a false alarm---while a malicious edit might, in principle, preserve
-carriers. \pr{} therefore certifies \emph{pixel-level integrity relative to a
-notarized original}, not semantic equivalence. We argue this is the right
-primitive: it cleanly separates ``bit-for-bit original'' (V1), ``faithfully
+carriers. \pr{} therefore certifies \emph{consistency with a notarized original}---exactly
+for V1, and up to the fingerprint tolerance $\tau$ for V2---not semantic
+equivalence. A local edit that keeps every tile within $\tau$ of the original
+(for example, a small object removed from a textured region) passes V2; edits that
+change a tile's coarse content, such as the $6$--$12\%$ splices of
+\S\ref{sec:e6}, do not. We argue this is the right primitive: it cleanly separates ``bit-for-bit original'' (V1), ``faithfully
 transcoded'' (V2), and ``cannot establish provenance,'' and it composes with
 perceptual-hash and content-similarity layers~\cite{videowmblockchain2024} for
 softer ``same-scene'' judgments.
@@ -1227,6 +1432,11 @@ silicon. A second, \emph{real-image} harness (Python; \texttt{numpy}, Pillow's
 libjpeg/WebP, \texttt{scikit-image}, and a real \texttt{reedsolo} code) runs the
 full evaluation below on the public Kodak set; a claims-to-experiments matrix and
 reproduction instructions are released in \texttt{experiments/EXPERIMENT\_PLAN.md}.
+The device-identity layer is implemented as a Solidity registry
+(\texttt{contracts/}, $16$ Hardhat tests) and a Python reference of the sensor
+key, signed records, content fingerprint, and verifier (\texttt{ledger.py},
+\texttt{device\_identity.py}, $18$ unit tests), with Merkle test vectors shared
+between the two implementations.
 
 \subsection{Micro-benchmark of the core (measured)}
 Table~\ref{tab:micro} reports \emph{measured} results from the reference
@@ -1289,9 +1499,9 @@ raw channel is not error-free---mean BER $\approx\!1.6\%$, content-dependent up 
 $13\%$ on the most textured frame---but the RS code recovers the exact $128$-bit
 payload on \mbox{$22$--$23/24$} images through real JPEG from $Q\!=\!95$ down to
 $Q\!=\!20$ (and $21/24$ at the extreme $Q\!=\!10$), Gaussian noise to
-$\sigma\!=\!20$, and light blur ($\sigma\!=\!0.5$), and on $20$--$22/24$ under
-WebP, resize to $0.75$--$1.5\times$, photometric edits, translational crops of
-$1$--$3\%$ with resync, and combined JPEG$+$resize. Recovery is weaker under
+$\sigma\!=\!20$, light blur ($\sigma\!=\!0.5$), and translational crops of
+$1$--$3\%$ with resync, and on $21$--$22/24$ under WebP, resize to
+$0.75$--$1.5\times$, photometric edits, and combined JPEG$+$resize. Recovery is weaker under
 stronger blur ($\sigma\!=\!1.0$: $19/24$) and $0.5\times$ resize ($16/24$).
 Failures are honest and informative: a single
 very-high-frequency frame exceeds the ECC capacity at $A\!\le\!6$, and
@@ -1306,12 +1516,13 @@ post-ECC decode rises from $0/24$ at $A\!=\!0.5$ to $23/24$ at $A\!=\!4$
 across all images ($1200$ trials) gives mean BER $0.4996$ and $0/1200$
 recoveries; running the correct-key decoder against the $24$ \emph{unmarked}
 images (a deepfake stand-in) against a claimed payload gives mean BER $0.494$ and
-$0/24$ false accepts. A \emph{copy/transplant} attack---lifting the marked
-residual from image $A$ onto a different image $B$---is exposed: the forgery
-decodes to $A$'s original identity in $15/17$ cases and passes as a \emph{new}
-claimed identity in $0/17$. These match the $p\!\approx\!\tfrac12$ bound of
-Prop.~\ref{prop:carriers}--\ref{prop:v2}, whose closed-form RS false-accept
-probability is $\le\!1.8\times10^{-65}$ for this code (\S\ref{sec:eval}).
+$0/24$ false accepts. These match the $p\!\approx\!\tfrac12$ model of
+Props.~\ref{prop:carriers}--\ref{prop:v2}, whose closed-form RS false-accept
+probability is $\le\!1.8\times10^{-65}$ for this code. A \emph{copy} attack,
+however, succeeds at the watermark level: lifting the marked residual from image
+$A$ onto a different image $B$ makes $B$ decode to $A$'s payload in $15/17$
+cases. The in-pixel channel alone does not make an identity non-transferable;
+\S\ref{sec:e6} shows that the signed, content-bound record does.
 
 \begin{table}[t]
 \centering
@@ -1336,8 +1547,7 @@ Gaussian blur $\sigma\!=\!1.0$     & $0.033$ & $19/24$ \\
 Resize $0.75\times,\,1.5\times$    & $0.025$ & $22/24$ \\
 Resize $0.5\times$                 & $0.042$ & $16/24$ \\
 Bright/contrast/gamma $\pm10\%$    & $0.017$ & $21$--$23/24$ \\
-Crop $1\%,3\%$ $+$ resync          & $0.018$ & $23/24$ \\
-Crop $2\%$ $+$ resync              & $0.112$ & $20/24$ \\
+Crop $1$--$3\%$ $+$ resync          & $0.019$ & $23/24$ \\
 JPEG$Q70$ $+$ resize $0.75\times$  & $0.026$ & $22/24$ \\
 \midrule
 JPEG $Q5$ (beyond range)           & $0.221$ & $0/24$ \\
@@ -1346,7 +1556,7 @@ Resized-crop \emph{[geom.\ limit]} & $0.49$ & $0/24$ \\
 \midrule
 \emph{Wrong-key read} (1200 trials) & $0.4996$ & $0/1200$ \\
 \emph{Forgery / unmarked} (24 trials) & $0.494$ & $0/24$ \\
-\emph{Copy attack} $\to$ new identity & --- & $0/17$ \\
+\emph{Copy attack} $\to$ source payload & --- & $15/17$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1434,14 +1644,127 @@ to $+0.004$ at JPEG~$Q50$ and PCE drops $\sim\!18\%$
 recompression that \pr{}'s \emph{active}, error-corrected mark is designed to
 overcome (it recovers the payload on $21/24$ images at $Q10$, Table~\ref{tab:robust}).
 
+\subsection{Device identity and content binding (E6)}\label{sec:e6}
+We evaluate the full verification path of \S\ref{sec:identity} on the same $24$
+Kodak images. \textbf{Setup.} One manufacturer admitted to the registry
+certifies a lot of eight sensors, each holding an on-die ECDSA P-256 key; every
+image is marked as in \S\ref{sec:robust} ($A\!=\!4$, RS$(48,16)$), encoded by the
+``camera'' as JPEG~$Q95$, and described by a sensor-signed record
+(Eq.~\ref{eq:record}); the $24$ record hashes are sealed as one Merkle batch. The
+ledger is an executable model of the contract of \S\ref{sec:contract}; the
+contract itself passes a $16$-case test suite on the Hardhat EVM covering the
+same state machine, Merkle compatibility with the Python implementation through
+shared test vectors, the leaf/node domain separation, and every revocation
+rule. To avoid tuning on the test set, the fingerprint threshold is calibrated on
+the $12$ even-indexed images (midpoint between the largest genuine distance under
+the benign suite of Table~\ref{tab:robust} and the smallest distance of
+$25$--$35\%$ splices) and \emph{every result below is on the $12$ held-out
+images}.
+
+\textbf{Fingerprint margin.} Calibration gives $\tau=0.286$. On held-out images
+the largest genuine distance under any benign attack is $0.082$, while different
+images are at least $0.866$ apart (median $1.24$)---a margin of more than
+$3\times$ on each side of $\tau$.
+
+\textbf{Genuine media} (Table~\ref{tab:e6verdicts}). The camera's own JPEG
+verifies as \textsc{Camera-original} on $12/12$ images through V1 alone, with
+no dependence on the watermark. Processed copies verify as
+\textsc{Transcoded-consistent} on $11/12$ images across JPEG down to $Q20$, noise,
+blur, resize $0.75$--$1.5\times$, photometric edits, $1$--$3\%$ crops, and combined
+attacks, and on $9$--$10/12$ under JPEG~$Q10$, WebP~$q60$ and $0.5\times$ resize. Every
+\textsc{Unverified} genuine verdict traces to the payload failing to decode
+(the texture-heavy frame of \S\ref{sec:robust}), never to the fingerprint. None
+of the $12$ unmarked originals is accepted.
+
+\textbf{Attacks} (Table~\ref{tab:e6attacks}). The keyless copy attack
+estimates the mark from a JPEG~$Q75$ copy of the source by the detector's own
+public projection and high-pass, and adds $1.5\times$ the estimate to another
+image; it makes the forgery decode the source's payload in $61/78$ attempts
+($78\%$), and $70/78$ with the original in hand. The content-bound record stops
+all of them: $0/156$ are accepted. An adaptive variant blends the source's
+coarse structure into the forgery,
+$B+\alpha\,(\mathrm{low}(A)-\mathrm{low}(B))$, plus $A$'s mark; it is rejected at
+every $\alpha$, including $\alpha=1$, where the forgery has lost its own content
+(PSNR $12.2$\,dB to $B$). Splices of foreign regions covering $6$--$12\%$ of the
+frame, recompressed at $Q90$, still decode the payload in $21/24$ cases but are
+all rejected by the tile fingerprint. Every record- and ledger-level attack is
+handled as specified, including time-scoped revocation in both directions.
+
+\textbf{Cost.} Signing a capture (fingerprint and ECDSA) takes $3.7$\,ms in
+Python on a commodity CPU; ECDSA verification takes $0.12$\,ms, and verifying an
+exact camera file end to end takes $4.1$\,ms. A record is $\approx\!3$\,KB off-chain.
+On-chain (Hardhat EVM, \texttt{solc}~0.8.24), sealing a batch costs $46{,}605$ gas
+regardless of its size---$4.66$ gas per image at $N\!=\!10^4$---certifying a lot
+costs $51{,}355$ gas, revoking a sensor $65{,}419$ gas, and verification is a
+free view call.
+
+\begin{table}[t]
+\centering
+\caption{E6 genuine-media verdicts on the \textbf{12 held-out Kodak images}
+(CO = \textsc{Camera-original}, TC = \textsc{Transcoded-consistent}, U =
+\textsc{Unverified}); $\tau$ calibrated on the other 12.}
+\label{tab:e6verdicts}
+\renewcommand{\arraystretch}{1.12}
+\setlength{\tabcolsep}{5pt}
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Condition} & \textbf{CO} & \textbf{TC} & \textbf{U} \\
+\midrule
+Camera JPEG (exact file)             & $12$ & $0$  & $0$ \\
+JPEG $Q95$--$Q20$                     & $0$  & $11$ & $1$ \\
+JPEG $Q10$; WebP $q60$                & $0$  & $10$ & $2$ \\
+WebP $q80$; noise $\sigma\!\le\!20$; blur $\sigma\!\le\!1$ & $0$ & $11$ & $1$ \\
+Resize $0.75\times,\,1.5\times$        & $0$  & $11$ & $1$ \\
+Resize $0.5\times$                     & $0$  & $9$  & $3$ \\
+Bright./contrast/gamma $\pm10\%$       & $0$  & $10$--$11$ & $1$--$2$ \\
+Crop $1$--$3\%$ $+$ resync             & $0$  & $11$ & $1$ \\
+JPEG$+$resize; JPEG$+$noise            & $0$  & $11$ & $1$ \\
+\midrule
+Unmarked originals                     & $0$  & $0$  & $12$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{E6 attacks on the 12 held-out images: watermark-level success versus
+end-to-end acceptance by the verifier of Alg.~\ref{alg:verify}.}
+\label{tab:e6attacks}
+\renewcommand{\arraystretch}{1.12}
+\setlength{\tabcolsep}{4pt}
+\footnotesize
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Attack} & \textbf{Payload decodes} & \textbf{Accepted} \\
+\midrule
+Keyless copy (from JPEG $Q75$)           & $61/78$ & $0/78$ \\
+Copy with original residual              & $70/78$ & $0/78$ \\
+Coarse transplant, $\alpha\!\in\!\{.25,.5,.75,.9,1\}$ & --- & $0/60$ \\
+Splice $6$--$12\%$ area, then $Q90$      & $21/24$ & $0/24$ \\
+\midrule
+Record edited (fingerprint, file hash)   & --- & $0/2$ \\
+Uncertified sensor key; borrowed signature & --- & $0/2$ \\
+Revoked sensor, sealed after revocation  & --- & $0/1$ \\
+Revoked sensor, sealed before revocation & --- & $1/1$ (valid) \\
+Anchor after seal; record not notarized  & --- & $0/2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \noindent\textbf{Scope and threats to validity.} These results validate the
 \emph{algorithmic} core---carrier design, host-suppressed spread-spectrum
 detection, robustness to \emph{real} JPEG/WebP/noise/blur/resize/photometric/crop
 attacks, false-accept behavior, and tamper localization---on \emph{real public
 imagery} with \emph{real codecs} and a \emph{real Reed--Solomon} code,
-independent of silicon. They do not yet model demosaicing from the Bayer/RAW
-domain, real per-column gain calibration error, lens/optical effects, or the
-analog photo-electron domain; the PRNU comparison uses real Kodak \emph{content}
+independent of silicon. They embed an \emph{additive} luma perturbation, whereas
+a sensor gain change is \emph{multiplicative}: the imprinted signal scales with
+scene brightness, weakening in dark regions and clipping at saturation. They do
+not yet model this, demosaicing from the Bayer/RAW domain, real per-column gain
+calibration error, lens/optical effects, or the analog photo-electron domain.
+The device-identity results (E6) use a software model of the sensor key and an
+executable model of the ledger; the contract is tested on a local EVM, not on a
+public network; the PRNU comparison uses real Kodak \emph{content}
 with the textbook multiplicative sensor model (per-camera RAW datasets are
 access-gated). The full harness, datasets script, and figures are released for
 reproduction.
@@ -1451,10 +1774,12 @@ The following require hardware or a full pipeline and are future work:
 (E1)~RAW/Bayer-domain capture and a multi-camera PRNU study on Dresden/VISION;
 (E2)~video robustness vs.\ H.264/HEVC QP and GOP placement with keyframe-level
 Merkle commitments; (E3)~an end-to-end re-capture and
-PRNU-copy~\cite{goljan2011defending} study; (E4)~latency/gas on a public testnet
-(our analytic estimate is $\approx\!45$\,k gas per registration, amortizing to
-$\approx\!4.5$ gas/image at Merkle batch $N\!=\!10^4$); and (E5)~a silicon study
-of per-region/per-pixel gain modulation on a sensor evaluation board.
+PRNU-copy~\cite{goljan2011defending} study, including capture-time liveness
+fields; (E4)~shutter-to-inclusion latency and finality on a public network (gas is
+measured, \S\ref{sec:e6}); (E5)~a silicon study of per-region/per-pixel gain
+modulation on a sensor evaluation board, including multiplicative gain on RAW
+data through a full ISP; and (E6)~on-die key generation and signing in a sensor
+secure element.
 
 %==============================================================
 \section{Discussion: Limitations, Privacy, Standardization}\label{sec:discussion}
@@ -1469,36 +1794,34 @@ only up to the attestation; and \emph{Tier~C (software/notarize-only)}---a
 C2PA/ProofMode-style capture-time hash with no in-pixel binding. Verifiers and
 policies must not conflate tiers.
 
-\textbf{Verification trust model.} The two bindings have different verification
-trust requirements, which we state plainly. The \emph{hard binding} (V1) is
-\emph{fully public}: anyone can recompute $\mathrm{SHA\text{-}256}(I'\|\mathbf m')$
-and check Merkle inclusion against the ledger with no secret. The \emph{in-pixel
-binding} (V2), as specified here, uses a \emph{symmetric} OEM key $k$ to
-regenerate the carrier layout, so it is checked by a key-holding party---the
-issuing OEM or a delegated verification service / API---rather than by an
-arbitrary viewer; $k$ cannot be published without enabling forgery. This is an
-acceptable split for the near-term deployment (courts, platforms, and
-fact-checkers query an OEM-operated or federated verification oracle, exactly as
-they already rely on CAs), but it means ``public'' applies in full only to V1.
-Making the in-pixel check \emph{publicly} verifiable without a shared secret is
-an explicit direction for future work: an asymmetric construction (the device
-signs a commitment to its keyed carrier layout, verifiable with a public key) or
-a zero-knowledge proof that a held key reproduces the observed mark, so a third
-party can confirm V2 without learning $k$.
+\textbf{Verification trust model.} Every check in Alg.~\ref{alg:verify} uses
+public information. The hard binding (V1) needs only the file, the record and the
+ledger. The in-pixel binding (V2) additionally needs the carrier key $k$ to
+locate the carriers; because authenticity rests on the sensor's signature and the
+content binding (Prop.~\ref{prop:identity}) rather than on the secrecy of $k$, an
+OEM can publish its carrier key and let any platform, court, or viewer run V2.
+An OEM that prefers to keep $k$ private (to make casual removal of the mark
+slightly harder) can instead operate a verification service; the security of an
+accepted verdict is the same either way.
 
 \textbf{Privacy-preserving notarization.} A naive design that wrote sensor
 $\mathrm{ID}$, time, and precise GPS to a public, immutable ledger would be
 actively dangerous for the very journalists and activists \pr{} aims to protect,
 and would violate data-protection law. \pr{} is therefore designed so that
 \emph{no raw PII ever touches the chain}. (i)~The only on-chain object is an
-opaque Merkle root of \mbox{SHA-256} commitments; the payload $\mathbf{m}$ and
-the image live off-chain. (ii)~The committed leaf is \emph{salted},
-$h=\mathrm{SHA\text{-}256}(I\|\mathbf{m}\|\,\textsf{salt})$, so the chain reveals
-nothing about $\mathbf{m}$ and identical captures are unlinkable without the
-salt. (iii)~Location is optional, omittable, and may be quantized coarsely or
-replaced by a salted commitment disclosed only under subpoena. (iv)~Device
-identity appears on-chain only as a rotating, secure-element-attested pseudonym,
-unlinkable to the physical device without OEM cooperation. (v)~A holder can prove
+opaque Merkle root of record hashes, alongside lot roots of sensor-key hashes
+and the revocations; the record, the payload $\mathbf{m}$ and the image live
+off-chain. (ii)~The leaf $h=\mathrm{SHA\text{-}256}(r\|\sigma)$ covers a
+randomized ECDSA signature, so the chain reveals nothing about $r$, and records
+are published only for images their owner chooses to publish. (iii)~Location is optional, omittable, and may be quantized coarsely or
+replaced by a salted commitment disclosed only under subpoena. (iv)~A sensor's
+public key appears on-chain only inside a lot root (and in clear only if the
+sensor is revoked); the in-pixel identifier is a rotating pseudonymous handle.
+A published record does reveal its sensor key, so two published images from one
+sensor are linkable; replacing ECDSA with a group or anonymous-attestation
+signature~\cite{brickell2004daa} would let a verifier learn only that
+\emph{some} certified sensor in lot $\lambda$ signed, and is the natural
+privacy upgrade. (v)~A holder can prove
 properties of a capture---``taken by a certified \pr{} device before block
 $t_b$''---to a verifier via a zero-knowledge selective-disclosure proof without
 revealing $\mathrm{ID}$, exact time, or location. Because only opaque hashes are
@@ -1516,8 +1839,14 @@ forced wholesale revocation in a deployed C2PA camera
 pipeline~\cite{c2pa2026security}); \emph{public, permissionless auditability} by any
 court, platform, or adversary without trusting the issuer; and
 \emph{censorship resistance}, important when the capturing party and the
-authority are adversaries (conflict zones, state actors). The cost---latency and
-gas---is amortized to $O(1)$ per capture by Merkle batching (\S\ref{sec:contract}).
+authority are adversaries (conflict zones, state actors). The same ledger also
+carries sensor certification and revocation, so a verifier answers ``was this
+sensor trusted \emph{when} this capture was sealed?'' from one public source, with
+no dependence on a vendor's revocation service---a question a certificate
+authority alone answers poorly once revocation lists are ignored or
+unavailable~\cite{c2pa2026security}. The cost---latency and gas---is amortized to
+$O(1)$ per capture by Merkle batching (\S\ref{sec:contract}); measured gas is
+$46{,}605$ per batch (\S\ref{sec:e6}).
 A \emph{hybrid} is natural and recommended: a TSA countersignature for instant,
 cheap proof plus periodic blockchain anchoring of the TSA's own Merkle roots, as
 OpenTimestamps does~\cite{proofmode2023}; \pr{} treats the ledger as the
@@ -1543,9 +1872,10 @@ content.
 and 3GPP is that interoperability emerges from a shared standard, not point
 products. We propose \pr{} as a cross-OEM capture-provenance profile that (a)
 fixes payload layout, ECC, the keyed selection function, and the carrier basis;
-(b) reuses C2PA manifests as the transport for assertions; and (c) standardizes
-the notarization contract interface, so any platform can verify any vendor's
-media. Consumer hardware-backed C2PA signing~\cite{google2025c2pa,truepic2024capture}
+(b) reuses C2PA manifests as the transport for assertions; (c) standardizes
+the capture-record format, the content fingerprint, and the registry contract
+interface---lot certification, revocation, sealing and \texttt{verifyCapture}---so
+any platform can verify any vendor's media. Consumer hardware-backed C2PA signing~\cite{google2025c2pa,truepic2024capture}
 shows the ecosystem is ready for the signing half; \pr{} adds the in-pixel,
 ledger-witnessed half.
 
@@ -1553,21 +1883,25 @@ ledger-witnessed half.
 \section{Conclusion and Future Work}\label{sec:conclusion}
 Reactive deepfake detection cannot win a generator-vs-detector arms race, and
 metadata-only provenance breaks the moment a credential is stripped. \pr{}
-relocates the root of trust into the pixels and onto a public ledger: a
-hardware-anchored, error-corrected, keyed signature embedded by the CMOS sensor
-at capture, plus a real-time blockchain commitment. This dual binding gives an
-affirmative, hardware-rooted proof of authenticity---publicly verifiable on-chain
-and key-verifiable in-pixel---that survives metadata loss and fails safe under
-laundering. We are careful about what this paper establishes: the algorithmic
-core (keyed spread-spectrum embedding, host-suppressed detection, error-corrected
-recovery, and the SHA-256/Merkle commitment) is \emph{implemented and measured}
-on real public images with real codecs; the smart-contract notarization is
-\emph{prototyped} with an analytic gas/latency estimate (not yet a live-net
-deployment); and the sensor-level gain hardware is a \emph{feasibility analysis}
-grounded in shipping process technology, not a silicon result. Future work includes
+relocates the root of trust into the pixels and onto a public ledger: an
+error-corrected payload embedded by the CMOS sensor at capture, a capture record
+signed by a key that only that sensor holds, and a blockchain that certifies the
+sensor, seals the record, and records any revocation. We showed that the
+in-pixel mark alone is not enough---it can be copied onto other content without
+any key---and that binding it to a sensor-signed content fingerprint closes that
+gap: on held-out images, none of $240$ copy, transplant and splice forgeries was
+accepted while genuine media verified through compression, resizing, photometric
+edits and crops. We are careful about what this paper establishes: the
+algorithmic core and the identity layer are \emph{implemented and measured} on
+real public images with real codecs; the registry contract is \emph{implemented
+and tested} on a local EVM with measured gas, but not yet deployed on a public
+network; and the sensor-level gain hardware and on-die keys are a
+\emph{feasibility analysis} grounded in shipping process technology, not a
+silicon result. Future work includes
 silicon-level validation on sensors with per-region gain control, codec-aware
-learned embedding for video~\cite{cstfmark2026}, privacy-preserving selective
-disclosure, formal modeling of the V2 soft-authenticity score, and pursuing
+learned embedding for video with per-segment records and Merkle trees of
+segments~\cite{cstfmark2026}, capture-time liveness fields against screen
+re-capture, anonymous-attestation signatures for unlinkable records, and pursuing
 \pr{} as an open cross-OEM standard. We view this as a foundational---if not
 all-encompassing---step toward driving deepfake-driven disinformation toward
 practical irrelevance for media that matters.
@@ -1584,16 +1918,18 @@ inappropriately influenced it.
 The reference implementation and the evaluation harness---the keyed
 spread-spectrum embed/extract of \S\ref{sec:embed}, the Reed--Solomon
 error-correction layer, the WAVES-aligned attack suite, and the
-tamper-localization and PRNU pipelines---are part of the open \pr{} project.
-All measured numbers in \S\ref{sec:eval}
-(Tables~\ref{tab:robust}--\ref{tab:loc}) were produced on the public Kodak image
-set with production codecs (\texttt{libjpeg} JPEG and \texttt{libwebp} WebP) and
-are reproducible end-to-end from the released scripts and a
-\texttt{requirements.txt} pinning the exact dependencies. The on-chain
-notarization in the current prototype is \emph{simulated} and labeled as such
-throughout; the silicon-dependent per-pixel gain mechanisms of \S\ref{sec:mfg}
-are a feasibility analysis grounded in the cited fabrication literature, not
-fabricated results.
+tamper-localization and PRNU pipelines, the device-identity reference and
+verifier, and the registry contract with its test suite---are part of the open
+\pr{} project. All measured numbers in \S\ref{sec:eval} were produced on the
+public Kodak image set with production codecs (\texttt{libjpeg} JPEG and
+\texttt{libwebp} WebP) and are reproducible end-to-end from the released scripts,
+a \texttt{requirements.txt}, and the contract's locked \texttt{npm} dependencies
+(the Solidity compiler is pinned to 0.8.24). The ledger in the Python
+experiments is an executable model of the contract, and the contract is tested
+on a local EVM; neither has been deployed to a public network. The sensor keys
+are software stand-ins for on-die keys, and the silicon-dependent per-pixel gain
+mechanisms of \S\ref{sec:mfg} are a feasibility analysis grounded in the cited
+fabrication literature, not fabricated results.
 
 \section*{Data Availability}
 The Kodak True\-Color image suite used in the experiments is publicly available.

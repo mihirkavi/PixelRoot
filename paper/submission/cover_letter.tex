@@ -15,7 +15,7 @@
 PixelRoot Project\\
 \href{mailto:hello@mihirkavishwar.com}{hello@mihirkavishwar.com}\\[1em]
 
-\noindent June 2026\\[1em]
+\noindent October 2026\\[1em]
 
 \noindent To the Editor-in-Chief and Associate Editors,\\
 \textit{IEEE Transactions on Information Forensics and Security}\\[1em]
@@ -32,37 +32,40 @@ detector-based defenses, which remain locked in an adversarial arms race and
 generalize poorly to unseen generators. Existing provenance schemes (e.g.,
 C2PA) anchor trust in detachable metadata. This paper proposes an alternative:
 moving the root of trust into the pixels themselves at the moment of capture,
-combined with real-time blockchain notarization of a cryptographic commitment to
-the frame. We believe this directly addresses core concerns of TIFS readers in
-media forensics, watermarking, and content authenticity.
+binding it to a signing key that only the capturing sensor holds, and anchoring
+both---the sensor's certification and each capture---on a public blockchain. We
+believe this directly addresses core concerns of TIFS readers in media
+forensics, watermarking, and content authenticity.
 
 The principal contributions of the work are:
 \begin{itemize}
   \item a hardware-rooted, dual-binding provenance architecture that combines an
-        in-pixel keyed spread-spectrum signature (soft binding) with on-chain
-        notarization of a per-frame hash (hard binding), organized into explicit
-        assurance tiers with a software-ISP fallback for legacy devices;
-  \item a concrete, tiered hardware ask, including a deep manufacturing
-        feasibility analysis of per-pixel gain control (dual-conversion-gain
-        pixels, coded-exposure pixels, and 3D-stacked digital-pixel sensors with
-        Cu--Cu hybrid bonding), with engineering schematics grounded in the
-        current fabrication literature;
-  \item a formal security analysis (hard-binding soundness, carrier
-        unpredictability, soft-binding false-accept bounds) and a
-        privacy-preserving notarization design (salted commitments, selective
-        disclosure, no raw PII on-chain); and
-  \item an empirical evaluation conducted entirely on public images (the Kodak
-        suite) with production codecs (\texttt{libjpeg}, \texttt{libwebp}) and a
-        real Reed--Solomon error-correction layer, evaluated under a
-        WAVES-aligned attack suite. We report imperceptibility (PSNR
-        $\approx$~38~dB, SSIM~$\approx$~0.94), payload recovery (23/24 images
-        decoded down to JPEG~Q10), a measured zero false-accept rate over 1224
-        wrong-key/unmarked trials, and tamper localization at ROC-AUC~$0.97$, and
-        we report the geometric-attack limitations honestly.
+        in-pixel, error-corrected spread-spectrum payload (soft binding) with
+        blockchain notarization of a sensor-signed capture record (hard
+        binding), organized into explicit assurance tiers;
+  \item a device-identity layer on the same ledger: on-die sensor keys certified
+        by production lot, time-scoped device and manufacturer revocation, and
+        capture records bound to a content fingerprint, with a tested Solidity
+        registry (measured gas) and a capture-time lower bound from a block
+        anchor;
+  \item a security analysis with five propositions, including identity
+        non-transferability, and an empirical demonstration that the in-pixel
+        mark alone can be copied without any key (78\% of trials) while the
+        content-bound record rejects all 240 copy, transplant, and splice
+        forgeries on held-out images;
+  \item an evaluation on public images (the Kodak suite) with production codecs
+        (\texttt{libjpeg}, \texttt{libwebp}) and a real Reed--Solomon code under a
+        WAVES-aligned attack suite: PSNR $\approx$~38~dB, payload recovery on
+        22--23/24 images down to JPEG~Q20 (21/24 at Q10), zero false accepts over
+        1224 wrong-key/unmarked trials, and tamper localization at
+        ROC-AUC~$0.97$, with the geometric-attack limitations reported; and
+  \item a manufacturing feasibility analysis of per-pixel gain control and a
+        privacy-preserving notarization design (no raw PII on-chain).
 \end{itemize}
 
 I confirm that this manuscript is original, has not been published previously,
 and is not under consideration for publication elsewhere, in whole or in part.
+A preprint of this manuscript is posted on arXiv, as IEEE policy permits.
 The work is the sole author's. There are no conflicts of interest to disclose,
 and the work received no external funding. The reference implementation and the
 evaluation harness are released openly so that all reported numbers are

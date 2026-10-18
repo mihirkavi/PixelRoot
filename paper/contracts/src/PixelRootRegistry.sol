@@ -102,6 +102,7 @@ contract PixelRootRegistry {
     }
 
     // ---------------------------------------------------------- notarization
+    // @listing-begin
 
     /// @notice Seal a Merkle root of capture-record hashes. Deliberately
     ///         permissionless (any device, app or batcher may submit, so no
@@ -160,6 +161,7 @@ contract PixelRootRegistry {
         deviceValid = deviceValidAt(lotRoot, deviceKeyHash, deviceProof, timestamp);
     }
 
+    // @listing-end
     // -------------------------------------------------------------- internal
 
     function _isActiveManufacturer(address m) internal view returns (bool) {

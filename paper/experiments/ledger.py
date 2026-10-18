@@ -71,6 +71,11 @@ class Registry:
     def tick(self, dt=12):
         self.now += dt
 
+    def block_hash(self, n):
+        """Canonical hash of block n (modelled as unpredictable before n exists)."""
+        assert n <= self.now, "block not produced yet"
+        return sha256(b"block" + n.to_bytes(8, "big"))
+
     def add_manufacturer(self, m):
         assert m not in self.manufacturer_since
         self.manufacturer_since[m] = self.now

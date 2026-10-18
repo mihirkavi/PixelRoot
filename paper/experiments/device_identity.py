@@ -181,6 +181,12 @@ class Verifier:
     def __init__(self, registry, index, carrier_key, R_for, tau, max_off=28):
         self.registry, self.index, self.key = registry, index, carrier_key
         self.R_for, self.tau, self.max_off = R_for, tau, max_off
+        # V1 lookup: file digests committed in published records
+        self.by_digest = {}
+        for entry in index.values():
+            core = entry[0]["core"]
+            self.by_digest[core["h_enc"]] = entry
+            self.by_digest[core["h_raw"]] = entry
 
     def ledger_ok(self, rec, batch_root, proof):
         if not check_signature(rec):
@@ -196,6 +202,8 @@ class Verifier:
             return False, "sensor not valid at seal time"
         if core["anchor_block"] > t:
             return False, "anchor after seal"
+        if bytes.fromhex(core["anchor_hash"]) != self.registry.block_hash(core["anchor_block"]):
+            return False, "anchor hash not on chain"
         return True, "ok"
 
     def decode(self, rgb_u8):
@@ -214,6 +222,12 @@ class Verifier:
         return (payload if ok else None), off
 
     def verify(self, file_bytes, rgb_u8):
+        # V1: the exact file (camera encoding or raw readout) is committed in a valid record
+        if file_bytes is not None:
+            entry = self.by_digest.get(hashlib.sha256(file_bytes).hexdigest())
+            if entry is not None and self.ledger_ok(*entry)[0]:
+                return "Camera-original", "exact"
+        # V2: in-pixel payload -> record -> content fingerprint
         payload, off = self.decode(rgb_u8)
         if payload is None or payload.hex() not in self.index:
             return "Unverified", "no payload"
@@ -221,8 +235,6 @@ class Verifier:
         good, why = self.ledger_ok(rec, batch_root, proof)
         if not good:
             return "Unverified", why
-        if file_bytes is not None and hashlib.sha256(file_bytes).hexdigest() in (rec["core"]["h_enc"], rec["core"]["h_raw"]):
-            return "Camera-original", "exact"
         aligned = np.roll(np.roll(np.asarray(rgb_u8), -off[0], axis=0), -off[1], axis=1)
         d = fp_distance(fp_from_hex(rec["core"]["fp"]), fingerprint(aligned), lost_tiles(off))
         if d <= self.tau:

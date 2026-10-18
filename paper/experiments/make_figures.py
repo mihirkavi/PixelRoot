@@ -263,10 +263,10 @@ def fig_datapath():
     y = 2.4; h = 0.95
     blocks = [
         (0.2, 1.7, "Pixel array\n(PD + gain\nselect)", "#cfe3ff"),
-        (2.1, 1.5, "Keyed PRNG\nseed = H(k \u2225 m)\nselect carriers", "#eef3ff"),
+        (2.1, 1.5, "Keyed PRNG\nseed = H(k \u2225 W \u2225 H)\nselect carriers", "#eef3ff"),
         (3.8, 1.5, "Gain/exposure\nmodulation\n(\u00b1 chip)", "#d8f0d8"),
         (5.5, 1.4, "ADC + ISP\n(readout)", "white"),
-        (7.1, 1.5, "SHA-256\ncommit\nH(I \u2225 m)", "#ffe9c7"),
+        (7.1, 1.5, "Sign record r\n(on-die sk)\nh = H(r \u2225 \u03c3)", "#ffe9c7"),
         (8.8, 1.5, "Merkle batch\n+ smart\ncontract", "#ffd9d4"),
         (10.5, 0.9, "Public\nledger", "#e8e8e8"),
     ]
@@ -277,13 +277,15 @@ def fig_datapath():
         x, w = xs[i]; nx, _ = xs[i + 1]
         arrow(ax, x + w + 0.02, y + h / 2, nx - 0.02, y + h / 2)
     # payload input
-    box(ax, 2.1, 0.7, 1.5, 0.7, "payload m\n(ID, time, GPS)", fc="white", ec=ACC, fs=7.6, tc=ACC)
-    arrow(ax, 2.85, 1.4, 2.85, y - 0.02, c=ACC)
+    box(ax, 3.8, 0.7, 1.5, 0.7, "payload m \u2192 RS\n(ID, time, GPS)", fc="white", ec=ACC, fs=7.6, tc=ACC)
+    arrow(ax, 4.55, 1.4, 4.55, y - 0.02, c=ACC)
+    # sensor key, certified on chain
+    box(ax, 7.1, 0.7, 1.5, 0.7, "sensor key sk\n(cert. in lot \u03bb)", fc="white", ec=RD, fs=7.6, tc=RD)
+    arrow(ax, 7.85, 1.4, 7.85, y - 0.02, c=RD)
     # OEM key
-    box(ax, 0.5, 0.7, 1.3, 0.7, "OEM key k\n(OTP/secure)", fc="white", ec=RD, fs=7.6, tc=RD)
-    arrow(ax, 1.8, 1.05, 2.1, 1.05 + 0.0, c=RD)
-    arrow(ax, 1.15, 1.4, 1.15, y - 0.02, c=RD, ls=(0, (3, 2)))
-    ax.text(5.75, 0.25, "Soft binding (in-pixel, survives transcoding)  +  Hard binding (on-chain hash) \u2014 two independent barriers.",
+    box(ax, 2.1, 0.7, 1.5, 0.7, "carrier key k\n(OEM)", fc="white", ec=ACC, fs=7.6, tc=ACC)
+    arrow(ax, 2.85, 1.4, 2.85, y - 0.02, c=ACC)
+    ax.text(5.75, 0.25, "Soft binding (in-pixel payload)  +  Hard binding (sensor-signed record, sealed on-chain) \u2014 bound together by the record's content fingerprint.",
             ha="center", fontsize=8.2, color=GO)
     save(fig, "fig_datapath")
 

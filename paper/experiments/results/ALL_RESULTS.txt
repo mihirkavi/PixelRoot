@@ -1,5 +1,5 @@
 PixelRoot — consolidated experimental results
-Generated: 2026-10-18 20:52 UTC
+Generated: 2026-10-18 21:03 UTC
 
 ########################################################################
 === E1: imperceptibility + robustness on REAL images (Kodak), REAL codecs + RS ECC ===
@@ -145,7 +145,7 @@ calibration images=12 (even indices); all results below are on the 12 held-out i
 
 (2) End-to-end verdicts (CO = Camera-original, TC = Transcoded-consistent, U = Unverified)
     Condition                   CO   TC    U
-    Camera JPEG (exact file)    11    0    1
+    Camera JPEG (exact file)    12    0    0
     JPEG Q95                     0   11    1
     JPEG Q90                     0   11    1
     JPEG Q80                     0   11    1
@@ -205,6 +205,6 @@ calibration images=12 (even indices); all results below are on the 12 held-out i
     PASS  record not notarized                             rejected (not notarized)
 
 (6) Cost per capture
-    record size (canonical JSON incl. signature + lot proof): 2988 B
-    chip signing (incl. fingerprint): 3.8 ms   ECDSA P-256 verify: 0.112 ms   full verify of a file: 194.7 ms
+    record size (canonical JSON incl. signature + lot proof): 2986 B
+    chip signing (incl. fingerprint): 3.7 ms   ECDSA P-256 verify: 0.118 ms   full verify of a file: 4.1 ms
 
