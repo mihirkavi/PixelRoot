@@ -354,7 +354,7 @@ def fig_results():
         ax.plot(xx, imp, "s--", color=RD, lw=2, label="impostor NCC")
         ax.set_xticks(list(xx)); ax.set_xticklabels(cond, rotation=20, fontsize=7)
         ax.set_ylabel("PRNU NCC")
-        ax.set_title("(d) Passive PRNU baseline: genuine\u2013impostor\nmargin shrinks under JPEG (motivates active mark)", fontsize=title_fs, pad=10)
+        ax.set_title("(d) Passive PRNU baseline: genuine\u2013impostor\nmargin narrows under JPEG", fontsize=title_fs, pad=10)
         ax.legend(fontsize=7); ax.grid(alpha=0.3)
     fig.subplots_adjust(left=0.10, right=0.94, top=0.93, bottom=0.12, hspace=0.55, wspace=0.40)
     save(fig, "fig_results")

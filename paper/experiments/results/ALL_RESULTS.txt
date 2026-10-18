@@ -1,5 +1,5 @@
 PixelRoot — consolidated experimental results
-Generated: 2026-10-18 21:13 UTC
+Generated: 2026-10-18 21:42 UTC
 
 ########################################################################
 === E1: imperceptibility + robustness on REAL images (Kodak), REAL codecs + RS ECC ===
@@ -112,21 +112,21 @@ ACTIVE, error-corrected mark addresses (E1: payload survives to JPEG Q10).
 Platform: Python 3.13.16 hashlib (OpenSSL SHA-NI if available)
 
 [C10] SHA-256 commitment timing (mean of 20 runs):
-   5.9 MB frame                       3.93 ms
-   6 MP RGB (2832x2122x3=18MB)        13.23 ms
-   1080p RGB (6.2MB)                  4.12 ms
-   seed derivation + carrier selection (128b x R=25, 32400 blocks): 0.482 ms
+   5.9 MB frame                       4.00 ms
+   6 MP RGB (2832x2122x3=18MB)        12.46 ms
+   1080p RGB (6.2MB)                  4.21 ms
+   carrier layout (384 coded bits x R=84, 32400 blocks, keyed_plan): 1.699 ms
 
 [C11] Merkle batching (domain-separated sorted-pair SHA-256; ledger.py == PixelRootRegistry.sol):
    N leaves    build (ms)    path len    proof bytes
-   1           0.011         0           0
-   100         0.146         7           224
-   10000       11.566        14          448
+   1           0.016         0           0
+   100         0.171         7           224
+   10000       17.269        14          448
    On-chain gas (measured, Hardhat EVM, solc 0.8.24, optimizer 200 runs, Hardhat network):
-     batch=1      per-tx=46605 gas   amortized/image=46605.00 gas
-     batch=100    per-tx=46605 gas   amortized/image=466.05 gas
-     batch=10000  per-tx=46605 gas   amortized/image=4.66 gas
-     registerLot=51355  revokeDevice=65419  verifyCapture (eth_call)=71362
+     batch=1      per-tx=47016 gas   amortized/image=47016.00 gas
+     batch=100    per-tx=47016 gas   amortized/image=470.16 gas
+     batch=10000  per-tx=47016 gas   amortized/image=4.70 gas
+     registerLot=51626  revokeDevice=65859  verifyCapture (eth_call)=72237
    (verification paths are view calls: no on-chain gas is paid to verify)
 
 [C7] RS(48,16) soft false-accept bound (Prop. 3), per-bit p=1/2:
@@ -136,12 +136,12 @@ Platform: Python 3.13.16 hashlib (OpenSSL SHA-NI if available)
 ########################################################################
 === E6: device identity + content binding on REAL images (Kodak) ===
 images=24 sizes=[(512, 768), (768, 512)] A=4.0 RS(48,16) sensors=8 (P-256, on-die)  lot+batch sealed on ledger
-
+fingerprint: 8x8 tiles over the interior (margin 32 px), 16x16 cells per tile, 8x8 DCT incl. DC
 calibration images=12 (even indices); all results below are on the 12 held-out images
 
 (1) Fingerprint distance (max per-tile relative L2)
-    calibration: genuine under benign suite max 0.092   25-35% splices min 0.481   -> tau=0.286
-    held-out:    genuine max 0.082 (p99 0.076)   different images min 0.866 (median 1.240)
+    calibration: genuine under benign suite max 0.143   25-35% splices min 0.821   -> tau=0.482
+    held-out:    genuine max 0.197 (p99 0.105)   different images min 1.085 (median 2.552)
 
 (2) End-to-end verdicts (CO = Camera-original, TC = Transcoded-consistent, U = Unverified)
     Condition                   CO   TC    U
@@ -180,32 +180,37 @@ calibration images=12 (even indices); all results below are on the 12 held-out i
     JPEG50+Noise5                0   11    1
     Resize0.75+JPEG40            0   11    1
     Unmarked originals           0    0   12
+    processed genuine copies verified: 358/396 [95% CI 0.87-0.93]
+    reasons for Unverified genuine verdicts: {'no payload': 38}
 
-(3) Copy attacks (A's mark onto a different image B)
-    keyless        trials=78  watermark decodes A's payload=61  end-to-end accepted=0
-    with-original  trials=78  watermark decodes A's payload=70  end-to-end accepted=0
+(3) Cross-scene copy attacks (A's mark onto a different image B)
+    keyless        watermark decodes A's payload=61/78  end-to-end accepted=0/78 [95% CI 0.00-0.05]
+    with-original  watermark decodes A's payload=70/78  end-to-end accepted=0/78 [95% CI 0.00-0.05]
 
-(4a) Coarse-structure transplant: B + alpha*(lowres(A)-lowres(B)) + A's mark
-    alpha=0.25  accepted=0/12  PSNR(forged,B)=24.0 dB  PSNR(forged,A)=11.9 dB
-    alpha=0.5   accepted=0/12  PSNR(forged,B)=18.1 dB  PSNR(forged,A)=13.7 dB
-    alpha=0.75  accepted=0/12  PSNR(forged,B)=14.6 dB  PSNR(forged,A)=15.5 dB
-    alpha=0.9   accepted=0/12  PSNR(forged,B)=13.1 dB  PSNR(forged,A)=16.4 dB
-    alpha=1.0   accepted=0/12  PSNR(forged,B)=12.2 dB  PSNR(forged,A)=16.8 dB
-(4b) Splices (25%/35% side, then JPEG Q90): trials=24  payload still decodes=21  accepted=0
+(4) Local edits of a genuine capture (accepted = verified as Transcoded-consistent)
+    Splice 25-35% side, JPEG Q90               payload decodes=21/24  accepted=0/24 [95% CI 0.00-0.14]
+    Patch 64x64 px, JPEG Q90                   payload decodes=11/12  accepted=3/12 [95% CI 0.09-0.53]
+    Patch 96x96 px, JPEG Q90                   payload decodes=11/12  accepted=1/12 [95% CI 0.01-0.35]
+    Patch 128x128 px, JPEG Q90                 payload decodes=11/12  accepted=0/12 [95% CI 0.00-0.24]
+    Shift+splice: top tile row                 payload decodes=8/12  accepted=0/12 [95% CI 0.00-0.24]
+    Shift+splice: 128 px patch, corner         payload decodes=11/12  accepted=2/12 [95% CI 0.05-0.45]
+    Adaptive: 96 px patch + band projection    payload decodes=11/12  accepted=11/12 [95% CI 0.65-0.99]
+    adaptive patches: donor-detail correlation 0.52, mean |change| inside patch 17.8 gray levels
 
 (5) Cryptographic / ledger attacks
-    PASS  genuine record                                   accepted
-    PASS  record edited to another image's fingerprint     rejected (bad signature)
-    PASS  record with altered file hash                    rejected (bad signature)
-    PASS  uncertified sensor key (claims a real lot)       rejected (sensor not valid at seal time)
-    PASS  genuine signature on a forged record             rejected (bad signature)
-    PASS  revoked sensor, sealed before revocation         accepted
-    PASS  revoked sensor, sealed after revocation          rejected (sensor not valid at seal time)
-    PASS  anchor block later than seal (time inconsistency) rejected (anchor after seal)
-    PASS  anchor hash not the chain's (forged early anchor) rejected (anchor hash not on chain)
-    PASS  record not notarized                             rejected (not notarized)
+    PASS  genuine record                                       accepted
+    PASS  record edited to another image's fingerprint         rejected (bad signature)
+    PASS  record with altered file hash                        rejected (bad signature)
+    PASS  uncertified sensor key (claims a real lot)           rejected (sensor not valid at seal time)
+    PASS  genuine signature on a forged record                 rejected (bad signature)
+    PASS  revoked sensor, sealed before revocation             accepted
+    PASS  revoked sensor, sealed after revocation              rejected (sensor not valid at seal time)
+    PASS  anchor block later than seal (time inconsistency)    rejected (anchor after seal)
+    PASS  anchor hash not the chain's (forged early anchor)    rejected (anchor hash not on chain)
+    PASS  record not notarized                                 rejected (not notarized)
+    PASS  burst: two records share one payload; both resolve   first Transcoded-consistent, second Transcoded-consistent
 
 (6) Cost per capture
-    record size (canonical JSON incl. signature + lot proof): 2988 B
-    chip signing (incl. fingerprint): 3.7 ms   ECDSA P-256 verify: 0.117 ms   full verify of a file: 4.3 ms
+    record size (canonical JSON incl. signature + lot proof): 17769 B
+    chip signing (incl. fingerprint): 9.0 ms   ECDSA P-256 verify: 0.152 ms   full verify of a file: 4.2 ms
 

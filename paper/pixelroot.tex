@@ -117,16 +117,16 @@ low-frequency per-region gain modulation. Each sensor holds a signing key
 generated on-die and certified on the blockchain by its manufacturer; it signs a
 capture record that binds the payload to the frame's hashes and to a robust
 content fingerprint, and the record is notarized on the same blockchain, which
-also records time-scoped revocation. We contribute a survey and gap analysis; a
-formal architecture, threat model, and five security propositions; a measured
+also records time-scoped revocation. We contribute a formal architecture and
+threat model with five security propositions; a measured
 robustness study on the Kodak images with real codecs, recovering the payload on $22$--$23/24$ images down to JPEG $Q20$ ($21/24$ at
 $Q10$) at $38$\,dB PSNR with $0/1224$ false accepts; a device-identity evaluation
 showing that the in-pixel mark alone can be copied without any key ($78\%$ of
-trials) and that the content-bound record stops it ($0$ of $240$ copy,
-transplant, and splice forgeries accepted on held-out images); a tested registry
-contract ($46.6$\,k gas per batch, $O(1)$ per image); a CMOS-manufacturing
-feasibility analysis of per-pixel gain and the tamper-localization layer it
-enables; and a privacy-preserving notarization design with a
+trials) while the content-bound record rejects every cross-scene copy and large
+splice on held-out images ($0/180$) and lets $90\%$ of processed genuine copies
+verify, linking local edits back to the original; a tested registry contract ($47$\,k gas per batch, $O(1)$
+per image); a CMOS-manufacturing
+feasibility analysis of per-pixel gain; and a privacy-preserving notarization design with a
 phased adoption path toward a cross-OEM interoperability standard.
 \end{abstract}
 
@@ -147,7 +147,7 @@ scenes, and full videos that humans---and automated detectors---routinely fail
 to distinguish from reality~\cite{croitoru2024deepfake,verdoliva2020media}. The
 harm is no longer hypothetical. Industry incident trackers attribute on the
 order of \$1.2--1.3~billion in documented fraud losses to deepfakes in 2025,
-roughly tripling year over year, with the overwhelming majority of losses
+rising steeply year over year, with the overwhelming majority of losses
 originating on social-media platforms~\cite{resemble2025threat,surfshark2025fraud};
 enterprise surveys report that a majority of organizations experienced
 deepfake-related incidents with mean losses exceeding
@@ -996,7 +996,7 @@ tile is ever skipped and the excluded border is wider than any accepted shift, a
 crop cannot hide an edit inside the fingerprinted region. Compression, noise,
 mild filtering, rescaling and photometric edits leave every tile's coarse
 structure nearly unchanged; different content, or a foreign region large enough
-to change a tile, does not. The record ($\approx\!12$\,KB) is published by the
+to change a tile, does not. The record ($\approx\!18$\,KB as hex JSON) is published by the
 capturing party, the OEM, or a content-addressed store when the image is
 published; only its hash reaches the chain. The record store is untrusted: a
 lookup by payload may return several records (bursts captured within one second
@@ -1267,9 +1267,7 @@ from a published image---without the carrier key, from a recompressed copy---and
 pastes it onto other content~\cite{kutter2000copy}. At the watermark level this
 succeeds ($78\%$ of keyless attempts decode the source payload, \S\ref{sec:e6});
 end to end it fails, because the payload resolves to the source's record, whose
-fingerprint describes different content ($0/156$ accepted). Blending the source's
-coarse structure into the forgery does not help until the forgery has become
-the source image ($0/60$ accepted).
+fingerprint describes different content ($0/156$ accepted).
 
 \textbf{Metadata forgery / stripping.} Editing or removing metadata cannot create
 a valid record. Stripping downgrades a credential-only scheme to
@@ -1296,12 +1294,16 @@ pattern~\cite{goljan2011defending} gains nothing: \pr{}'s identity is the
 sensor's signature over a content-bound record, not its PRNU, and a copied
 noise pattern carries no signature.
 
-\textbf{Splice / inpaint.} A splice leaves most carriers intact, so the payload
-usually still decodes; the tile fingerprint rejects it when the foreign region
-changes any tile's coarse content ($24/24$ splices covering $6$--$12\%$ of the
-frame rejected, \S\ref{sec:e6}). Edits smaller than a tile's tolerance remain
-inside the semantic boundary; for forensic media, the per-pixel localization
-layer (\S\ref{sec:mfg}, \S\ref{sec:robust}) localizes them.
+\textbf{Splice, inpaint, and local edits.} A splice leaves most carriers intact,
+so the payload usually still decodes; the fingerprint rejects it when the foreign
+region changes a tile's coarse content ($24/24$ splices covering $6$--$12\%$ of
+the frame rejected, \S\ref{sec:e6}), and because no tile is skipped, shifting
+the image cannot hide it. Smaller patches sometimes stay within $\tau$, and an
+adversary holding the original can force any local edit to match the
+fingerprint's cell means. Such images are verified only as derivatives of the
+capture: the verifier returns the record and the original for comparison, and
+for forensic media the per-pixel localization layer (\S\ref{sec:mfg},
+\S\ref{sec:robust}) localizes edits. Pixel-exact integrity is V1's role.
 
 \textbf{Sensor-key extraction.} An invasive attack on a device the adversary
 owns yields that one sensor's key, with which it can sign records for arbitrary
@@ -1342,7 +1344,8 @@ Metadata forge/strip & V2 reads $\mathbf{m}$; record resolves & A3,A4 & P3,P4 \\
 Re-capture (screen) & new record; no back-dating & A3--A5 & P1,P5 \\
 Replay / pre-stage & bracket $(\mathrm{time}(b_\beta),\mathrm{time}(b_s)]$ & A3--A5 & P1,P5 \\
 PRNU copy~\cite{goljan2011defending} & identity is a signature, not PRNU & A4,A5 & P4 \\
-Splice / inpaint   & tile fingerprint mismatch & A4 & P4 \\
+Large splice       & tile fingerprint mismatch & A4 & P4 \\
+Local edit (adaptive) & accepted only as derivative; V1 fails & A3,A4 & P1,P4 \\
 Sensor-key theft   & one identity; revocation stops new records & A3 & P4 \\
 Rogue manufacturer & governance revocation; no retro-lots & A3 & P4 \\
 Launder / regenerate & fails \emph{safe} to \textsc{Unverified} & A4 & P3 \\
@@ -1485,42 +1488,44 @@ full evaluation below on the public Kodak set; a claims-to-experiments matrix an
 reproduction instructions are released in \texttt{experiments/EXPERIMENT\_PLAN.md}
 at \url{https://github.com/mihirkavi/PixelRoot}.
 The device-identity layer is implemented as a Solidity registry
-(\texttt{contracts/}, $16$ Hardhat tests) and a Python reference of the sensor
+(\texttt{contracts/}, $18$ Hardhat tests) and a Python reference of the sensor
 key, signed records, content fingerprint, and verifier (\texttt{ledger.py},
-\texttt{device\_identity.py}, $18$ unit tests), with Merkle test vectors shared
+\texttt{device\_identity.py}, $21$ unit tests), with Merkle test vectors shared
 between the two implementations.
 
 \subsection{Micro-benchmark of the core (measured)}
-Table~\ref{tab:micro} reports \emph{measured} results from the reference
-implementation on a commodity laptop CPU (Node.js~v20), over a synthetic
-$1920\times1080$ RGB frame ($\approx\!5.9$\,MB). These validate functional
-correctness and show the on-device cryptographic overhead is negligible relative
-to capture: seed derivation and full carrier-set generation complete in tens of
-microseconds, and a \mbox{SHA-256} commitment over the $\approx\!6$\,MB $1080$p
-frame in $\approx\!3$\,ms (a true $6$\,MP RGB frame takes $\approx\!8.5$\,ms in
-the Python harness, \texttt{e5\_crypto.py})---i.e.\ the hard binding adds far less latency than a single
-exposure. Determinism (identical carriers across runs), carrier uniqueness, the
-encode/verify round-trip, and single-bit tamper rejection all hold.
+Table~\ref{tab:micro} reports the cost of the capture-time operations, measured
+with the Python reference implementation on a commodity CPU (\texttt{e5\_crypto.py},
+\texttt{e6\_device\_identity.py}) and gas measured on the Hardhat EVM. The
+on-device cryptographic work is small next to an exposure: generating the carrier
+layout for a $1080$p frame takes $1.7$\,ms, a \mbox{SHA-256} commitment over the
+$1080$p frame $4.2$\,ms ($12.5$\,ms for a $6$\,MP frame), and forming and signing a
+capture record $9.0$\,ms, all in unoptimized Python; a sensor's hardware hash and
+signature engines are faster.
 
 \begin{table}[t]
 \centering
-\caption{Measured core performance and correctness (reference prototype,
-\mbox{v2} payload, $1920\times1080$ RGB).}
+\caption{Measured cost of the capture and verification path (Python reference on
+a commodity CPU; gas on the Hardhat EVM, \texttt{solc}~0.8.24).}
 \label{tab:micro}
-\renewcommand{\arraystretch}{1.2}
+\renewcommand{\arraystretch}{1.15}
 \footnotesize
 \begin{tabular}{@{}lr@{}}
 \toprule
-\textbf{Quantity} & \textbf{Value} \\
+\textbf{Operation} & \textbf{Cost} \\
 \midrule
-Payload / coded carriers            & $128$ b / $128$ pos. \\
-Seed derivation                     & $0.0024$\,ms \\
-Full signature (seed+select+bits)   & $0.018$\,ms \\
-SHA-256 commit over $1080$p frame ($6$\,MB) & $3.09$\,ms \\
-Carrier determinism (re-run)        & identical ($\checkmark$) \\
-Carrier coordinate uniqueness       & $\checkmark$ \\
-Encode$\rightarrow$verify round-trip & pass ($\checkmark$) \\
-Single-bit tamper                   & rejected ($\checkmark$) \\
+Carrier layout, $1080$p ($384$ bits, $R\!=\!84$) & $1.7$\,ms \\
+SHA-256 over $1080$p / $6$\,MP RGB frame  & $4.2$ / $12.5$\,ms \\
+Record: fingerprint $+$ ECDSA P-256 sign  & $9.0$\,ms \\
+ECDSA P-256 verify                         & $0.15$\,ms \\
+Verify exact camera file end to end        & $4.2$\,ms \\
+Merkle root over $10^4$ records            & $17.3$\,ms \\
+Inclusion proof, $10^4$ batch              & $14\times32$\,B \\
+\midrule
+\texttt{register} (any batch size)         & $47{,}016$ gas \\
+\quad per image at $N\!=\!10^4$            & $4.70$ gas \\
+\texttt{registerLot} / \texttt{revokeDevice} & $51{,}626$ / $65{,}859$ gas \\
+\texttt{verifyCapture}                     & view call (free) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1683,8 +1688,7 @@ real-JPEG quality on Kodak (nearly flat through $Q10$, cliff at $Q5$; RS recover
 the payload on $21$--$23/24$ images through $Q10$). (b) Amplitude operating curve at JPEG~$Q40$ over all $24$
 images: a genuine robustness cliff. (c) Tamper-localization ROC on real splices
 (AUC $\approx\!0.97$). (d) Passive PRNU baseline: the genuine--impostor
-correlation margin shrinks under JPEG, motivating \pr{}'s active, error-corrected
-mark.}
+correlation margin narrows under JPEG.}
 \label{fig:results}
 \end{figure*}
 
@@ -1707,59 +1711,75 @@ Kodak images. \textbf{Setup.} One manufacturer admitted to the registry
 certifies a lot of eight sensors, each holding an on-die ECDSA P-256 key; every
 image is marked as in \S\ref{sec:robust} ($A\!=\!4$, RS$(48,16)$), encoded by the
 ``camera'' as JPEG~$Q95$, and described by a sensor-signed record
-(Eq.~\ref{eq:record}); the $24$ record hashes are sealed as one Merkle batch. The
+(Eq.~\ref{eq:record}); the record hashes are sealed as one Merkle batch. The
 ledger is an executable model of the contract of \S\ref{sec:contract}; the
-contract itself passes a $16$-case test suite on the Hardhat EVM covering the
+contract itself passes an $18$-case test suite on the Hardhat EVM covering the
 same state machine, Merkle compatibility with the Python implementation through
-shared test vectors, the leaf/node domain separation, and every revocation
-rule. To avoid tuning on the test set, the fingerprint threshold is calibrated on
-the $12$ even-indexed images (midpoint between the largest genuine distance under
-the benign suite of Table~\ref{tab:robust} and the smallest distance of
-$25$--$35\%$ splices) and \emph{every result below is on the $12$ held-out
-images}.
+shared test vectors, the leaf/node domain separation, the per-manufacturer lot
+keys (including a front-running race), the sealing block number, and every
+revocation rule. To avoid tuning on the test set, the fingerprint threshold is
+calibrated on the $12$ even-indexed images (midpoint between the largest genuine
+distance under the benign suite of Table~\ref{tab:robust} and the smallest
+distance of $25$--$35\%$ splices), and \emph{every result below is on the $12$
+held-out images}, with Wilson $95\%$ intervals where rates are reported.
 
-\textbf{Fingerprint margin.} Calibration gives $\tau=0.286$. On held-out images
-the largest genuine distance under any benign attack is $0.082$, while different
-images are at least $0.866$ apart (median $1.24$)---a margin of more than
-$3\times$ on each side of $\tau$.
+\textbf{Fingerprint margin.} Calibration gives $\tau=0.482$. On held-out images
+the largest genuine distance under any benign attack is $0.197$, while different
+images are at least $1.085$ apart (median $2.55$).
 
 \textbf{Genuine media} (Table~\ref{tab:e6verdicts}). The camera's own JPEG
-verifies as \textsc{Camera-original} on $12/12$ images through V1 alone, with
-no dependence on the watermark. Processed copies verify as
-\textsc{Transcoded-consistent} on $11/12$ images across JPEG down to $Q20$, noise,
-blur, resize $0.75$--$1.5\times$, photometric edits, $1$--$3\%$ crops, and combined
-attacks, and on $9$--$10/12$ under JPEG~$Q10$, WebP~$q60$ and $0.5\times$ resize. Every
-\textsc{Unverified} genuine verdict traces to the payload failing to decode
-(the texture-heavy frame of \S\ref{sec:robust}), never to the fingerprint. None
-of the $12$ unmarked originals is accepted.
+verifies as \textsc{Camera-original} on $12/12$ images through V1 alone, with no
+dependence on the watermark. Processed copies verify as
+\textsc{Transcoded-consistent} in $358$ of $396$ cases ($90\%$, CI $0.87$--$0.93$):
+$11/12$ images across JPEG down to $Q20$, noise, blur, resize $0.75$--$1.5\times$,
+photometric edits, $1$--$3\%$ crops and combined attacks, and $9$--$10/12$ under
+JPEG~$Q10$, WebP~$q60$, brightness~$\times1.1$ and $0.5\times$ resize. All $38$
+\textsc{Unverified} genuine verdicts are payload-decode failures (mostly the
+texture-heavy frame of \S\ref{sec:robust}); the fingerprint rejected none. None of
+the $12$ unmarked originals is accepted.
 
-\textbf{Attacks} (Table~\ref{tab:e6attacks}). The keyless copy attack
-estimates the mark from a JPEG~$Q75$ copy of the source by the detector's own
-public projection and high-pass, and adds $1.5\times$ the estimate to another
-image; it makes the forgery decode the source's payload in $61/78$ attempts
-($78\%$), and $70/78$ with the original in hand. The content-bound record stops
-all of them: $0/156$ are accepted. An adaptive variant blends the source's
-coarse structure into the forgery,
-$B+\alpha\,(\mathrm{low}(A)-\mathrm{low}(B))$, plus $A$'s mark; it is rejected at
-every $\alpha$, including $\alpha=1$, where the forgery has lost its own content
-(PSNR $12.2$\,dB to $B$). Splices of foreign regions covering $6$--$12\%$ of the
-frame, recompressed at $Q90$, still decode the payload in $21/24$ cases but are
-all rejected by the tile fingerprint. Every record- and ledger-level attack is
-handled as specified, including time-scoped revocation in both directions.
+\textbf{Cross-scene forgeries} (Table~\ref{tab:e6attacks}). The keyless copy
+attack estimates the mark from a JPEG~$Q75$ copy of the source by the detector's
+own public projection and high-pass and adds $1.5\times$ the estimate to another
+image; the forgery decodes the source's payload in $61/78$ attempts ($78\%$), and
+$70/78$ with the original in hand. The content-bound record rejects all $156$
+(CI upper bound $0.05$ per attack), and all $24$ splices covering $6$--$12\%$ of
+the frame, including the $21$ whose payload still decodes.
 
-\textbf{Cost.} Signing a capture (fingerprint and ECDSA) takes $3.7$\,ms in
-Python on a commodity CPU; ECDSA verification takes $0.12$\,ms, and verifying an
-exact camera file end to end takes $4.3$\,ms. A record is $\approx\!3$\,KB off-chain.
-On-chain (Hardhat EVM, \texttt{solc}~0.8.24), sealing a batch costs $46{,}605$ gas
-regardless of its size---$4.66$ gas per image at $N\!=\!10^4$---certifying a lot
-costs $51{,}355$ gas, revoking a sensor $65{,}419$ gas, and verification is a
-free view call.
+\textbf{Local edits within one capture.} Smaller pasted patches are sometimes
+within $\tau$: $3/12$ at $64\times64$\,px (about $1\%$ of the frame), $1/12$ at
+$96\times96$, $0/12$ at $128\times128$, and $2/12$ for a $128$-px patch near the
+border followed by an $8$-px shift (a whole foreign tile row followed by the same
+shift is rejected $12/12$, so a crop no longer hides content). An \emph{adaptive}
+adversary who holds the original does better: after pasting a $96\times96$ foreign
+patch it re-imposes the original's mean on every fingerprint cell, and $11/12$
+such images are accepted. The pasted detail survives only below the cell size
+(about $5$\,px here): its correlation with the donor is $0.52$, and it changes the
+patch by $17.8$ gray levels on average---visible on inspection
+(Fig.~\ref{fig:adaptive}). These results are why \pr{} defines a transcoded
+verdict as \emph{derivation from a notarized capture}, returns the record (and,
+when published, the original file) for comparison, and reserves pixel-exact
+certification for V1 (\S\ref{sec:identity}).
+
+\textbf{Ledger and record attacks.} All eleven record- and ledger-level cases in
+Table~\ref{tab:e6attacks} behave as specified, including time-scoped revocation in
+both directions, an anchor block later than the seal, an anchor hash that is not
+the chain's, and a burst of two captures sharing one payload (both resolve).
+
+\textbf{Cost.} Signing a capture (fingerprint and ECDSA) takes $9.0$\,ms in Python
+on a commodity CPU; ECDSA verification takes $0.15$\,ms, and verifying an exact
+camera file end to end $4.2$\,ms. A record is $\approx\!18$\,KB as hex-encoded JSON
+(about half that in binary), off-chain. On-chain (Hardhat EVM, \texttt{solc}~0.8.24),
+sealing a batch costs $47{,}016$ gas regardless of its size---$4.70$ gas per image
+at $N\!=\!10^4$---certifying a lot costs $51{,}626$ gas, revoking a sensor
+$65{,}859$ gas, and verification is a free view call.
 
 \begin{table}[t]
 \centering
 \caption{E6 genuine-media verdicts on the \textbf{12 held-out Kodak images}
 (CO = \textsc{Camera-original}, TC = \textsc{Transcoded-consistent}, U =
-\textsc{Unverified}); $\tau$ calibrated on the other 12.}
+\textsc{Unverified}); $\tau$ calibrated on the other 12. Every U is a
+payload-decode failure.}
 \label{tab:e6verdicts}
 \renewcommand{\arraystretch}{1.12}
 \setlength{\tabcolsep}{5pt}
@@ -1778,6 +1798,7 @@ Bright./contrast/gamma $\pm10\%$       & $0$  & $10$--$11$ & $1$--$2$ \\
 Crop $1$--$3\%$ $+$ resync             & $0$  & $11$ & $1$ \\
 JPEG$+$resize; JPEG$+$noise            & $0$  & $11$ & $1$ \\
 \midrule
+All processed copies                   & $0$  & $358$ & $38$ \\
 Unmarked originals                     & $0$  & $0$  & $12$ \\
 \bottomrule
 \end{tabular}
@@ -1786,7 +1807,7 @@ Unmarked originals                     & $0$  & $0$  & $12$ \\
 \begin{table}[t]
 \centering
 \caption{E6 attacks on the 12 held-out images: watermark-level success versus
-end-to-end acceptance by the verifier of Alg.~\ref{alg:verify}.}
+acceptance as \textsc{Transcoded-consistent} by Alg.~\ref{alg:verify}.}
 \label{tab:e6attacks}
 \renewcommand{\arraystretch}{1.12}
 \setlength{\tabcolsep}{4pt}
@@ -1795,20 +1816,41 @@ end-to-end acceptance by the verifier of Alg.~\ref{alg:verify}.}
 \toprule
 \textbf{Attack} & \textbf{Payload decodes} & \textbf{Accepted} \\
 \midrule
+\multicolumn{3}{@{}l}{\emph{Cross-scene}} \\
 Keyless copy (from JPEG $Q75$)           & $61/78$ & $0/78$ \\
 Copy with original residual              & $70/78$ & $0/78$ \\
-Coarse transplant, $\alpha\!\in\!\{.25,.5,.75,.9,1\}$ & --- & $0/60$ \\
-Splice $6$--$12\%$ area, then $Q90$      & $21/24$ & $0/24$ \\
+Splice $6$--$12\%$ of frame, $Q90$       & $21/24$ & $0/24$ \\
 \midrule
+\multicolumn{3}{@{}l}{\emph{Local edits within one capture}} \\
+Patch $64$\,px, $Q90$                      & $11/12$ & $3/12$ \\
+Patch $96$\,px, $Q90$                      & $11/12$ & $1/12$ \\
+Patch $128$\,px, $Q90$                     & $11/12$ & $0/12$ \\
+Foreign tile row $+$ $8$-px shift        & $8/12$  & $0/12$ \\
+$128$-px patch near border $+$ shift     & $11/12$ & $2/12$ \\
+Adaptive: $96$-px patch $+$ cell means   & $11/12$ & $11/12$ \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Record and ledger}} \\
 Record edited (fingerprint, file hash)   & --- & $0/2$ \\
 Uncertified sensor key; borrowed signature & --- & $0/2$ \\
 Revoked sensor, sealed after revocation  & --- & $0/1$ \\
 Revoked sensor, sealed before revocation & --- & $1/1$ (valid) \\
-Anchor after seal; forged anchor hash      & --- & $0/2$ \\
+Anchor after seal; forged anchor hash    & --- & $0/2$ \\
 Record not notarized                     & --- & $0/1$ \\
+Burst: two records, one payload          & --- & $2/2$ (valid) \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_adaptive.png}
+\caption{Adaptive local edit accepted as \textsc{Transcoded-consistent} (E6).
+Left: marked original. Centre: a $96\times96$ patch from another photograph,
+pasted and then forced to the original's fingerprint-cell means, after JPEG~$Q90$.
+Right: the donor. The edit is visible on inspection and appears in a comparison
+with the original that the record links to; only V1 certifies exact pixels.}
+\label{fig:adaptive}
+\end{figure}
 
 \noindent\textbf{Scope and threats to validity.} These results validate the
 \emph{algorithmic} core---carrier design, host-suppressed spread-spectrum
@@ -1903,7 +1945,7 @@ no dependence on a vendor's revocation service---a question a certificate
 authority alone answers poorly once revocation lists are ignored or
 unavailable~\cite{c2pa2026security}. The cost---latency and gas---is amortized to
 $O(1)$ per capture by Merkle batching (\S\ref{sec:contract}); measured gas is
-$46{,}605$ per batch (\S\ref{sec:e6}).
+$47{,}016$ per batch (\S\ref{sec:e6}).
 A \emph{hybrid} is natural and recommended: a TSA countersignature for instant,
 cheap proof plus periodic blockchain anchoring of the TSA's own Merkle roots, as
 OpenTimestamps does~\cite{proofmode2023}; \pr{} treats the ledger as the
@@ -1949,10 +1991,14 @@ error-corrected payload embedded by the CMOS sensor at capture, a capture record
 signed by a key that only that sensor holds, and a blockchain that certifies the
 sensor, seals the record, and records any revocation. We showed that the
 in-pixel mark alone is not enough---it can be copied onto other content without
-any key---and that binding it to a sensor-signed content fingerprint closes that
-gap: on held-out images, none of $240$ copy, transplant and splice forgeries was
-accepted while genuine media verified through compression, resizing, photometric
-edits and crops. We are careful about what this paper establishes: the
+any key---and that binding it to a sensor-signed content fingerprint makes the
+identity non-transferable: on held-out images no cross-scene copy or large splice
+was accepted, while $90\%$ of processed genuine copies verified through
+compression, resizing, photometric edits and crops. We also showed the limit of
+any tolerant binding: an adversary who holds the original can make local edits
+that keep the fingerprint, so a transcoded verdict means \emph{derived from}
+a notarized capture, which the verifier returns for comparison, and only the
+camera-original verdict certifies exact pixels. We are careful about what this paper establishes: the
 algorithmic core and the identity layer are \emph{implemented and measured} on
 real public images with real codecs; the registry contract is \emph{implemented
 and tested} on a local EVM with measured gas, but not yet deployed on a public

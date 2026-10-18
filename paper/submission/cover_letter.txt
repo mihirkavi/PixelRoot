@@ -40,8 +40,9 @@ The principal contributions of the work are:
 -   a security analysis with five propositions, including identity
     non-transferability, and an empirical demonstration that the in-pixel mark
     alone can be copied without any key (78% of trials) while the
-    content-bound record rejects all 240 copy, transplant, and splice
-    forgeries on held-out images;
+    content-bound record rejects every cross-scene copy and large splice on
+    held-out images (0/180), together with an adaptive attack that defines
+    precisely what a transcoded verdict can and cannot certify;
 
 -   an evaluation on public images (the Kodak suite) with production codecs
     (libjpeg, libwebp) and a real Reed-Solomon code under a WAVES-aligned
