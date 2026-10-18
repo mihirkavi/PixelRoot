@@ -1,5 +1,5 @@
 PixelRoot — consolidated experimental results
-Generated: Thu Jun  4 23:53:02 PDT 2026
+Generated: 2026-10-18 20:52 UTC
 
 ########################################################################
 === E1: imperceptibility + robustness on REAL images (Kodak), REAL codecs + RS ECC ===
@@ -37,11 +37,11 @@ Contrast 1.1          0.0181      22/24
 Gamma 0.9             0.0157      23/24
 Gamma 1.1             0.0174      22/24
 Crop 1%               0.0171      23/24
-Crop 2%               0.1117      20/24
+Crop 2%               0.0193      23/24
 Crop 3%               0.0195      23/24
-Rotate 1deg [lim]     0.5036      0/24
-Rotate 2deg [lim]     0.5013      0/24
-ResizedCrop 3% [lim]  0.4898      0/24
+Rotate 1deg [lim]     0.4964      0/24
+Rotate 2deg [lim]     0.4920      0/24
+ResizedCrop 3% [lim]  0.4880      0/24
 JPEG70+Resize0.75     0.0258      22/24
 JPEG50+Noise5         0.0166      23/24
 Resize0.75+JPEG40     0.0267      22/24
@@ -91,7 +91,6 @@ metrics follow forgery-localization literature (pixel-F1, p-F1, IoU, AUC)
    Pixel-IoU              = 0.3912
    Block TPR / FPR @thr   = 0.927 / 0.104
 
-
 ########################################################################
 === E4: PRNU passive-baseline pipeline (real Kodak content) ===
 fingerprint strength K_std=0.01, train=12 imgs/camera, test=12 imgs x 2 cameras
@@ -110,26 +109,102 @@ ACTIVE, error-corrected mark addresses (E1: payload survives to JPEG Q10).
 
 ########################################################################
 === E5: crypto micro-benchmarks, Merkle batching, RS false-accept bound ===
-Platform: Python 3.9.6 hashlib (OpenSSL SHA-NI if available)
+Platform: Python 3.13.16 hashlib (OpenSSL SHA-NI if available)
 
 [C10] SHA-256 commitment timing (mean of 20 runs):
-   5.9 MB frame                       2.64 ms
-   6 MP RGB (2832x2122x3=18MB)        8.50 ms
-   1080p RGB (6.2MB)                  2.92 ms
-   seed derivation + carrier selection (128b x R=25, 32400 blocks): 0.430 ms
+   5.9 MB frame                       3.93 ms
+   6 MP RGB (2832x2122x3=18MB)        13.23 ms
+   1080p RGB (6.2MB)                  4.12 ms
+   seed derivation + carrier selection (128b x R=25, 32400 blocks): 0.482 ms
 
-[C11] Merkle batching (sorted-pair SHA-256, matches registry.sol):
+[C11] Merkle batching (domain-separated sorted-pair SHA-256; ledger.py == PixelRootRegistry.sol):
    N leaves    build (ms)    path len    proof bytes
-   1           0.002         0           0
-   100         0.059         7           224
-   10000       5.814         14          448
-   On-chain gas (analytic EVM):
-     batch=1      per-tx=44996 gas   amortized/image=44996.00 gas
-     batch=100    per-tx=44996 gas   amortized/image=449.96 gas
-     batch=10000  per-tx=44996 gas   amortized/image=4.50 gas
-   (verifyInclusion is a view call: 0 on-chain gas; proof verified off-chain)
+   1           0.011         0           0
+   100         0.146         7           224
+   10000       11.566        14          448
+   On-chain gas (measured, Hardhat EVM, solc 0.8.24, optimizer 200 runs, Hardhat network):
+     batch=1      per-tx=46605 gas   amortized/image=46605.00 gas
+     batch=100    per-tx=46605 gas   amortized/image=466.05 gas
+     batch=10000  per-tx=46605 gas   amortized/image=4.66 gas
+     registerLot=51355  revokeDevice=65419  verifyCapture (eth_call)=71362
+   (verification paths are view calls: no on-chain gas is paid to verify)
 
 [C7] RS(48,16) soft false-accept bound (Prop. 3), per-bit p=1/2:
    corrects t=16 byte errors; P[random read decodes to a claimed payload]
    = 1.833e-65   (empirical E2: 0/1200 wrong-key, 0/24 forgery)
+
+########################################################################
+=== E6: device identity + content binding on REAL images (Kodak) ===
+images=24 sizes=[(512, 768), (768, 512)] A=4.0 RS(48,16) sensors=8 (P-256, on-die)  lot+batch sealed on ledger
+
+calibration images=12 (even indices); all results below are on the 12 held-out images
+
+(1) Fingerprint distance (max per-tile relative L2)
+    calibration: genuine under benign suite max 0.092   25-35% splices min 0.481   -> tau=0.286
+    held-out:    genuine max 0.082 (p99 0.076)   different images min 0.866 (median 1.240)
+
+(2) End-to-end verdicts (CO = Camera-original, TC = Transcoded-consistent, U = Unverified)
+    Condition                   CO   TC    U
+    Camera JPEG (exact file)    11    0    1
+    JPEG Q95                     0   11    1
+    JPEG Q90                     0   11    1
+    JPEG Q80                     0   11    1
+    JPEG Q70                     0   11    1
+    JPEG Q60                     0   11    1
+    JPEG Q50                     0   11    1
+    JPEG Q40                     0   11    1
+    JPEG Q30                     0   11    1
+    JPEG Q20                     0   11    1
+    JPEG Q10                     0   10    2
+    WebP q80                     0   11    1
+    WebP q60                     0   10    2
+    Noise s2                     0   11    1
+    Noise s5                     0   11    1
+    Noise s10                    0   11    1
+    Noise s20                    0   11    1
+    Blur r0.5                    0   11    1
+    Blur r1.0                    0   11    1
+    Resize 0.5x                  0    9    3
+    Resize 0.75x                 0   11    1
+    Resize 1.5x                  0   11    1
+    Brightness 0.9               0   11    1
+    Brightness 1.1               0   10    2
+    Contrast 0.9                 0   11    1
+    Contrast 1.1                 0   11    1
+    Gamma 0.9                    0   11    1
+    Gamma 1.1                    0   11    1
+    Crop 1%                      0   11    1
+    Crop 2%                      0   11    1
+    Crop 3%                      0   11    1
+    JPEG70+Resize0.75            0   11    1
+    JPEG50+Noise5                0   11    1
+    Resize0.75+JPEG40            0   11    1
+    Unmarked originals           0    0   12
+
+(3) Copy attacks (A's mark onto a different image B)
+    keyless        trials=78  watermark decodes A's payload=61  end-to-end accepted=0
+    with-original  trials=78  watermark decodes A's payload=70  end-to-end accepted=0
+
+(4a) Coarse-structure transplant: B + alpha*(lowres(A)-lowres(B)) + A's mark
+    alpha=0.25  accepted=0/12  PSNR(forged,B)=24.0 dB  PSNR(forged,A)=11.9 dB
+    alpha=0.5   accepted=0/12  PSNR(forged,B)=18.1 dB  PSNR(forged,A)=13.7 dB
+    alpha=0.75  accepted=0/12  PSNR(forged,B)=14.6 dB  PSNR(forged,A)=15.5 dB
+    alpha=0.9   accepted=0/12  PSNR(forged,B)=13.1 dB  PSNR(forged,A)=16.4 dB
+    alpha=1.0   accepted=0/12  PSNR(forged,B)=12.2 dB  PSNR(forged,A)=16.8 dB
+(4b) Splices (25%/35% side, then JPEG Q90): trials=24  payload still decodes=21  accepted=0
+
+(5) Cryptographic / ledger attacks
+    PASS  genuine record                                   accepted
+    PASS  record edited to another image's fingerprint     rejected (bad signature)
+    PASS  record with altered file hash                    rejected (bad signature)
+    PASS  uncertified sensor key (claims a real lot)       rejected (sensor not valid at seal time)
+    PASS  genuine signature on a forged record             rejected (bad signature)
+    PASS  revoked sensor, sealed before revocation         accepted
+    PASS  revoked sensor, sealed after revocation          rejected (sensor not valid at seal time)
+    PASS  anchor block later than seal (time inconsistency) rejected (anchor after seal)
+    PASS  record not notarized                             rejected (not notarized)
+
+(6) Cost per capture
+    record size (canonical JSON incl. signature + lot proof): 2988 B
+    chip signing (incl. fingerprint): 3.8 ms   ECDSA P-256 verify: 0.112 ms   full verify of a file: 194.7 ms
 
