@@ -66,8 +66,9 @@ calibration images=12 (even indices); all results below are on the 12 held-out i
     PASS  revoked sensor, sealed before revocation         accepted
     PASS  revoked sensor, sealed after revocation          rejected (sensor not valid at seal time)
     PASS  anchor block later than seal (time inconsistency) rejected (anchor after seal)
+    PASS  anchor hash not the chain's (forged early anchor) rejected (anchor hash not on chain)
     PASS  record not notarized                             rejected (not notarized)
 
 (6) Cost per capture
-    record size (canonical JSON incl. signature + lot proof): 2986 B
-    chip signing (incl. fingerprint): 3.7 ms   ECDSA P-256 verify: 0.118 ms   full verify of a file: 4.1 ms
+    record size (canonical JSON incl. signature + lot proof): 2988 B
+    chip signing (incl. fingerprint): 3.7 ms   ECDSA P-256 verify: 0.117 ms   full verify of a file: 4.3 ms

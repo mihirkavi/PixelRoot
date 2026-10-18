@@ -1692,7 +1692,7 @@ handled as specified, including time-scoped revocation in both directions.
 
 \textbf{Cost.} Signing a capture (fingerprint and ECDSA) takes $3.7$\,ms in
 Python on a commodity CPU; ECDSA verification takes $0.12$\,ms, and verifying an
-exact camera file end to end takes $4.1$\,ms. A record is $\approx\!3$\,KB off-chain.
+exact camera file end to end takes $4.3$\,ms. A record is $\approx\!3$\,KB off-chain.
 On-chain (Hardhat EVM, \texttt{solc}~0.8.24), sealing a batch costs $46{,}605$ gas
 regardless of its size---$4.66$ gas per image at $N\!=\!10^4$---certifying a lot
 costs $51{,}355$ gas, revoking a sensor $65{,}419$ gas, and verification is a
@@ -1747,7 +1747,8 @@ Record edited (fingerprint, file hash)   & --- & $0/2$ \\
 Uncertified sensor key; borrowed signature & --- & $0/2$ \\
 Revoked sensor, sealed after revocation  & --- & $0/1$ \\
 Revoked sensor, sealed before revocation & --- & $1/1$ (valid) \\
-Anchor after seal; record not notarized  & --- & $0/2$ \\
+Anchor after seal; forged anchor hash      & --- & $0/2$ \\
+Record not notarized                     & --- & $0/1$ \\
 \bottomrule
 \end{tabular}
 \end{table}
