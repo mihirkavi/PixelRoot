@@ -125,7 +125,7 @@ forensics, watermarking, C2PA, and blockchain media integrity into a
 security argument with three propositions; (iii)~a \emph{measured} robustness
 study on real public images (Kodak) with real \texttt{libjpeg}/WebP codecs and a
 real Reed--Solomon code under a WAVES-style attack suite---recovering the payload
-on $23/24$ images down to JPEG $Q20$ ($21/24$ at $Q10$) at $38$\,dB PSNR, with
+on $22$--$23/24$ images down to JPEG $Q20$ ($21/24$ at $Q10$) at $38$\,dB PSNR, with
 $0/1224$ false-accepts and a documented geometric limitation; (iv)~a CMOS-manufacturing
 feasibility analysis of per-pixel gain control, with engineering schematics, and
 the tamper-localization layer it unlocks (ROC-AUC $0.97$); and (v)~a
@@ -755,11 +755,13 @@ s = \mathrm{SHA\text{-}256}(k\,\|\,\mathbf{m}),
 \end{equation}
 which keys a cryptographic PRNG (a stream/CTR-mode keyed generator); the seed
 entropy is therefore bounded by the key, not by a truncated word, so the carrier
-layout is not amenable to offline enumeration. (The released prototype seeds
-NumPy's legacy generator with a $32$-bit reduction of $s$ for convenience; this
-is an implementation detail that does not affect the measured robustness or
-false-accept behavior of \S\ref{sec:eval}, which depend on key \emph{mismatch},
-not seed width. A deployment uses the full-width keyed PRNG.) For each coded
+layout is not amenable to offline enumeration. (The released prototype departs
+from this specification in two ways: it derives the layout from the key alone,
+$\mathrm{SHA\text{-}256}(k)$, not from $k\|\mathbf{m}$, and it seeds NumPy's
+legacy generator with a $32$-bit reduction of that digest. Neither affects the
+measured robustness or false-accept behavior of \S\ref{sec:eval}, which depend
+on key \emph{mismatch}, not on seed width or payload dependence; but a $32$-bit
+seed is enumerable offline, so a deployment must use the full-width keyed PRNG.) For each coded
 bit the PRNG draws $R$ distinct carrier blocks without repetition and assigns
 each an antipodal \emph{chip} $c_j\!\in\!\{\pm1\}$ (spread spectrum). The $128$
 payload bits are first protected by error correction (a Reed--Solomon code over
@@ -792,7 +794,8 @@ earlier designs confused: the modulation is applied as a \emph{spatial} per-regi
 gain (hardware-realizable, \S\ref{sec:hw}) but lives in a \emph{low-frequency
 DCT} band (JPEG-survivable). Because $\Phi_{u,v}$ for $(u,v)\!\neq\!(0,0)$ is
 zero-mean over the block, the embedding leaves block brightness essentially
-unchanged and is imperceptible (measured $\ge\!40$\,dB PSNR, \S\ref{sec:eval}).
+unchanged and is imperceptible (measured mean PSNR $38.2$\,dB at the $A\!=\!4$
+operating point and $41.2$\,dB at $A\!=\!3$, \S\ref{sec:eval}).
 
 \paragraph{Correlation read-back}\label{par:readback}
 A questioned image $I'$ is decoded by \emph{projecting} each carrier block onto
@@ -815,8 +818,9 @@ so the payload signal grows as $R A$ while the random chips make the host terms
 average toward zero ($\mathrm{std}\!\propto\!\sqrt{R}$): the detection
 signal-to-noise ratio improves as $\sqrt{R}$. The per-bit magnitude $|D|$ is the
 soft confidence passed to the error-correction decoder. This is a textbook
-blind, spread-spectrum watermark detector, and it is what makes the measured BER
-in \S\ref{sec:eval} reach zero through aggressive JPEG.
+blind, spread-spectrum watermark detector, and it is what keeps the measured raw
+BER in \S\ref{sec:eval} near $2\%$ through aggressive JPEG---low enough for the
+error-correcting code to recover the payload.
 
 \subsection{Commitment and notarization}
 Immediately after readout, the device computes a hard binding
@@ -971,16 +975,18 @@ Under a collision-resistant hash $\mathcal{H}$ \emph{(A4)} and an immutable
 ledger \emph{(A3)}, passing V1 implies that the exact bitstring
 $I^\star\|\mathbf{m}^\star$ existed at or before the block time of its sealing
 root. Producing a distinct $I^\star\neq I$ that passes V1 against a root sealed
-for $I$ requires a second preimage / collision of $\mathcal{H}$, i.e.\ succeeds
-with probability $\le 2^{-128}$ for \mbox{SHA-256}.
+for $I$ requires a second preimage of $\mathcal{H}$ (generic work $\approx\!2^{256}$
+for \mbox{SHA-256}); an adversary who also controls the original capture needs
+only a collision (generic work $\approx\!2^{128}$).
 \end{proposition}
 \begin{proof}[Proof sketch]
 $h=\mathcal{H}(I\|\mathbf{m})$ is a Merkle leaf; \texttt{verifyInclusion}
 recomputes the root from $(h,\pi)$ and compares to the sealed value. A different
 $I^\star$ yielding the same leaf is a collision of $\mathcal{H}$; a different leaf
 yielding the same root is a collision of the tree's compression function.
-Rewriting the sealed root violates A3. The $2^{-128}$ bound is the birthday
-security of a 256-bit digest.
+Rewriting the sealed root violates A3. The $2^{256}$ figure is the generic
+second-preimage cost of a 256-bit digest; the $2^{128}$ figure is its birthday
+(collision) bound.
 \end{proof}
 
 \begin{proposition}[Carrier unpredictability]\label{prop:carriers}
@@ -990,13 +996,16 @@ correctly recovering the carrier-and-chip assignment is
 \begin{equation}
 \Pr[\text{guess}] \;=\; \Big[\binom{N_B}{m}\,2^{m}\Big]^{-1},
 \end{equation}
-which for a $1920\times1080$ frame ($N_B\!=\!32400$ blocks), $m\!=\!3200$ is far
-below $10^{-3000}$. Moreover, since $s=\mathcal H(k\|\mathbf
+which for the evaluated setting ($768\times512$ Kodak frames, $N_B\!=\!6144$
+blocks, $n_c\!=\!384$ RS-coded bits, $R\!=\!16$, so $m\!=\!N_B$ and every block is
+a carrier) is $2^{-6144}\!<\!10^{-1849}$: all of the protection then comes from
+the secret chip signs. Moreover, since $s=\mathcal H(k\|\mathbf
 m)$ keys a cryptographic PRNG, distinct payloads induce computationally
 independent carrier layouts, so observing signatures for many images leaks no
 usable information about the layout for a fresh $\mathbf{m}$. The empirical
-counterpart---reading a marked image with $300$ \emph{wrong} keys---yields mean
-BER $0.503$ and $0/300$ correct recoveries (\S\ref{sec:eval}), matching the
+counterpart---reading each of the $24$ marked images with $50$ \emph{wrong} keys
+($1200$ trials)---yields mean BER $0.4996$ and $0/1200$ correct recoveries
+(\S\ref{sec:eval}), matching the
 $p\!\approx\!\tfrac12$ random-guess model.
 \end{proposition}
 
@@ -1011,7 +1020,8 @@ falsely accepts with probability at most
 \Pr[\text{V2 false-accept}] \;\le\; \sum_{j=0}^{t}\binom{n_s}{j}(1-q)^{\,j}\,q^{\,n_s-j},
 \label{eq:fa}
 \end{equation}
-the tail probability that at most $t$ of $n_s$ bytes happen to match by chance.
+the tail probability that at most $t$ of the $n_s$ bytes differ, i.e.\ that at
+least $n_s-t$ bytes match by chance.
 For our \mbox{RS$(48,16)$} code ($n_s=48$, $t=16$), this is
 $\le 1.8\times10^{-65}$.
 \end{proposition}
@@ -1026,7 +1036,7 @@ Prop.~\ref{prop:v1}.
 
 \noindent\textbf{Take-away.} Prop.~\ref{prop:v1}--\ref{prop:v2} give two
 \emph{independent} exponential barriers; an attacker must defeat \emph{both} the
-ledger ($2^{-128}$) and either the key-protected carrier layout
+ledger (Prop.~\ref{prop:v1}) and either the key-protected carrier layout
 (Prop.~\ref{prop:carriers}) or the error-correcting code (Prop.~\ref{prop:v2}).
 We now show each catalogued attack reduces to violating one of these.
 
@@ -1117,7 +1127,7 @@ spread-spectrum de-spreading over $R$ blocks (Eq.~\ref{eq:despread}) suppresses
 both quantization noise and host content by a further $\sqrt{R}$. Our
 measurements with the production \texttt{libjpeg} codec (\S\ref{sec:eval})
 confirm the analysis: after RS correction the $128$-bit payload is recovered on
-$23/24$ Kodak images from $Q\!=\!95$ down to $Q\!=\!20$ and on $21/24$ at the
+$22$--$23/24$ Kodak images from $Q\!=\!95$ down to $Q\!=\!20$ and on $21/24$ at the
 extreme $Q\!=\!10$, and the amplitude sweep in \S\ref{sec:eval} locates the
 graceful decode-failure cliff, below which \pr{} returns the safe
 \textsc{Unverified} rather than a false positive. The earlier fragile/semi-fragile
@@ -1128,14 +1138,19 @@ Block-grid embedding is sensitive to operations that move the grid: cropping,
 translation, padding, and rescaling. \pr{} addresses this with an explicit
 \emph{resynchronization} stage and is honest about its envelope. (i)~\textbf{Rescaling}:
 because the carrier is a low-frequency coefficient, moderate down/up-sampling
-preserves it; measured BER is zero under bilinear resize to $0.5\times$ and
-$0.75\times$ and under a combined JPEG\,$Q70$\,$+$\,$0.75\times$ attack
-(\S\ref{sec:eval}). (ii)~\textbf{Translation/crop}: the verifier searches a small
+largely preserves it, though not losslessly: under a bilinear resize round-trip
+the raw BER rises from $0.016$ to $0.026$ at $0.75\times$ and $0.042$ at
+$0.5\times$, and RS decoding recovers the payload on $22/24$ and $16/24$ images
+respectively ($22/24$ for a combined JPEG\,$Q70$\,$+$\,$0.75\times$ attack;
+\S\ref{sec:eval}). (ii)~\textbf{Translation/crop}: the verifier searches a small
 range of block-grid offsets $\delta$ and keeps the most confident decode
 (line~5 of Alg.~\ref{alg:verify}); since the genuine layout produces a sharp
 correlation peak (Eq.~\ref{eq:despread}) while wrong offsets give noise, the
-search recovers the payload---measured BER is zero for border crops of $1$--$6\%$
-(up to $\sim\!31$\,px) once the offset is covered. A known synchronization
+search usually recovers the payload: for top-left border crops of $1\%$, $2\%$,
+and $3\%$ (shifts of up to $23$\,px, within the $\pm28$\,px search range) RS
+decoding succeeds on $23/24$, $20/24$, and $23/24$ images. The $2\%$ case raises
+the raw BER to $0.11$, so resynchronization is not uniformly reliable; larger
+crops were not tested. A known synchronization
 template (a fixed low-frequency pattern) can extend this to scale/anchor
 estimation, as in the watermarking-sync literature. (iii)~\textbf{Limits}:
 large arbitrary crops, rotation, and projective warps that are not covered by
@@ -1219,8 +1234,9 @@ implementation on a commodity laptop CPU (Node.js~v20), over a synthetic
 $1920\times1080$ RGB frame ($\approx\!5.9$\,MB). These validate functional
 correctness and show the on-device cryptographic overhead is negligible relative
 to capture: seed derivation and full carrier-set generation complete in tens of
-microseconds, and a \mbox{SHA-256} commitment over a 6\,MP frame in
-$\approx\!3$\,ms---i.e.\ the hard binding adds far less latency than a single
+microseconds, and a \mbox{SHA-256} commitment over the $\approx\!6$\,MB $1080$p
+frame in $\approx\!3$\,ms (a true $6$\,MP RGB frame takes $\approx\!8.5$\,ms in
+the Python harness, \texttt{e5\_crypto.py})---i.e.\ the hard binding adds far less latency than a single
 exposure. Determinism (identical carriers across runs), carrier uniqueness, the
 encode/verify round-trip, and single-bit tamper rejection all hold.
 
@@ -1238,7 +1254,7 @@ encode/verify round-trip, and single-bit tamper rejection all hold.
 Payload / coded carriers            & $128$ b / $128$ pos. \\
 Seed derivation                     & $0.0024$\,ms \\
 Full signature (seed+select+bits)   & $0.018$\,ms \\
-SHA-256 commit over $6$\,MP frame    & $3.09$\,ms \\
+SHA-256 commit over $1080$p frame ($6$\,MB) & $3.09$\,ms \\
 Carrier determinism (re-run)        & identical ($\checkmark$) \\
 Carrier coordinate uniqueness       & $\checkmark$ \\
 Encode$\rightarrow$verify round-trip & pass ($\checkmark$) \\
@@ -1271,11 +1287,13 @@ Table~\ref{tab:robust} reports the raw (pre-ECC) coded-bit BER and the
 \emph{end-to-end} payload-decode success after RS correction. On real content the
 raw channel is not error-free---mean BER $\approx\!1.6\%$, content-dependent up to
 $13\%$ on the most textured frame---but the RS code recovers the exact $128$-bit
-payload on \mbox{$23/24$} images through real JPEG from $Q\!=\!95$ down to
-$Q\!=\!20$ (and $21/24$ at the extreme $Q\!=\!10$), WebP, Gaussian noise to
-$\sigma\!=\!20$, blur, resize to
-$0.5$--$1.5\times$, all photometric edits, translational crops of $1$--$3\%$ with
-resync, and combined JPEG$+$resize. Failures are honest and informative: a single
+payload on \mbox{$22$--$23/24$} images through real JPEG from $Q\!=\!95$ down to
+$Q\!=\!20$ (and $21/24$ at the extreme $Q\!=\!10$), Gaussian noise to
+$\sigma\!=\!20$, and light blur ($\sigma\!=\!0.5$), and on $20$--$22/24$ under
+WebP, resize to $0.75$--$1.5\times$, photometric edits, translational crops of
+$1$--$3\%$ with resync, and combined JPEG$+$resize. Recovery is weaker under
+stronger blur ($\sigma\!=\!1.0$: $19/24$) and $0.5\times$ resize ($16/24$).
+Failures are honest and informative: a single
 very-high-frequency frame exceeds the ECC capacity at $A\!\le\!6$, and
 \emph{geometric} rotation ($\pm1$--$2^\circ$) and resized-crop drive BER to
 $\approx\!0.5$---a documented limitation requiring explicit rotation/scale
@@ -1309,14 +1327,17 @@ error; ``decode'' is exact post-ECC payload recovery.}
 \toprule
 \textbf{Attack} & \textbf{raw BER} & \textbf{decode} \\
 \midrule
-JPEG $Q95$--$Q20$                  & $0.016$ & $23/24$ \\
+JPEG $Q95$--$Q20$                  & $0.016$ & $22$--$23/24$ \\
 JPEG $Q10$                         & $0.022$ & $21/24$ \\
 WebP $q80,\,q60$                   & $0.022$ & $21$--$22/24$ \\
 Gaussian noise $\sigma\!\le\!20$   & $0.017$ & $23/24$ \\
 Gaussian blur $\sigma\!=\!0.5$     & $0.018$ & $23/24$ \\
+Gaussian blur $\sigma\!=\!1.0$     & $0.033$ & $19/24$ \\
 Resize $0.75\times,\,1.5\times$    & $0.025$ & $22/24$ \\
+Resize $0.5\times$                 & $0.042$ & $16/24$ \\
 Bright/contrast/gamma $\pm10\%$    & $0.017$ & $21$--$23/24$ \\
 Crop $1\%,3\%$ $+$ resync          & $0.018$ & $23/24$ \\
+Crop $2\%$ $+$ resync              & $0.112$ & $20/24$ \\
 JPEG$Q70$ $+$ resize $0.75\times$  & $0.026$ & $22/24$ \\
 \midrule
 JPEG $Q5$ (beyond range)           & $0.221$ & $0/24$ \\
@@ -1394,8 +1415,8 @@ Block TPR / FPR            & $0.914/0.037$ & $0.927/0.104$ \\
 \centering
 \includegraphics[width=0.92\textwidth]{fig_results.pdf}
 \caption{Measured results on real public images. (a) In-pixel channel raw BER vs.\
-real-JPEG quality on Kodak (flat through $Q10$, cliff at $Q5$; RS recovers the
-payload through $Q10$). (b) Amplitude operating curve at JPEG~$Q40$ over all $24$
+real-JPEG quality on Kodak (nearly flat through $Q10$, cliff at $Q5$; RS recovers
+the payload on $21$--$23/24$ images through $Q10$). (b) Amplitude operating curve at JPEG~$Q40$ over all $24$
 images: a genuine robustness cliff. (c) Tamper-localization ROC on real splices
 (AUC $\approx\!0.97$). (d) Passive PRNU baseline: the genuine--impostor
 correlation margin shrinks under JPEG, motivating \pr{}'s active, error-corrected
@@ -1411,7 +1432,7 @@ clean images, but the genuine--impostor NCC margin shrinks from $+0.019$ (clean)
 to $+0.004$ at JPEG~$Q50$ and PCE drops $\sim\!18\%$
 (Fig.~\ref{fig:results}(d))---the well-known fragility of passive forensics under
 recompression that \pr{}'s \emph{active}, error-corrected mark is designed to
-overcome (it recovers the payload through $Q10$, Table~\ref{tab:robust}).
+overcome (it recovers the payload on $21/24$ images at $Q10$, Table~\ref{tab:robust}).
 
 \noindent\textbf{Scope and threats to validity.} These results validate the
 \emph{algorithmic} core---carrier design, host-suppressed spread-spectrum
