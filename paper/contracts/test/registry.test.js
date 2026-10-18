@@ -127,19 +127,20 @@ describe("PixelRootRegistry", function () {
     it("accepts a capture signed by a certified, unrevoked sensor", async function () {
       const recs = [rand(), rand(), rand()];
       const r = await capture(recs);
-      const [inc, t, dev] = await reg.verifyCapture(
+      const [inc, t, blk, dev] = await reg.verifyCapture(
         hex(r), hex(recs[2]), proof(recs, 2).map(hex),
-        hex(lotRoot), hex(deviceKeys[1]), proof(deviceKeys, 1).map(hex));
+        oem.address, hex(lotRoot), hex(deviceKeys[1]), proof(deviceKeys, 1).map(hex));
       expect(inc).to.equal(true);
       expect(t).to.be.greaterThan(0n);
+      expect(blk).to.be.greaterThan(0n);
       expect(dev).to.equal(true);
     });
 
     it("rejects a sensor key that is not in the lot", async function () {
       const recs = [rand()];
       const r = await capture(recs);
-      const [, , dev] = await reg.verifyCapture(hex(r), hex(recs[0]), [],
-        hex(lotRoot), hex(rand()), proof(deviceKeys, 0).map(hex));
+      const [, , , dev] = await reg.verifyCapture(hex(r), hex(recs[0]), [],
+        oem.address, hex(lotRoot), hex(rand()), proof(deviceKeys, 0).map(hex));
       expect(dev).to.equal(false);
     });
 
@@ -152,19 +153,19 @@ describe("PixelRootRegistry", function () {
       const after = [rand()];
       const rAfter = await capture(after);
       const p = proof(deviceKeys, 3).map(hex);
-      const [, , devBefore] = await reg.verifyCapture(hex(rBefore), hex(before[0]), [], hex(lotRoot), hex(deviceKeys[3]), p);
-      const [, , devAfter] = await reg.verifyCapture(hex(rAfter), hex(after[0]), [], hex(lotRoot), hex(deviceKeys[3]), p);
+      const [, , , devBefore] = await reg.verifyCapture(hex(rBefore), hex(before[0]), [], oem.address, hex(lotRoot), hex(deviceKeys[3]), p);
+      const [, , , devAfter] = await reg.verifyCapture(hex(rAfter), hex(after[0]), [], oem.address, hex(lotRoot), hex(deviceKeys[3]), p);
       expect(devBefore).to.equal(true);
       expect(devAfter).to.equal(false);
       // other sensors in the lot are unaffected
-      const [, , other] = await reg.verifyCapture(hex(rAfter), hex(after[0]), [], hex(lotRoot), hex(deviceKeys[0]), proof(deviceKeys, 0).map(hex));
+      const [, , , other] = await reg.verifyCapture(hex(rAfter), hex(after[0]), [], oem.address, hex(lotRoot), hex(deviceKeys[0]), proof(deviceKeys, 0).map(hex));
       expect(other).to.equal(true);
     });
 
-    it("only the certifying manufacturer can revoke, and only lot members", async function () {
+    it("only the certifying manufacturer can revoke (its own lot), and only lot members", async function () {
       await reg.addManufacturer(oem2.address);
       const p = proof(deviceKeys, 0).map(hex);
-      await expect(reg.connect(oem2).revokeDevice(hex(lotRoot), hex(deviceKeys[0]), p)).to.be.revertedWith("not lot manufacturer");
+      await expect(reg.connect(oem2).revokeDevice(hex(lotRoot), hex(deviceKeys[0]), p)).to.be.revertedWith("unknown lot");
       await expect(reg.connect(oem).revokeDevice(hex(lotRoot), hex(rand()), p)).to.be.revertedWith("device not in lot");
       await reg.connect(oem).revokeDevice(hex(lotRoot), hex(deviceKeys[0]), p);
       await expect(reg.connect(oem).revokeDevice(hex(lotRoot), hex(deviceKeys[0]), p)).to.be.revertedWith("already revoked");
@@ -179,8 +180,34 @@ describe("PixelRootRegistry", function () {
       await advance(30);
       const recs = [rand()];
       const r = await capture(recs);
-      const [, , dev] = await reg.verifyCapture(hex(r), hex(recs[0]), [], hex(lotRoot), hex(deviceKeys[0]), proof(deviceKeys, 0).map(hex));
+      const [, , , dev] = await reg.verifyCapture(hex(r), hex(recs[0]), [], oem.address, hex(lotRoot), hex(deviceKeys[0]), proof(deviceKeys, 0).map(hex));
       expect(dev).to.equal(true);
+    });
+
+    it("lots are keyed by manufacturer: a front-run root cannot be hijacked", async function () {
+      await reg.addManufacturer(oem2.address);
+      const keys = [rand(), rand(), rand()];
+      const r = root(keys);
+      await reg.connect(oem2).registerLot(hex(r), 3);           // rival registers the same root first
+      await reg.connect(oem).registerLot(hex(r), 3);            // the real manufacturer still can
+      await reg.connect(oem2).revokeDevice(hex(r), hex(keys[1]), proof(keys, 1).map(hex));
+      await advance(30);
+      const recs = [rand()];
+      const cr = await capture(recs);
+      const p = proof(keys, 1).map(hex);
+      const [, , , mine] = await reg.verifyCapture(hex(cr), hex(recs[0]), [], oem.address, hex(r), hex(keys[1]), p);
+      const [, , , theirs] = await reg.verifyCapture(hex(cr), hex(recs[0]), [], oem2.address, hex(r), hex(keys[1]), p);
+      expect(mine).to.equal(true);
+      expect(theirs).to.equal(false);
+    });
+
+    it("records the sealing block number for anchor checks", async function () {
+      const recs = [rand()];
+      const r = root(recs);
+      const rc = await (await reg.connect(anyone).register(hex(r), 1)).wait();
+      expect(await reg.sealedBlock(hex(r))).to.equal(BigInt(rc.blockNumber));
+      const [, , blk] = await reg.verifyCapture(hex(r), hex(recs[0]), [], oem.address, hex(lotRoot), hex(deviceKeys[0]), proof(deviceKeys, 0).map(hex));
+      expect(blk).to.equal(BigInt(rc.blockNumber));
     });
 
     it("manufacturer revocation invalidates its sensors from that time on", async function () {
@@ -192,8 +219,8 @@ describe("PixelRootRegistry", function () {
       const after = [rand()];
       const rAfter = await capture(after);
       const p = proof(deviceKeys, 2).map(hex);
-      expect((await reg.verifyCapture(hex(rBefore), hex(before[0]), [], hex(lotRoot), hex(deviceKeys[2]), p))[2]).to.equal(true);
-      expect((await reg.verifyCapture(hex(rAfter), hex(after[0]), [], hex(lotRoot), hex(deviceKeys[2]), p))[2]).to.equal(false);
+      expect((await reg.verifyCapture(hex(rBefore), hex(before[0]), [], oem.address, hex(lotRoot), hex(deviceKeys[2]), p))[3]).to.equal(true);
+      expect((await reg.verifyCapture(hex(rAfter), hex(after[0]), [], oem.address, hex(lotRoot), hex(deviceKeys[2]), p))[3]).to.equal(false);
     });
 
     it("a lot certified after the capture does not validate it (no retroactive certification)", async function () {
@@ -202,7 +229,7 @@ describe("PixelRootRegistry", function () {
       await advance(60);
       const late = [rand(), rand()];
       await reg.connect(oem).registerLot(hex(root(late)), 2);
-      const [, , dev] = await reg.verifyCapture(hex(r), hex(recs[0]), [], hex(root(late)), hex(late[0]), proof(late, 0).map(hex));
+      const [, , , dev] = await reg.verifyCapture(hex(r), hex(recs[0]), [], oem.address, hex(root(late)), hex(late[0]), proof(late, 0).map(hex));
       expect(dev).to.equal(false);
     });
   });
@@ -224,7 +251,7 @@ describe("PixelRootRegistry", function () {
       const r = root(recs);
       await reg.register(hex(r), recs.length);
       const est = await reg.verifyCapture.estimateGas(hex(r), hex(recs[42]), proof(recs, 42).map(hex),
-        hex(bigRoot), hex(big[3]), proof(big, 3).map(hex));
+        oem.address, hex(bigRoot), hex(big[3]), proof(big, 3).map(hex));
       rows.push(["verifyCapture (eth_call, 10^4 batch, 1024 lot)", est]);
       const byName = Object.fromEntries(rows);
       const report = {

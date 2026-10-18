@@ -9,6 +9,7 @@ from math import comb
 import numpy as np
 
 import ledger
+import pixelroot as pr
 
 OUT = os.path.join(os.path.dirname(__file__), "results"); os.makedirs(OUT, exist_ok=True)
 
@@ -29,18 +30,15 @@ def bench_sha256():
     return res
 
 def bench_seed_select():
-    """Seed derivation + keyed carrier-selection time (128 bits x R=25 over 32400
-    blocks for a 1080p frame), pure-Python reference."""
-    key = b"PIXELROOT-OEM-KEY-v2"
-    payload = np.random.RandomState(1).randint(0, 256, 16, dtype=np.uint8).tobytes()
+    """Carrier-layout generation as deployed in pixelroot.keyed_plan (key-only
+    seed, permutation of all blocks, antipodal chips) for 384 RS-coded bits over
+    a 1080p frame (32,400 blocks, R = 84)."""
     n_blocks = (1920 // 8) * (1080 // 8)
+    R = n_blocks // 384
     REP = 200
     t0 = time.perf_counter()
     for _ in range(REP):
-        seed = int.from_bytes(hashlib.sha256(key + payload).digest()[:4], "big")
-        rng = np.random.RandomState(seed)
-        sel = rng.permutation(n_blocks)[:3200]
-        chips = rng.choice(np.array([-1, 1]), size=3200)
+        pr.keyed_plan("PIXELROOT-OEM-KEY-v2", 384, R, n_blocks)
     dt = (time.perf_counter() - t0) / REP * 1000
     return dt, n_blocks
 
@@ -96,7 +94,7 @@ def main():
     L.append("[C10] SHA-256 commitment timing (mean of 20 runs):")
     for k, v in sha.items():
         L.append(f"   {k:<34} {v:.2f} ms")
-    L.append(f"   seed derivation + carrier selection (128b x R=25, {nblk} blocks): {seed_dt:.3f} ms")
+    L.append(f"   carrier layout (384 coded bits x R=84, {nblk} blocks, keyed_plan): {seed_dt:.3f} ms")
     L.append("")
     L.append("[C11] Merkle batching (domain-separated sorted-pair SHA-256; ledger.py == PixelRootRegistry.sol):")
     L.append(f"   {'N leaves':<12}{'build (ms)':<14}{'path len':<12}{'proof bytes'}")

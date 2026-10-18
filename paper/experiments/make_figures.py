@@ -263,10 +263,10 @@ def fig_datapath():
     y = 2.4; h = 0.95
     blocks = [
         (0.2, 1.7, "Pixel array\n(PD + gain\nselect)", "#cfe3ff"),
-        (2.1, 1.5, "Keyed PRNG\nseed = H(k \u2225 W \u2225 H)\nselect carriers", "#eef3ff"),
+        (2.1, 1.5, "Keyed PRNG\nseed = H(k)\nselect carriers", "#eef3ff"),
         (3.8, 1.5, "Gain/exposure\nmodulation\n(\u00b1 chip)", "#d8f0d8"),
         (5.5, 1.4, "ADC + ISP\n(readout)", "white"),
-        (7.1, 1.5, "Sign record r\n(on-die sk)\nh = H(r \u2225 \u03c3)", "#ffe9c7"),
+        (7.1, 1.5, "Sign record r\n(on-die sk)\nh = H(r \u2225 \u03c8)", "#ffe9c7"),
         (8.8, 1.5, "Merkle batch\n+ smart\ncontract", "#ffd9d4"),
         (10.5, 0.9, "Public\nledger", "#e8e8e8"),
     ]
@@ -280,7 +280,7 @@ def fig_datapath():
     box(ax, 3.8, 0.7, 1.5, 0.7, "payload m \u2192 RS\n(ID, time, GPS)", fc="white", ec=ACC, fs=7.6, tc=ACC)
     arrow(ax, 4.55, 1.4, 4.55, y - 0.02, c=ACC)
     # sensor key, certified on chain
-    box(ax, 7.1, 0.7, 1.5, 0.7, "sensor key sk\n(cert. in lot \u03bb)", fc="white", ec=RD, fs=7.6, tc=RD)
+    box(ax, 7.1, 0.7, 1.5, 0.7, "sensor key sk\n(cert. in lot \u039b)", fc="white", ec=RD, fs=7.6, tc=RD)
     arrow(ax, 7.85, 1.4, 7.85, y - 0.02, c=RD)
     # OEM key
     box(ax, 2.1, 0.7, 1.5, 0.7, "carrier key k\n(OEM)", fc="white", ec=ACC, fs=7.6, tc=ACC)

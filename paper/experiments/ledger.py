@@ -86,32 +86,32 @@ class Registry:
 
     def register_lot(self, m, lot_root):
         assert m in self.manufacturer_since and m not in self.manufacturer_revoked
-        assert lot_root not in self.lots
-        self.lots[lot_root] = (m, self.now)
+        assert (m, lot_root) not in self.lots  # lots are keyed by (manufacturer, root)
+        self.lots[(m, lot_root)] = self.now
 
     def revoke_device(self, m, lot_root, key_hash, proof):
-        assert self.lots[lot_root][0] == m and verify(lot_root, key_hash, proof)
-        self.device_revoked.setdefault((lot_root, key_hash), self.now)
+        assert (m, lot_root) in self.lots and verify(lot_root, key_hash, proof)
+        self.device_revoked.setdefault((m, lot_root, key_hash), self.now)
 
     def register(self, root):
         assert root not in self.sealed
         self.sealed[root] = self.now
 
-    def device_valid_at(self, lot_root, key_hash, proof, t):
-        if lot_root not in self.lots:
-            return False
-        m, lot_t = self.lots[lot_root]
-        if lot_t > t:
+    def device_valid_at(self, m, lot_root, key_hash, proof, t):
+        lot_t = self.lots.get((m, lot_root))
+        if lot_t is None or lot_t > t:
             return False
         if m in self.manufacturer_revoked and self.manufacturer_revoked[m] <= t:
             return False
-        rev = self.device_revoked.get((lot_root, key_hash))
+        rev = self.device_revoked.get((m, lot_root, key_hash))
         if rev is not None and rev <= t:
             return False
         return verify(lot_root, key_hash, proof)
 
-    def verify_capture(self, root, record_hash, proof, lot_root, key_hash, dev_proof):
+    def verify_capture(self, root, record_hash, proof, m, lot_root, key_hash, dev_proof):
+        """Mirrors PixelRootRegistry.verifyCapture; in this model the block number
+        and the block time are the same clock (`now`)."""
         t = self.sealed.get(root)
         if t is None:
-            return False, None, False
-        return verify(root, record_hash, proof), t, self.device_valid_at(lot_root, key_hash, dev_proof, t)
+            return False, None, None, False
+        return verify(root, record_hash, proof), t, t, self.device_valid_at(m, lot_root, key_hash, dev_proof, t)

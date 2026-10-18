@@ -40,6 +40,7 @@ class SensorChip:
         self._key = ec.generate_private_key(ec.SECP256R1())
         self.public_key = self._key.public_key().public_bytes(
             serialization.Encoding.X962, serialization.PublicFormat.CompressedPoint)
+        self.counter = 0  # monotonic capture counter kept in the sensor
 
     @property
     def key_hash(self):
@@ -62,6 +63,7 @@ class Manufacturer:
         lot_root = ledger.merkle_root(key_hashes)
         self.registry.register_lot(self.name, lot_root)
         for i, c in enumerate(chips):
+            c.manufacturer = self.name
             c.lot_root = lot_root
             c.lot_proof = ledger.merkle_proof(key_hashes, i)
         return chips, key_hashes
@@ -71,42 +73,46 @@ class Manufacturer:
 
 # ------------------------------------------------------- content fingerprint
 
-FP_GRID = 4      # 4x4 tiles
-FP_SIDE = 32     # each tile is box-downsampled to 32x32 luma
-FP_KEEP = 8      # keep the 8x8 lowest DCT coefficients, minus DC -> 63 per tile
-FP_FLOOR = 800.0 # energy floor so flat tiles (sky, walls) do not dominate
-
-
-def _tile_box(W, H, tx, ty):
-    return (tx * W // FP_GRID, ty * H // FP_GRID, (tx + 1) * W // FP_GRID, (ty + 1) * H // FP_GRID)
+FP_MARGIN = 32   # border excluded from the fingerprint; >= the largest supported crop offset
+FP_GRID = 8      # 8x8 tiles over the interior
+FP_SIDE = 16     # each tile is box-downsampled to 16x16 luma
+FP_KEEP = 8      # keep the 8x8 lowest DCT coefficients, DC included (tile mean vs. frame mean)
+FP_FLOOR = 300.0 # energy floor so flat tiles (sky, walls) do not dominate
 
 
 def fingerprint(rgb_u8):
-    """Robust content fingerprint: for each tile of a 4x4 grid, the 63 lowest
-    non-DC DCT coefficients of its 32x32 box-downsampled luma, quantised to int8
-    with a per-tile scale (1,072 bytes). Stable under compression, noise, mild
-    blur, rescaling and photometric edits; changes when a tile's content does."""
-    g = Image.fromarray(np.asarray(rgb_u8, dtype=np.uint8)).convert("L")
-    W, H = g.size
-    feats = np.zeros((FP_GRID * FP_GRID, FP_KEEP * FP_KEEP - 1))
+    """Robust content fingerprint of the frame interior (a FP_MARGIN border is
+    excluded so that translational crops up to that size remove nothing it
+    covers). For each tile of an 8x8 grid: the 8x8 lowest DCT coefficients of
+    its 16x16 box-downsampled luma, taken relative to the interior's mean and
+    quantised to int16 with a per-tile scale (8,448 bytes)."""
+    y = np.asarray(Image.fromarray(np.asarray(rgb_u8, dtype=np.uint8)).convert("L"), dtype=np.float64)
+    H, W = y.shape
+    inner = y[FP_MARGIN:H - FP_MARGIN, FP_MARGIN:W - FP_MARGIN]
+    h, w = inner.shape
+    mean = inner.mean()
+    feats = np.zeros((FP_GRID * FP_GRID, FP_KEEP * FP_KEEP))
     for ty in range(FP_GRID):
         for tx in range(FP_GRID):
-            a = np.asarray(g.crop(_tile_box(W, H, tx, ty)).resize((FP_SIDE, FP_SIDE), Image.BOX), dtype=np.float64)
-            feats[ty * FP_GRID + tx] = dctn(a, norm="ortho")[:FP_KEEP, :FP_KEEP].ravel()[1:]
+            t = inner[ty * h // FP_GRID:(ty + 1) * h // FP_GRID, tx * w // FP_GRID:(tx + 1) * w // FP_GRID]
+            a = np.asarray(Image.fromarray(t).resize((FP_SIDE, FP_SIDE), Image.BOX), dtype=np.float64)
+            feats[ty * FP_GRID + tx] = dctn(a - mean, norm="ortho")[:FP_KEEP, :FP_KEEP].ravel()
     return feats
 
 
-def fp_distance(ref, test, skip=()):
-    """Largest per-tile relative L2 distance ||ref - test|| / (||ref|| + floor),
-    ignoring tiles in `skip` (tiles the verifier knows were cropped away)."""
-    d = np.linalg.norm(ref - test, axis=1) / (np.linalg.norm(ref, axis=1) + FP_FLOOR)
-    keep = [i for i in range(len(d)) if i not in set(skip)]
-    return float(d[keep].max()) if keep else float("inf")
+def fp_tile_distances(ref, test):
+    """Per-tile relative L2 distance ||ref - test|| / (||ref|| + floor)."""
+    return np.linalg.norm(ref - test, axis=1) / (np.linalg.norm(ref, axis=1) + FP_FLOOR)
+
+
+def fp_distance(ref, test):
+    """Largest per-tile distance (Eq. fpdist)."""
+    return float(fp_tile_distances(ref, test).max())
 
 
 def fp_to_hex(fp):
-    scale = np.maximum(np.abs(fp).max(axis=1), 1e-9) / 127.0
-    q = np.round(fp / scale[:, None]).astype(np.int8)
+    scale = np.maximum(np.abs(fp).max(axis=1), 1e-9) / 32767.0
+    q = np.round(fp / scale[:, None]).astype(np.int16)
     return (scale.astype(np.float32).tobytes() + q.tobytes()).hex()
 
 
@@ -114,17 +120,8 @@ def fp_from_hex(h):
     raw = bytes.fromhex(h)
     n = FP_GRID * FP_GRID
     scale = np.frombuffer(raw[: 4 * n], dtype=np.float32).astype(np.float64)
-    q = np.frombuffer(raw[4 * n:], dtype=np.int8).astype(np.float64).reshape(n, -1)
+    q = np.frombuffer(raw[4 * n:], dtype=np.int16).astype(np.float64).reshape(n, -1)
     return q * scale[:, None]
-
-
-def lost_tiles(offset):
-    """Tiles that intersect the border a translational crop removed. `offset`
-    is the block-grid resync offset (oy, ox) found by the in-pixel decoder."""
-    oy, ox = offset
-    rows = ({0} if oy < 0 else set()) | ({FP_GRID - 1} if oy > 0 else set())
-    cols = ({0} if ox < 0 else set()) | ({FP_GRID - 1} if ox > 0 else set())
-    return {r * FP_GRID + c for r in range(FP_GRID) for c in range(FP_GRID) if r in rows or c in cols}
 
 # ------------------------------------------------------------ capture record
 
@@ -146,6 +143,7 @@ def make_record(chip, payload, marked_u8, encoded, anchor):
     core = {
         "v": RECORD_VERSION,
         "sensor_pub": chip.public_key.hex(),
+        "manufacturer": chip.manufacturer,
         "lot_root": chip.lot_root.hex(),
         "payload": bytes(payload).hex(),
         "h_raw": hashlib.sha256(marked_u8.tobytes()).hexdigest(),
@@ -153,7 +151,9 @@ def make_record(chip, payload, marked_u8, encoded, anchor):
         "fp": fp_to_hex(fingerprint(marked_u8)),
         "anchor_block": anchor[0],
         "anchor_hash": anchor[1].hex(),
+        "ctr": chip.counter,
     }
+    chip.counter += 1
     sig = chip.sign(canonical(core))
     rec = {"core": core, "sig": sig.hex(), "lot_proof": [p.hex() for p in chip.lot_proof]}
     return rec
@@ -175,32 +175,36 @@ def check_signature(rec):
 
 class Verifier:
     """End-to-end verification of a questioned file. `index` maps an in-pixel
-    payload to its published record and Merkle proof (the off-chain record
-    store); `registry` is the ledger; `tau` bounds the fingerprint distance."""
+    payload to the list of published (record, batch root, Merkle proof) entries
+    carrying it (the off-chain record store, which is untrusted: every entry is
+    checked against the ledger); `registry` is the ledger; `tau` bounds the
+    fingerprint distance. `max_off` must not exceed FP_MARGIN."""
 
     def __init__(self, registry, index, carrier_key, R_for, tau, max_off=28):
         self.registry, self.index, self.key = registry, index, carrier_key
         self.R_for, self.tau, self.max_off = R_for, tau, max_off
         # V1 lookup: file digests committed in published records
+        assert max_off <= FP_MARGIN
         self.by_digest = {}
-        for entry in index.values():
-            core = entry[0]["core"]
-            self.by_digest[core["h_enc"]] = entry
-            self.by_digest[core["h_raw"]] = entry
+        for entries in index.values():
+            for entry in entries:
+                core = entry[0]["core"]
+                self.by_digest[core["h_enc"]] = entry
+                self.by_digest[core["h_raw"]] = entry
 
     def ledger_ok(self, rec, batch_root, proof):
         if not check_signature(rec):
             return False, "bad signature"
         core = rec["core"]
         key_hash = hashlib.sha256(bytes.fromhex(core["sensor_pub"])).digest()
-        inc, t, dev = self.registry.verify_capture(
-            batch_root, record_hash(rec), proof, bytes.fromhex(core["lot_root"]), key_hash,
-            [bytes.fromhex(p) for p in rec["lot_proof"]])
+        inc, t, sealed_block, dev = self.registry.verify_capture(
+            batch_root, record_hash(rec), proof, core["manufacturer"], bytes.fromhex(core["lot_root"]),
+            key_hash, [bytes.fromhex(p) for p in rec["lot_proof"]])
         if not inc:
             return False, "not notarized"
         if not dev:
             return False, "sensor not valid at seal time"
-        if core["anchor_block"] > t:
+        if core["anchor_block"] > sealed_block:
             return False, "anchor after seal"
         if bytes.fromhex(core["anchor_hash"]) != self.registry.block_hash(core["anchor_block"]):
             return False, "anchor hash not on chain"
@@ -222,21 +226,28 @@ class Verifier:
         return (payload if ok else None), off
 
     def verify(self, file_bytes, rgb_u8):
+        """Returns (verdict, reason). A Transcoded-consistent verdict means the
+        file is derived from the capture its record describes (same scene at the
+        fingerprint's resolution); only Camera-original certifies exact pixels."""
         # V1: the exact file (camera encoding or raw readout) is committed in a valid record
         if file_bytes is not None:
             entry = self.by_digest.get(hashlib.sha256(file_bytes).hexdigest())
             if entry is not None and self.ledger_ok(*entry)[0]:
                 return "Camera-original", "exact"
-        # V2: in-pixel payload -> record -> content fingerprint
+        # V2: in-pixel payload -> candidate records -> content fingerprint
         payload, off = self.decode(rgb_u8)
         if payload is None or payload.hex() not in self.index:
             return "Unverified", "no payload"
-        rec, batch_root, proof = self.index[payload.hex()]
-        good, why = self.ledger_ok(rec, batch_root, proof)
-        if not good:
-            return "Unverified", why
         aligned = np.roll(np.roll(np.asarray(rgb_u8), -off[0], axis=0), -off[1], axis=1)
-        d = fp_distance(fp_from_hex(rec["core"]["fp"]), fingerprint(aligned), lost_tiles(off))
-        if d <= self.tau:
-            return "Transcoded-consistent", f"fp {d:.3f}"
-        return "Unverified", f"content mismatch {d:.3f}"
+        fp = fingerprint(aligned)
+        why = "no valid record"
+        for rec, batch_root, proof in self.index[payload.hex()]:
+            good, why_rec = self.ledger_ok(rec, batch_root, proof)
+            if not good:
+                why = why_rec
+                continue
+            d = fp_distance(fp_from_hex(rec["core"]["fp"]), fp)
+            if d <= self.tau:
+                return "Transcoded-consistent", f"fp {d:.3f}"
+            why = f"content mismatch {d:.3f}"
+        return "Unverified", why

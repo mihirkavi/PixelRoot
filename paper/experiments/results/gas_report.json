@@ -1,7 +1,7 @@
 {
  "evm": "solc 0.8.24, optimizer 200 runs, Hardhat network",
- "register": 46605,
- "registerLot": 51355,
- "revokeDevice": 65419,
- "verifyCapture": 71362
+ "register": 47016,
+ "registerLot": 51626,
+ "revokeDevice": 65883,
+ "verifyCapture": 72205
 }

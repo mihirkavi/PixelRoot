@@ -63,9 +63,23 @@ def test_registry_revocation_is_time_scoped():
     reg.tick()
     oem.revoke(c)
     t_rev = reg.now
-    assert reg.device_valid_at(c.lot_root, c.key_hash, c.lot_proof, t_before)
-    assert not reg.device_valid_at(c.lot_root, c.key_hash, c.lot_proof, t_rev)
-    assert reg.device_valid_at(chips[0].lot_root, chips[0].key_hash, chips[0].lot_proof, t_rev)
+    assert reg.device_valid_at("OEM", c.lot_root, c.key_hash, c.lot_proof, t_before)
+    assert not reg.device_valid_at("OEM", c.lot_root, c.key_hash, c.lot_proof, t_rev)
+    assert reg.device_valid_at("OEM", chips[0].lot_root, chips[0].key_hash, chips[0].lot_proof, t_rev)
+
+
+def test_lots_are_keyed_by_manufacturer():
+    reg = ledger.Registry()
+    oem = di.Manufacturer("OEM", reg)
+    rival = di.Manufacturer("RIVAL", reg)
+    keys = [H(f"k{i}") for i in range(3)]
+    root = ledger.merkle_root(keys)
+    reg.register_lot("RIVAL", root)          # front-run with the same root
+    reg.register_lot("OEM", root)
+    reg.revoke_device("RIVAL", root, keys[0], ledger.merkle_proof(keys, 0))
+    reg.tick()
+    assert reg.device_valid_at("OEM", root, keys[0], ledger.merkle_proof(keys, 0), reg.now)
+    assert not reg.device_valid_at("RIVAL", root, keys[0], ledger.merkle_proof(keys, 0), reg.now)
 
 
 def test_lot_after_capture_does_not_validate():
@@ -74,7 +88,7 @@ def test_lot_after_capture_does_not_validate():
     t0 = reg.now
     reg.tick()
     chips, _ = oem.produce_lot(2)
-    assert not reg.device_valid_at(chips[0].lot_root, chips[0].key_hash, chips[0].lot_proof, t0)
+    assert not reg.device_valid_at("OEM", chips[0].lot_root, chips[0].key_hash, chips[0].lot_proof, t0)
 
 
 def _scene(seed=0, h=256, w=256):
@@ -105,8 +119,37 @@ def test_record_signature_detects_tampering():
     assert not di.check_signature(rec)
 
 
-def test_lost_tiles_follow_crop_direction():
-    assert di.lost_tiles((0, 0)) == set()
-    top_left = di.lost_tiles((-5, -5))
-    assert 0 in top_left and di.FP_GRID * di.FP_GRID - 1 not in top_left
-    assert len(top_left) == 2 * di.FP_GRID - 1
+def test_fingerprint_ignores_border_within_margin():
+    a = _scene(4, 320, 320).astype(np.uint8)
+    f = di.fingerprint(a)
+    b = a.copy()
+    b[: di.FP_MARGIN - 1] = 0          # rewrite a strip inside the margin
+    assert di.fp_distance(f, di.fingerprint(b)) < 1e-9
+    c = a.copy()
+    c[160:200, 160:200] = 255 - c[160:200, 160:200]   # change interior content
+    assert di.fp_distance(f, di.fingerprint(c)) > 0.3
+
+
+def test_sensor_counter_is_monotonic():
+    reg = ledger.Registry()
+    chips, _ = di.Manufacturer("OEM", reg).produce_lot(1)
+    img = _scene(5).astype(np.uint8)
+    r1 = di.make_record(chips[0], b"\x01" * 16, img, di.jpeg_bytes(img), (reg.now, reg.block_hash(reg.now)))
+    r2 = di.make_record(chips[0], b"\x01" * 16, img, di.jpeg_bytes(img), (reg.now, reg.block_hash(reg.now)))
+    assert r2["core"]["ctr"] == r1["core"]["ctr"] + 1
+
+
+def test_anchor_hash_must_match_chain():
+    reg = ledger.Registry()
+    chips, _ = di.Manufacturer("OEM", reg).produce_lot(1)
+    reg.tick()
+    img = _scene(6).astype(np.uint8)
+    good = di.make_record(chips[0], b"\x02" * 16, img, di.jpeg_bytes(img), (reg.now, reg.block_hash(reg.now)))
+    bad = di.make_record(chips[0], b"\x03" * 16, img, di.jpeg_bytes(img), (1, b"\x00" * 32))
+    reg.tick()
+    hs = [di.record_hash(good), di.record_hash(bad)]
+    root = ledger.merkle_root(hs)
+    reg.register(root)
+    ver = di.Verifier(reg, {}, "k", lambda n: 1, 0.5)
+    assert ver.ledger_ok(good, root, ledger.merkle_proof(hs, 0))[0]
+    assert ver.ledger_ok(bad, root, ledger.merkle_proof(hs, 1)) == (False, "anchor hash not on chain")

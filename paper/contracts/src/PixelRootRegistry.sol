@@ -29,19 +29,24 @@ contract PixelRootRegistry {
     mapping(address => uint64) public manufacturerSince;
     /// manufacturer => block time it was revoked (0 == active)
     mapping(address => uint64) public manufacturerRevokedAt;
-    /// lot root (Merkle root of sensor key hashes) => lot
+    /// lotKey(manufacturer, lot root) => lot. Keying by manufacturer means no
+    /// party can claim, or revoke within, another manufacturer's lot.
     mapping(bytes32 => Lot) public lots;
-    /// keccak256(lotRoot, deviceKeyHash) => block time the sensor key was revoked
+    /// keccak256(lotKey, deviceKeyHash) => block time the sensor key was revoked
     mapping(bytes32 => uint64) public deviceRevokedAt;
-    /// capture-batch root => block time it was sealed (0 == unknown)
-    mapping(bytes32 => uint64) public sealedAt;
+    /// capture-batch root => when it was sealed (time 0 == unknown); one slot
+    struct Seal {
+        uint64 time;        // block timestamp
+        uint64 blockNumber; // block number, compared with a record's anchor block
+    }
+    mapping(bytes32 => Seal) internal seals;
 
     event GovernanceTransferred(address indexed from, address indexed to);
     event ManufacturerAdded(address indexed manufacturer, uint64 timestamp);
     event ManufacturerRevoked(address indexed manufacturer, uint64 timestamp);
     event LotRegistered(bytes32 indexed lotRoot, address indexed manufacturer, uint64 timestamp, uint32 deviceCount);
-    event DeviceRevoked(bytes32 indexed lotRoot, bytes32 indexed deviceKeyHash, uint64 timestamp);
-    event RootRegistered(bytes32 indexed root, address indexed submitter, uint64 timestamp, uint256 leafCount);
+    event DeviceRevoked(address indexed manufacturer, bytes32 indexed lotRoot, bytes32 indexed deviceKeyHash, uint64 timestamp);
+    event RootRegistered(bytes32 indexed root, address indexed submitter, uint64 timestamp, uint64 blockNumber, uint256 leafCount);
 
     modifier onlyGovernance() {
         require(msg.sender == governance, "not governance");
@@ -83,22 +88,22 @@ contract PixelRootRegistry {
     function registerLot(bytes32 lotRoot, uint32 deviceCount) external {
         require(_isActiveManufacturer(msg.sender), "not an active manufacturer");
         require(lotRoot != bytes32(0), "empty root");
-        require(lots[lotRoot].sealedAt == 0, "lot exists");
-        lots[lotRoot] = Lot(msg.sender, uint64(block.timestamp), deviceCount);
+        bytes32 key = lotKey(msg.sender, lotRoot);
+        require(lots[key].sealedAt == 0, "lot exists");
+        lots[key] = Lot(msg.sender, uint64(block.timestamp), deviceCount);
         emit LotRegistered(lotRoot, msg.sender, uint64(block.timestamp), deviceCount);
     }
 
     /// @notice Revoke one sensor key (e.g. a compromised or stolen device). Only
     ///         the manufacturer that certified the lot may revoke its members.
     function revokeDevice(bytes32 lotRoot, bytes32 deviceKeyHash, bytes32[] calldata proof) external {
-        Lot memory lot = lots[lotRoot];
-        require(lot.sealedAt != 0, "unknown lot");
-        require(lot.manufacturer == msg.sender, "not lot manufacturer");
+        bytes32 key = lotKey(msg.sender, lotRoot);
+        require(lots[key].sealedAt != 0, "unknown lot");
         require(_verify(lotRoot, deviceKeyHash, proof), "device not in lot");
-        bytes32 k = keccak256(abi.encodePacked(lotRoot, deviceKeyHash));
+        bytes32 k = keccak256(abi.encodePacked(key, deviceKeyHash));
         require(deviceRevokedAt[k] == 0, "already revoked");
         deviceRevokedAt[k] = uint64(block.timestamp);
-        emit DeviceRevoked(lotRoot, deviceKeyHash, uint64(block.timestamp));
+        emit DeviceRevoked(msg.sender, lotRoot, deviceKeyHash, uint64(block.timestamp));
     }
 
     // ---------------------------------------------------------- notarization
@@ -111,54 +116,77 @@ contract PixelRootRegistry {
     ///         sensor signature inside each record, checked against the lots.
     function register(bytes32 root, uint256 leafCount) external {
         require(root != bytes32(0), "empty root");
-        require(sealedAt[root] == 0, "already sealed");
-        sealedAt[root] = uint64(block.timestamp);
-        emit RootRegistered(root, msg.sender, uint64(block.timestamp), leafCount);
+        require(seals[root].time == 0, "already sealed");
+        seals[root] = Seal(uint64(block.timestamp), uint64(block.number));
+        emit RootRegistered(root, msg.sender, uint64(block.timestamp), uint64(block.number), leafCount);
     }
 
     // ----------------------------------------------------------- verification
 
+    function sealedAt(bytes32 root) public view returns (uint64) {
+        return seals[root].time;
+    }
+
+    function sealedBlock(bytes32 root) public view returns (uint64) {
+        return seals[root].blockNumber;
+    }
+
     function leafHash(bytes32 item) public pure returns (bytes32) {
         return sha256(abi.encodePacked(bytes1(0x00), item));
+    }
+
+    function lotKey(address manufacturer, bytes32 lotRoot) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(manufacturer, lotRoot));
     }
 
     /// @notice True iff `recordHash` is in a sealed capture batch `root`.
     function verifyInclusion(bytes32 root, bytes32 recordHash, bytes32[] calldata proof)
         external view returns (bool included, uint64 timestamp)
     {
-        timestamp = sealedAt[root];
+        timestamp = seals[root].time;
         if (timestamp == 0) return (false, 0);
         return (_verify(root, recordHash, proof), timestamp);
     }
 
-    /// @notice True iff the sensor key was certified in `lotRoot` no later than
-    ///         time `t` and neither it nor its manufacturer was revoked by `t`.
-    function deviceValidAt(bytes32 lotRoot, bytes32 deviceKeyHash, bytes32[] calldata proof, uint64 t)
-        public view returns (bool)
-    {
-        Lot memory lot = lots[lotRoot];
+    /// @notice True iff `manufacturer` certified the sensor key in `lotRoot` no
+    ///         later than time `t` and neither the key nor the manufacturer was
+    ///         revoked by `t`.
+    function deviceValidAt(
+        address manufacturer,
+        bytes32 lotRoot,
+        bytes32 deviceKeyHash,
+        bytes32[] calldata proof,
+        uint64 t
+    ) public view returns (bool) {
+        bytes32 key = lotKey(manufacturer, lotRoot);
+        Lot memory lot = lots[key];
         if (lot.sealedAt == 0 || lot.sealedAt > t) return false;
-        uint64 mRev = manufacturerRevokedAt[lot.manufacturer];
+        uint64 mRev = manufacturerRevokedAt[manufacturer];
         if (mRev != 0 && mRev <= t) return false;
-        uint64 dRev = deviceRevokedAt[keccak256(abi.encodePacked(lotRoot, deviceKeyHash))];
+        uint64 dRev = deviceRevokedAt[keccak256(abi.encodePacked(key, deviceKeyHash))];
         if (dRev != 0 && dRev <= t) return false;
         return _verify(lotRoot, deviceKeyHash, proof);
     }
 
-    /// @notice One-call ledger check for a capture: the record is sealed, and
-    ///         the signing sensor was valid at the sealing time.
+    /// @notice One-call ledger check for a capture: the record is sealed (at
+    ///         `timestamp`, in block `blockNumber`, which the verifier compares
+    ///         with the record's anchor block), and the signing sensor was valid
+    ///         at the sealing time.
     function verifyCapture(
         bytes32 root,
         bytes32 recordHash,
         bytes32[] calldata proof,
+        address manufacturer,
         bytes32 lotRoot,
         bytes32 deviceKeyHash,
         bytes32[] calldata deviceProof
-    ) external view returns (bool included, uint64 timestamp, bool deviceValid) {
-        timestamp = sealedAt[root];
-        if (timestamp == 0) return (false, 0, false);
+    ) external view returns (bool included, uint64 timestamp, uint64 blockNumber, bool deviceValid) {
+        Seal memory seal = seals[root];
+        timestamp = seal.time;
+        if (timestamp == 0) return (false, 0, 0, false);
+        blockNumber = seal.blockNumber;
         included = _verify(root, recordHash, proof);
-        deviceValid = deviceValidAt(lotRoot, deviceKeyHash, deviceProof, timestamp);
+        deviceValid = deviceValidAt(manufacturer, lotRoot, deviceKeyHash, deviceProof, timestamp);
     }
 
     // @listing-end
