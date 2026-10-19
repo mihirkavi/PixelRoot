@@ -1,107 +1,107 @@
-# Submitting PixelRoot to arXiv and IEEE TIFS
+# Submitting PixelRoot to IEEE TIFS and arXiv
 
-Target journal: **IEEE Transactions on Information Forensics and Security** (regular
-paper), formatted with the `IEEEtran` journal class. The same sources produce the
-arXiv preprint.
+One source, two versions (switch `\ifshort` in `pixelroot.tex`):
 
-## 1. Build everything
+| Version | Source | Pages | Used for |
+|---|---|---|---|
+| TIFS submission | `pixelroot_tifs.tex` (defines the switch and inputs `pixelroot.tex`) | 13, incl. references | IEEE TIFS main manuscript |
+| Full (extended) | `pixelroot.tex` | 22 | arXiv preprint; TIFS supplementary material |
+
+The TIFS version moves the manufacturing analysis (M1–M3, Figs. 2–5), the
+per-pixel localization (E3) and PRNU (E4) experiments, the background, the
+detailed related work and threat catalogue, the micro-benchmarks, the contract
+listing and the applications section into the extended version. The blockchain,
+the device-identity layer, all propositions and the E1/E2/E6 evaluation are in
+both versions.
+
+## 1. Build
 
 ```
 cd paper/submission
 bash make_bundle.sh
 ```
 
-It compiles each bundle from a clean copy and fails on unresolved references.
-Outputs in `paper/submission/dist/`:
+The script compiles both versions from a clean copy and fails if either has
+unresolved references or if the TIFS version exceeds 13 pages. Outputs in `dist/`:
 
 | File | Use |
 |---|---|
-| `pixelroot.pdf` | IEEE "Main Document – PDF" slot; also the PDF to proof-read |
-| `pixelroot_submission.zip` | IEEE "Main Manuscript" (LaTeX) slot: `pixelroot.tex`, `references.bib`, `pixelroot.bbl`, `figures/`, `contracts/src/PixelRootRegistry.sol` |
-| `pixelroot_arxiv.tar.gz` | arXiv upload: the same sources with the `.bbl` instead of the `.bib` (arXiv does not run BibTeX); verified to compile with pdfLaTeX alone |
-| `pixelroot_supplementary.zip` | Optional supplementary material: experiment code, results, contract and tests (no image data) |
+| `pixelroot_tifs.pdf` | IEEE "Main Document – PDF" |
+| `pixelroot_tifs_submission.zip` | IEEE "Main Manuscript" (LaTeX: `pixelroot_tifs.tex`, `pixelroot.tex`, `references.bib`, `pixelroot_tifs.bbl`, `figures/`, `contracts/src/…sol`) |
+| `pixelroot_supplementary.zip` | IEEE "Supplementary Material": the extended version PDF, code, results, contract and tests |
+| `pixelroot_arxiv.tar.gz` | arXiv upload: full version, `.bbl` instead of `.bib`; verified to compile with pdfLaTeX alone |
+| `pixelroot_full.pdf` | what arXiv will render, for proofreading |
 
-The cover letter (`cover_letter.tex` / `.txt`) and the conflict-of-interest
-statement (`conflict_of_interest.tex` / `.txt`) are standalone; compile with
-`pdflatex` if the portal wants PDFs.
+`arxiv_metadata.txt` and `arxiv_abstract.txt` hold the arXiv form fields. The
+cover letter and conflict-of-interest statement are standalone (`.tex`/`.txt`).
 
-## 2. Before you submit (decisions only you can make)
+## 2. Compliance check (verified 19 Oct 2026)
 
-1. **Length.** The manuscript is about 21 two-column pages. IEEE Signal Processing
-   Society journals have historically set about 10 pages as the standard length,
-   with mandatory charges for every page beyond that (historically $220/page) and a
-   hard ceiling. Check the current TIFS *Information for Authors* page. To fit
-   without touching the blockchain or the device-identity layer, the independent
-   review suggests moving to supplementary material: the manufacturing analysis
-   M1–M3 with Figs. 2–5, the per-pixel localization layer (E3) and the PRNU baseline
-   (E4); and dropping the step-by-step list, the micro-benchmark table, Listing 1
-   and the Applications section. The arXiv version can stay long.
-2. **Code availability.** The paper cites `https://github.com/mihirkavi/PixelRoot`.
-   Make the repository public (or replace the URL with a Zenodo DOI) before
-   submitting.
-3. **Title.** The title says "Real-Time Blockchain Notarization"; the paper measures
-   gas but not public-network latency (future work F4). Consider "Capture-Time" if
-   reviewers object.
-4. **References to verify by hand** (details could not be checked from primary
-   sources in this environment): `gowal2025synthid`, `yang2024steganalysis`,
-   `fernandez2024videoseal`, `c2pa2026security`, `prnubench2025`, `tugofwar2024`,
-   `resemble2025threat`, `surfshark2025fraud`, `ironscales2025`, and the other
-   2025–2026 web sources. Also consider citing the Digimarc patents on in-sensor
-   watermarking (e.g. "Digital watermarking CMOS sensor") once you confirm their
-   numbers and status.
-5. **Reproduce on your machine** (optional but recommended): `bash
-   ../experiments/fetch_data.sh`, then run the scripts listed in
-   `experiments/EXPERIMENT_PLAN.md`; every number in the paper is in
-   `experiments/results/`.
-
-## 3. arXiv
-
-1. Create an account at arxiv.org (use an institutional or professional email if
-   possible) and add your ORCID.
-2. Primary category: **cs.CR** (Cryptography and Security); cross-list **cs.CV** and
-   **eess.IV**. A first submission to cs.CR may need an **endorsement** from an
-   established cs.CR author; arXiv shows the endorsement request link during
-   submission. Allow a few days.
-3. Upload `dist/pixelroot_arxiv.tar.gz`. arXiv compiles with pdfLaTeX and the
-   bundle has been tested that way. Check the generated PDF carefully.
-4. Metadata: copy the title, and paste the abstract as plain text (no LaTeX
-   macros: write PixelRoot, 128-bit, Reed-Solomon, Q20, 78%, etc.). Comments field,
-   for example: "21 pages, 8 figures, 9 tables. Submitted to IEEE Transactions on
-   Information Forensics and Security. Code: https://github.com/mihirkavi/PixelRoot".
-5. License: choose the **arXiv non-exclusive distribution license** (the default).
-   It is compatible with later transferring copyright to IEEE. Avoid CC BY
-   unless you plan to pay for open access.
-6. IEEE allows posting the submitted version on arXiv. If the paper is accepted,
-   update the arXiv entry with the IEEE copyright notice and the DOI, as IEEE's
-   policy requires.
-
-## 4. IEEE TIFS (IEEE Author Portal / ScholarOne)
-
-1. Log in with your IEEE account and ORCID; choose *IEEE Transactions on
-   Information Forensics and Security* → *Regular Paper*.
-2. Pick EDICS / subject areas close to: multimedia forensics, watermarking and
-   data hiding, hardware security, applied cryptography.
-3. Upload slots:
-
-| Portal slot | Required? | Upload |
+| Rule | Source | Status |
 |---|---|---|
-| Main Manuscript (LaTeX) | Required | `dist/pixelroot_submission.zip` |
-| Main Document – PDF | Required | `dist/pixelroot.pdf` |
-| Conflict of Interest | Required | `conflict_of_interest.pdf` (compile the `.tex`) |
-| Cover letter | Recommended | `cover_letter.pdf` (compile the `.tex`) |
-| Supplementary Material for Review | Optional | `dist/pixelroot_supplementary.zip` |
+| TIFS regular paper: initial submission ≤ 13 double-column pages at 10 pt, **including** references; revised ≤ 16 | IEEE SPS *Information for Authors* | **Met**: 13 pages (enforced by the build) |
+| Single-spaced, double-column submission | SPS AE guidelines | Met (`IEEEtran` journal) |
+| Mandatory overlength charges beyond 10 *published* pages ($220/page in the SPS page) | SPS *Information for Authors* | Applies if accepted: 13 pages → about 3 overlength pages |
+| Abstract 150–250 words, index terms | IEEE journal template | Met (≈245 words; 10 index terms) |
+| Disclose AI-generated content in the acknowledgments: system, sections, extent | IEEE PSPB Operations Manual 8.2.1.B.10 | **Met**: Acknowledgment names Claude (Anthropic), the sections and the extent. **You must review and confirm it** (§3) |
+| Authors take responsibility; AI cannot be an author; significant AI use reported | arXiv policy (Jan 2023) | Met: same disclosure in the arXiv version; sole human author |
+| Preprint posted before acceptance carries IEEE's submission notice | IEEE preprint policy | **Met**: arXiv version's first-page footnote has the exact notice |
+| After acceptance: add IEEE copyright notice; after publication: add DOI / full citation | IEEE preprint policy | To do later |
+| Conflict-of-interest statement | TIFS portal | Met (in paper and as a separate file) |
+| Fonts embedded, no Type 3 | IEEE PDF requirements | Met (all 29 fonts embedded and subset) |
+| arXiv: TeX source, pdfLaTeX, `.bbl` named like the main file, allowed filename characters, figures included (PDF/PNG) | arXiv submission help | Met (checked by the build) |
+| arXiv CS: review/position papers need prior peer review | arXiv blog, 31 Oct 2025 | Not applicable: original research with new system, code and experiments (state this if a moderator asks) |
+| arXiv abstract ≤ 1,920 characters, plain text | arXiv form | Met: 1,633 characters (`arxiv_abstract.txt`) |
 
-4. In the cover letter / comments, mention the arXiv preprint and its identifier
-   once you have it.
-5. Check the current TIFS instructions on reviewer anonymity. If the portal asks
-   for an anonymized manuscript, remove the author block, the PixelRoot project
-   affiliation, and the GitHub URL, and rebuild the bundle.
+## 3. You must do these (they cannot be done for you)
 
-## 5. What has been checked
+1. **Read and confirm the AI disclosure** (Acknowledgment, both versions). It
+   states that Claude drafted and revised text, wrote and ran code, and checked
+   numbers, and that you directed and reviewed everything. Edit it if any part is
+   inaccurate (for example, if AI was also used in earlier drafts), and actually
+   review the AI-written sections before submitting: you take responsibility for
+   every claim.
+2. **Make the code public**: the paper cites `https://github.com/mihirkavi/PixelRoot`.
+   Make it public (or archive a release on Zenodo and cite the DOI).
+3. **Accounts**: IEEE Author Portal account with ORCID; arXiv account (endorsement
+   may be required for a first cs.CR submission).
+4. **Order**: submit to TIFS first (or the same day), then post on arXiv; add the
+   arXiv identifier to the TIFS submission comments.
+5. **Proofread** `dist/pixelroot_tifs.pdf` and `dist/pixelroot_full.pdf` end to end.
 
-- `make_bundle.sh` builds all three archives from scratch with no undefined
-  citations or references; the arXiv tarball compiles with pdfLaTeX only.
+## 4. arXiv steps
+
+1. Start a new submission; license: *arXiv.org perpetual, non-exclusive license*.
+2. Categories: primary **cs.CR**; cross-list **cs.CV**, **eess.IV**.
+3. Upload `dist/pixelroot_arxiv.tar.gz`; process; check the rendered PDF matches
+   `dist/pixelroot_full.pdf` (22 pages).
+4. Paste the fields from `arxiv_metadata.txt` and the abstract from
+   `arxiv_abstract.txt`.
+
+## 5. IEEE TIFS steps (IEEE Author Portal)
+
+1. Select *IEEE Transactions on Information Forensics and Security* → *Regular Paper*.
+2. Upload:
+
+| Portal slot | Upload |
+|---|---|
+| Main Manuscript (LaTeX) | `dist/pixelroot_tifs_submission.zip` |
+| Main Document – PDF | `dist/pixelroot_tifs.pdf` |
+| Conflict of Interest | `conflict_of_interest.pdf` (compile the `.tex`) |
+| Cover letter | `cover_letter.pdf` (compile the `.tex`) |
+| Supplementary Material for Review | `dist/pixelroot_supplementary.zip` |
+
+3. Choose subject areas near: multimedia forensics; watermarking and data hiding;
+   hardware security; applied cryptography and blockchain.
+4. Check the portal's instructions on reviewer anonymity; if an anonymized
+   manuscript is required, remove the author block and the GitHub URL and rebuild.
+
+## 6. Already verified in this repository
+
 - Contract: 18 Hardhat tests (`cd ../contracts && npm ci && npm test`).
 - Python: 21 unit tests (`cd ../experiments && python3 -m pytest -q tests`).
-- Every quantitative claim was audited against `experiments/results/` by an
-  independent review pass; its findings were fixed in this version.
+- Every number in both versions comes from `experiments/results/`; an independent
+  review pass audited them (`reports/PixelRoot independent review.md`).
+- References: the entries an earlier pass could not verify (SynthID-Image,
+  Video Seal, the steganalysis/averaging paper, the C2PA security analysis) were
+  checked against arXiv and IACR ePrint listings.

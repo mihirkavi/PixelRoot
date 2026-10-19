@@ -89,6 +89,13 @@
 
 \begin{document}
 
+% ---- Version switch -------------------------------------------------------
+% pixelroot_tifs.tex defines \pixelrootshort before \input-ing this file to
+% build the IEEE TIFS submission (<= 13 pages). Without it, this file builds
+% the full version (arXiv preprint; supplementary material for TIFS).
+\newif\ifshort
+\ifdefined\pixelrootshort \shorttrue \else \shortfalse \fi
+
 \title{\pr{}: Hardware-Anchored, Sensor-Level Media Provenance with
 Real-Time Blockchain Notarization for Trustworthy Imaging}
 
@@ -96,12 +103,22 @@ Real-Time Blockchain Notarization for Trustworthy Imaging}
 \thanks{M.~Kavishwar is an independent researcher with the PixelRoot Project
 (e-mail: hello@mihirkavishwar.com).}%
 \thanks{Manuscript prepared for submission, October 2026. The author declares no
-conflict of interest. This work received no external funding.}}
+conflict of interest. This work received no external funding.%
+\ifshort{} An extended version with the manufacturing analysis, additional
+experiments, and the full registry contract is provided as supplementary
+material.\fi}%
+\ifshort\else\thanks{This work has been submitted to the IEEE for possible
+publication. Copyright may be transferred without notice, after which this version
+may no longer be accessible.}\fi}
 
-% Running headers: this is a submission draft, not an accepted/published paper,
-% so we do not assert a volume/issue. We mark it as submitted for review.
+% Running headers: a submission, not an accepted paper, so no volume/issue.
+\ifshort
+\markboth{Submitted to IEEE Transactions on Information Forensics and Security}%
+{Kavishwar: \pr{}: Hardware-Anchored, Sensor-Level Media Provenance}
+\else
 \markboth{Preprint --- Submitted to IEEE Transactions on Information Forensics and Security}%
 {Kavishwar: \pr{}: Hardware-Anchored, Sensor-Level Media Provenance}
+\fi
 
 \maketitle
 
@@ -218,6 +235,26 @@ binding tolerates mild processing and survives metadata stripping, but is
 statistically softer. Together they cover each other's failure modes.
 
 \subsection{Contributions}
+\ifshort
+\begin{enumerate}
+\item \textbf{An architecture} (\S\ref{sec:arch}) with a feasibility-grounded,
+tiered hardware ask: a keyed, error-corrected payload written by per-region sensor
+gain, and the CMOS routes that make per-pixel gain manufacturable.
+\item \textbf{A device-identity layer on the ledger} (\S\ref{sec:identity},
+\S\ref{sec:contract}): on-die sensor keys certified by lot, time-scoped
+revocation, sensor-signed records bound to a content fingerprint, a block anchor
+that bounds capture time from below, and a tested registry contract.
+\item \textbf{A security analysis} (\S\ref{sec:threat}, \S\ref{sec:security}) with
+five propositions and a threat catalogue, including the watermark copy attack,
+sensor-key theft, and adaptive local edits.
+\item \textbf{Measurements on real images} (\S\ref{sec:eval}): robustness of the
+in-pixel channel to real codecs and edits, and an end-to-end identity evaluation
+on held-out images showing that the mark alone is copyable without a key and that
+the content-bound record stops cross-scene forgery.
+\item \textbf{A deployable design} (\S\ref{sec:discussion}): verification from
+public data, privacy-preserving notarization, and a phased adoption path.
+\end{enumerate}
+\else
 \begin{enumerate}
 \item \textbf{A unifying survey and gap analysis} (\S\ref{sec:related})
 spanning deepfake generation/detection, passive PRNU forensics, active
@@ -237,7 +274,7 @@ notarization protocol.
 manufacturable---not a physics barrier---via floating-diffusion
 conversion-gain selection, coded-exposure pixels, and 3D-stacked per-pixel ADCs
 joined by Cu--Cu hybrid bonding, with \emph{engineering schematics}
-(Figs.~\ref{fig:m1}--\ref{fig:m3}), an explicit cost/trade-off assessment and a
+\ifshort(in the supplementary extended version), \else(Figs.~\ref{fig:m1}--\ref{fig:m3}), \fi an explicit cost/trade-off assessment and a
 concrete OEM ``provenance-write'' primitive; and the optional per-pixel
 tamper-localization layer this unlocks.
 \item \textbf{A device-identity layer on the ledger} (\S\ref{sec:identity}):
@@ -267,8 +304,12 @@ erased), a justification of public-ledger anchoring over a
 single RFC~3161 time-stamping authority (with a hybrid option), and a phased,
 backward-compatible adoption path toward an OEM standard.
 \end{enumerate}
+\fi
+
 
 %==============================================================
+\ifshort
+\else
 \section{Background}\label{sec:background}
 
 \subsection{The CMOS imaging pipeline}
@@ -316,10 +357,13 @@ storage~\cite{benet2014ipfs}. Hardware attestation of the signing
 environment follows established trusted-computing
 practice~\cite{trustedcomputing,google2025c2pa}.
 
+\fi
 %==============================================================
 \section{Related Work and Literature Survey}\label{sec:related}
 We organize prior art into five threads and then identify the gap \pr{} fills.
 
+\ifshort
+\else
 \subsection{Deepfake generation and detection}
 Surveys by Verdoliva~\cite{verdoliva2020media}, Mirsky and
 Lee~\cite{mirsky2021creation}, and Croitoru \emph{et
@@ -336,6 +380,27 @@ provide gradient signal to the next generator~\cite{tugofwar2024}. \emph{Limitat
 detection is reactive, probabilistic, and structurally one step behind; it
 cannot offer affirmative, durable proof that a specific artifact is genuine.
 
+\fi
+\ifshort
+Four lines of work bear on \pr{}. \emph{Passive sensor forensics} attributes an
+image to a camera through its photo-response non-uniformity (PRNU)
+fingerprint~\cite{lukas2006digital,chen2008determining}, but needs reference images,
+weakens under compression~\cite{prnubench2025}, and can be copied onto forged
+images~\cite{goljan2011defending}. \emph{Watermarking} embeds recoverable
+signals~\cite{begum2020digital,cox1997secure,hartung1998watermarking} and now marks
+generated content at scale~\cite{gowal2025synthid,fernandez2024videoseal,bui2023trustmark},
+yet marks can be copied~\cite{kutter2000copy}, averaged
+out~\cite{yang2024steganalysis} or removed by regeneration~\cite{zhao2024invisible,saberi2024robustness};
+in-camera marking has precedent~\cite{blythe2004secure}. \emph{Provenance standards}
+such as C2PA bind signed manifests to assets and now ship in
+cameras and phones~\cite{c2pa2024spec,google2025c2pa,truepic2024capture,proofmode2023},
+but manifests are stripped in distribution and revocation has failed in
+practice~\cite{c2pa2026security}. \emph{Blockchain media integrity} anchors hashes
+on public ledgers~\cite{hasan2019combating,qureshi2021blockchain,videowmblockchain2024},
+typically after capture and in software. The extended version surveys each line
+in detail.
+
+\else
 \subsection{Passive sensor forensics (PRNU)}
 PRNU-based source identification, introduced by Luk\'a\v{s} \emph{et
 al.}~\cite{lukas2006digital} and extended to integrity verification by Chen
@@ -420,6 +485,7 @@ exact hashes are destroyed by any re-encoding while perceptual hashes trade away
 cryptographic guarantees. \pr{} narrows the window to the shutter event and adds
 a hardware-anchored in-pixel binding the ledger alone cannot provide.
 
+\fi
 \subsection{Gap analysis and precise novelty}
 Table~\ref{tab:compare} summarizes the landscape. Each ingredient exists in
 isolation: watermarking embeds recoverable signals in pixels; PRNU ties images
@@ -582,6 +648,15 @@ A central objection to any ``sensor-level embedding'' proposal is that
 commercial CMOS sensors do \emph{not} expose arbitrary per-pixel gain. \pr{}
 does not require it. We organize sensor gain controllability into a spectrum and
 target the realistic middle of it:
+\ifshort
+from a single global gain (too coarse to carry a payload), through per-column
+programmable-gain amplifiers (present in column-parallel readout) and per-region
+conversion-gain or HDR zones~\cite{hdrcis2024review,dcg_fdshared2020,tcg_sony2022},
+to per-pixel gain (manufacturable but not yet productized, \S\ref{sec:mfg}). A
+static per-column profile gives every block in a column the same chip sign, so
+the block-keyed layout needs per-region control or per-column gains
+re-programmed at line rate.
+\else
 \begin{itemize}
 \item \textbf{Global gain (today).} A single ISO/analog-gain register per frame.
 Too coarse to carry a spatial payload.
@@ -605,6 +680,7 @@ process technologies already in volume manufacturing make it achievable
 (\S\ref{sec:mfg}). \pr{} therefore treats per-pixel control as the apex target
 to standardize, not an impossibility to avoid.
 \end{itemize}
+\fi
 
 \noindent\textbf{The \pr{} ask (tiered).} We ask manufacturers for a
 \emph{provenance-write} capability, achievable at three increasing cost points:
@@ -629,6 +705,22 @@ as the attested execution environment (comparable to today's secure-capture
 apps). We label such captures at a lower assurance tier
 (\S\ref{sec:discussion}) and never conflate them with sensor-rooted captures.
 
+\ifshort
+\subsection{Manufacturing per-pixel gain}\label{sec:mfg}
+Per-pixel gain is not exposed by today's commodity sensors, but it is an
+integration choice rather than a physics barrier: three process technologies in
+volume production make it achievable---per-pixel conversion-gain selection in
+dual/triple-conversion-gain pixels~\cite{hdrcis2024review,tcg_sony2022},
+coded-exposure pixels with in-pixel memory~\cite{pecmos2024,codedexposure_thesis},
+and 3D-stacked digital pixel sensors joined by Cu--Cu hybrid
+bonding~\cite{cucu_hybridbond2025,dps_meta_brillnics2025}. The stacked logic tier
+is also a natural home for the on-die key of \S\ref{sec:identity}. Per-pixel
+control further enables a high-resolution integrity layer that localizes splices
+(block ROC-AUC $0.97$ on $48$ real splices). The feasibility analysis with
+engineering schematics and costs, and the localization experiment, are in the
+extended version supplied as supplementary material.
+
+\else
 \subsection{Manufacturing per-pixel gain: a feasibility analysis}\label{sec:mfg}
 Because a reviewer (and an OEM) will ask \emph{exactly how} a fab would build
 per-pixel intensity control, we survey the silicon options and their cost. Three
@@ -757,6 +849,7 @@ gracefully under recompression (AUC $0.95$ at JPEG~$Q90$; \S\ref{sec:robust}), s
 it is intended for lightly-processed forensic media
 rather than as the primary identity channel.
 
+\fi
 \subsection{Provenance payload}
 The payload $\mathbf{m}$ is a fixed-width record (\pr{}~v2: $128$ bits):
 \begin{equation}
@@ -775,6 +868,8 @@ pseudonymous ID with \emph{no} location; precise location, when enabled, may be
 coarsened or replaced by a salted commitment disclosed only under subpoena
 (\S\ref{sec:discussion}).
 
+\ifshort
+\else
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.96\textwidth]{fig_datapath.pdf}
@@ -789,6 +884,7 @@ binding; the record's content fingerprint ties the two together
 \label{fig:datapath}
 \end{figure*}
 
+\fi
 \subsection{Keyed region selection and spread-spectrum coding}\label{sec:select}
 \pr{} partitions the frame into $8\!\times\!8$ blocks aligned with the JPEG grid
 and treats \emph{blocks}, not single pixels, as carriers. The carrier layout is
@@ -920,6 +1016,8 @@ queued in secure storage and submitted on reconnect, with the latency recorded.
 \end{algorithmic}
 \end{algorithm}
 
+\ifshort
+\else
 \subsubsection*{Step-by-step}
 (1)~\textbf{Anchor}: note a recent block $\beta$. (2)~\textbf{Acquire identity \&
 context}: the $48$-bit OTP handle, the attested clock $t$, and optional location.
@@ -938,6 +1036,7 @@ manifest, and publish them to the record store when the image is published. The
 manifest is a convenience: V2 needs only the pixels, the record store, and the
 ledger.
 
+\fi
 \subsection{Device identity and content-bound records}\label{sec:identity}
 The OTP identifier inside $\mathbf{m}$ names a sensor, but it proves nothing: it
 is a public number, and the in-pixel mark that carries it can be estimated from
@@ -1056,13 +1155,15 @@ amortized, and inclusion is proven with a $\lceil\log_2 N\rceil$-length path.
 Sealing is deliberately permissionless---any device, app, or batcher may submit,
 so no party can censor a capture---and the submitter carries no trust:
 authenticity comes from the sensor signature inside each record, checked against
-the certified lots. Listing~\ref{lst:sol} shows the notarization and verification
-calls; the full contract, a $16$-case test suite, and the measured gas
-(\S\ref{sec:e6}) are released.
+the certified lots. \ifshort\else Listing~\ref{lst:sol} shows the notarization and
+verification calls; \fi The full contract, an $18$-case test suite, and the measured
+gas (\S\ref{sec:e6}) are released.
 
+\ifshort\else
 \lstinputlisting[style=solidity,caption={\pr{}Registry (v2): permissionless
 batch sealing and the verification calls (excerpt).},label={lst:sol},
 linerange=@listing-begin-@listing-end,rangeprefix=//\ ,includerangemarker=false]{contracts/src/PixelRootRegistry.sol}
+\fi
 
 \noindent A capture is \emph{notarized} once \texttt{register} mines. A verifier
 later calls \texttt{verifyCapture} (a view call, no gas) with the batch root, the
@@ -1256,6 +1357,17 @@ sensor's signature, its on-ledger certification, and the content binding
 to these guarantees.
 
 \subsection{Threat catalogue}
+\ifshort
+Table~\ref{tab:threats} maps each attack in the threat model to the assumption
+it relies on and the guarantee that defeats it; the extended version discusses
+each in turn. Two entries deserve emphasis. A genuine sensor filming a screen
+produces a valid new record for the re-capture event: \pr{} attests that a
+certified sensor recorded this light at this time, not that the scene was real,
+and capture-time liveness signals (depth, focus distance) are future work. A
+stolen sensor key can sign arbitrary content until it is revoked; the damage is
+confined to one identity, and the capture counter helps detect cloning.
+
+\else
 \textbf{Deepfake / synthetic substitution.} A fully generated image was never
 exposed on a certified sensor, so no valid record commits its file or its
 content. V1 fails, and any payload it carries (decoded by chance, copied, or
@@ -1327,6 +1439,7 @@ diffusion model~\cite{zhao2024invisible} can remove the in-pixel payload. The
 result is \textsc{Unverified}---a negative result, never a false positive: \pr{}
 declines to certify; it does not certify a manipulated artifact.
 
+\fi
 \begin{table}[t]
 \centering
 \caption{Threat catalogue mapped to defenses and guarantees.}
@@ -1364,6 +1477,8 @@ by design---ideal for a pristine original---while real-world distribution
 demands \emph{semi-fragile} survivability (V2). We therefore analyze the in-pixel
 channel under lossy coding.
 
+\ifshort
+\else
 \subsection{JPEG}
 JPEG's quantization matrix scales with the quality factor $Q$ and most
 aggressively discards high-frequency DCT energy~\cite{wallace1992jpeg}. This is
@@ -1381,6 +1496,7 @@ graceful decode-failure cliff, below which \pr{} returns the safe
 \textsc{Unverified} rather than a false positive. The earlier fragile/semi-fragile
 tension is thus resolved by construction, not asserted.
 
+\fi
 \subsection{Geometric edits and synchronization}\label{sec:geom}
 Block-grid embedding is sensitive to operations that move the grid: cropping,
 translation, padding, and rescaling. \pr{} addresses this with an explicit
@@ -1445,6 +1561,8 @@ perceptual-hash and content-similarity layers~\cite{videowmblockchain2024} for
 softer ``same-scene'' judgments.
 
 %==============================================================
+\ifshort
+\else
 \section{Applications: Human-in-the-Loop Trust}\label{sec:apps}
 
 \pr{} is designed so that a human or institutional verifier remains in the loop
@@ -1471,6 +1589,7 @@ $O(1)$ ledger lookup at upload to label assets ``camera-original,''
 ``transcoded-but-consistent,'' or ``unverified,'' shifting the default from
 ``trust until debunked'' to ``label by provenance.''
 
+\fi
 %==============================================================
 \section{Evaluation and Reference Implementation}\label{sec:eval}
 
@@ -1493,6 +1612,8 @@ key, signed records, content fingerprint, and verifier (\texttt{ledger.py},
 \texttt{device\_identity.py}, $21$ unit tests), with Merkle test vectors shared
 between the two implementations.
 
+\ifshort
+\else
 \subsection{Micro-benchmark of the core (measured)}
 Table~\ref{tab:micro} reports the cost of the capture-time operations, measured
 with the Python reference implementation on a commodity CPU (\texttt{e5\_crypto.py},
@@ -1530,6 +1651,7 @@ Inclusion proof, $10^4$ batch              & $14\times32$\,B \\
 \end{tabular}
 \end{table}
 
+\fi
 \subsection{Measured robustness of the in-pixel channel}\label{sec:robust}
 We evaluate the spread-spectrum embedding (\S\ref{sec:embed}) on
 \emph{real public images} with \emph{real image codecs}, following the current
@@ -1549,7 +1671,7 @@ Eq.~\eqref{eq:despread} followed by RS decoding. The harness is released
 
 \textbf{Fidelity.} Embedding is imperceptible: mean PSNR $38.2$\,dB and SSIM
 $0.942$ between original and marked frames (the per-frame fidelity rises to
-$\sim\!41$\,dB at $A\!=\!3$; Table~\ref{tab:sweep}). \textbf{Robustness.}
+$\sim\!41$\,dB at $A\!=\!3$\ifshort\else; Table~\ref{tab:sweep}\fi). \textbf{Robustness.}
 Table~\ref{tab:robust} reports the raw (pre-ECC) coded-bit BER and the
 \emph{end-to-end} payload-decode success after RS correction. On real content the
 raw channel is not error-free---mean BER $\approx\!1.6\%$, content-dependent up to
@@ -1565,7 +1687,7 @@ very-high-frequency frame exceeds the ECC capacity at $A\!\le\!6$, and
 \emph{geometric} rotation ($\pm1$--$2^\circ$) and resized-crop drive BER to
 $\approx\!0.5$---a documented limitation requiring explicit rotation/scale
 synchronization (\S\ref{sec:discussion}). \textbf{Operating curve.}
-Table~\ref{tab:sweep} and Fig.~\ref{fig:results}(b) sweep amplitude at a fixed
+\ifshort An amplitude sweep\else Table~\ref{tab:sweep} and Fig.~\ref{fig:results}(b) sweep amplitude\fi{} at a fixed
 strong attack (JPEG~$Q40$) over all $24$ images, exposing a genuine cliff:
 post-ECC decode rises from $0/24$ at $A\!=\!0.5$ to $23/24$ at $A\!=\!4$
 ($38$\,dB), so $A\!=\!4$ is the imperceptible-yet-robust operating point.
@@ -1618,6 +1740,7 @@ Resized-crop \emph{[geom.\ limit]} & $0.49$ & $0/24$ \\
 \end{tabular}
 \end{table}
 
+\ifshort\else
 \begin{table}[t]
 \centering
 \caption{Amplitude operating curve at JPEG $Q40$ (all $24$ Kodak images):
@@ -1642,7 +1765,10 @@ $6.0$ & $35.2$ & $0.005$ & $23/24$ \\
 \\[2pt]
 {\footnotesize $^\dagger$At $A\!=\!0.5$ rounding to integers leaves most pixels unchanged.}
 \end{table}
+\fi
 
+\ifshort
+\else
 \noindent\textbf{Optional per-pixel localization layer.} When the sensor
 supports per-pixel gain (\S\ref{sec:mfg}), \pr{} adds a second, keyed
 high-resolution pattern that serves as a spatial integrity map. On the $24$ real
@@ -1705,6 +1831,7 @@ active, error-corrected payload instead carries an identifier that resolves to a
 signed record (it is recovered on $21/24$ images at $Q10$, Table~\ref{tab:robust}).
 A realistic multi-camera PRNU comparison on RAW data is future work (F1).
 
+\fi
 \subsection{Device identity and content binding (E6)}\label{sec:e6}
 We evaluate the full verification path of \S\ref{sec:identity} on the same $24$
 Kodak images. \textbf{Setup.} One manufacturer admitted to the registry
@@ -1904,6 +2031,16 @@ An OEM that prefers to keep $k$ private (to make casual removal of the mark
 slightly harder) can instead operate a verification service; the security of an
 accepted verdict is the same either way.
 
+\ifshort
+\textbf{Privacy-preserving notarization.} No personal data reaches the chain:
+it holds only lot roots of sensor-key hashes, revocations, and opaque Merkle roots
+of record hashes. Records live off-chain, are published only for images their
+owner publishes, and can be erased; location is optional and off by default; the
+in-pixel identifier is a rotating pseudonymous handle. A published record does
+reveal its sensor key, so two published images from one sensor are linkable;
+anonymous-attestation signatures~\cite{brickell2004daa} are the natural upgrade.
+
+\else
 \textbf{Privacy-preserving notarization.} A naive design that wrote sensor
 $\mathrm{ID}$, time, and precise GPS to a public, immutable ledger would be
 actively dangerous for the very journalists and activists \pr{} aims to protect,
@@ -1929,6 +2066,20 @@ while the immutable proof-of-existence remains a meaningless digest---squaring
 immutability with the right to be forgotten. In high-risk settings the capturing
 party may also defer notarization (commit a sealed hash, disclose context later).
 
+\fi
+\ifshort
+\textbf{Why a public ledger rather than a timestamping authority?} An RFC~3161
+authority or a transparency log~\cite{rfc6962} gives append-only timestamps, but
+each is a party that can be coerced, compromised, or censored---and certificate
+compromise has already forced wholesale revocation in a deployed C2PA
+camera~\cite{c2pa2026security}. A public chain offers permissionless auditability
+and censorship resistance, and here it also holds sensor certification and
+revocation, so ``was this sensor trusted when this capture was sealed?'' has one
+public answer. Merkle batching makes the cost $O(1)$ per capture
+($47{,}016$ gas per batch); an authority or log can serve as a fast path anchored
+on the chain.
+
+\else
 \textbf{Why a public ledger and not just a timestamping authority?} Proposition~1
 only needs a trustworthy, append-only timestamp, which an RFC~3161 time-stamping
 authority (TSA) also provides. We anchor to a public blockchain for properties a
@@ -1955,10 +2106,19 @@ similar auditability with lower latency but depends on its operators and
 monitors; it can likewise serve as a fast path whose roots are anchored on the
 chain.
 
+\fi
 \textbf{Failure-safe semantics.} As emphasized, \pr{} declines rather than
 falsely certifies under heavy laundering or unsynchronizable geometric edits;
 downstream policy must treat ``unverified'' as ``unknown,'' not ``fake.''
 
+\ifshort
+\textbf{Adoption and standardization.} \pr{} cannot verify media from cameras
+that never marked it; unmarked media is labeled ``unverified,'' never ``fake.'' We
+propose a phased rollout (software capture apps, then attested ISPs, then sensor
+gain hardware) and a cross-OEM profile that fixes the payload, carrier, record
+format, fingerprint, and registry interface, reusing C2PA manifests as transport.
+
+\else
 \textbf{Adoption path and honest efficacy ceiling.} \pr{} cannot verify media
 from cameras that never marked it, so its value grows with deployment and is
 \emph{not} a universal deepfake solution. We therefore propose a phased,
@@ -1982,6 +2142,7 @@ any platform can verify any vendor's media. Consumer hardware-backed C2PA signin
 shows the ecosystem is ready for the signing half; \pr{} adds the in-pixel,
 ledger-witnessed half.
 
+\fi
 %==============================================================
 \section{Conclusion and Future Work}\label{sec:conclusion}
 Reactive deepfake detection cannot win a generator-vs-detector arms race, and
@@ -2012,6 +2173,22 @@ re-capture, anonymous-attestation signatures for unlinkable records, and pursuin
 \pr{} as an open cross-OEM standard. We view this as a foundational---if not
 all-encompassing---step toward driving deepfake-driven disinformation toward
 practical irrelevance for media that matters.
+
+%==============================================================
+\section*{Acknowledgment}
+\textbf{Use of generative AI.} In accordance with IEEE and arXiv policy, the
+author discloses that Claude, a large language model by Anthropic (used through
+Claude Code), assisted substantially in preparing this manuscript and its
+software. It drafted and revised text, most extensively in the device-identity
+design (\S\ref{sec:identity}--\S\ref{sec:contract}), the security analysis
+(\S\ref{sec:security}), the identity evaluation (\S\ref{sec:e6}), and the
+discussion (\S\ref{sec:discussion}), and edited the remaining sections for
+consistency with the measured results; it wrote and ran, under the author's
+direction, the device-identity and evaluation code, the registry contract and its
+tests, and the attack experiments; and it checked every reported number against
+the experiment outputs. The author directed the work, reviewed all AI-assisted
+text, code, and results, and takes full responsibility for the content of this
+article.
 
 %==============================================================
 \section*{Conflict of Interest}

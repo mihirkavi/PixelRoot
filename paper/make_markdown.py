@@ -4,6 +4,25 @@ import subprocess
 import tempfile
 
 src = open("pixelroot.tex").read()
+
+
+def full_version(tex):
+    """Resolve the \\ifshort switch to the full (arXiv) version."""
+    out, i = [], 0
+    while True:
+        k = tex.find("\\ifshort", i)
+        if k == -1:
+            out.append(tex[i:])
+            return "".join(out)
+        f = tex.find("\\fi", k)
+        e = tex.find("\\else", k, f)
+        out.append(tex[i:k])
+        if e != -1:
+            out.append(tex[e + len("\\else"):f])
+        i = f + len("\\fi")
+
+
+src = full_version(src.replace("\\newif\\ifshort", "").replace("\\ifdefined\\pixelrootshort \\shorttrue \\else \\shortfalse \\fi", ""))
 pre = src.replace("\\pr{}", "PixelRoot").replace("\\IEEEPARstart{D}{igital}", "Digital")
 
 

@@ -56,7 +56,13 @@ The principal contributions of the work are:
 
 I confirm that this manuscript is original, has not been published previously,
 and is not under consideration for publication elsewhere, in whole or in part.
-A preprint of this manuscript is posted on arXiv, as IEEE policy permits. The
+A preprint of the extended version is posted on arXiv, as IEEE policy permits,
+and the same extended version is included as supplementary material: it adds the
+manufacturing feasibility analysis, two secondary experiments, and the contract
+listing that the 13-page manuscript summarizes. As disclosed in the
+Acknowledgment, a generative AI assistant (Anthropic's Claude) was used in
+preparing the text and software; I have reviewed all of it and take full
+responsibility for the content. The
 work is the sole author's. There are no conflicts of interest to disclose, and
 the work received no external funding. The reference implementation and the
 evaluation harness are released openly so that all reported numbers are
