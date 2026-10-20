@@ -510,7 +510,7 @@ A verifier holds a questioned file (bytes $E'$, pixels $I'$), the public ledger,
 
 <div class="algorithmic">
 
-ledger, record store, carrier key $k$, threshold $\tau$ **if** $\exists$ valid $r$ with $\mathcal H(E')\in\{\mathcal H(E(I)),\mathcal H(I)\}$ **return** Camera-original $(\{B_j\},\{c_j\})\gets \mathrm{CSPRNGselect}(\mathrm{SHA\text{-}256}(k),N_B,n_c,R)$ $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$ $D_i\gets \sum_{j} c_j\,\langle I'_{B_j+\delta^\star},\Phi_{u,v}\rangle/\|\Phi_{u,v}\|^2$ $\hat b_i\gets \mathbf{1}[D_i>0];\; w_i\gets |D_i|$ $\hat{\mathbf{m}}\gets \mathrm{ECC\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$ Transcoded-consistent, $r$ Unverified
+ledger, record store, carrier key $k$, threshold $\tau$ **if** $\exists$ valid $r$ with $\mathcal H(E')\in\{\mathcal H(E(I)),\mathcal H(I)\}$ **return** Camera-original $(\{B_j\},\{c_j\})\gets \mathrm{Select}(\mathrm{SHA\text{-}256}(k),N_B,n_c,R)$ $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$ $D_i\gets \sum_{j} c_j\,\langle I'_{B_j+\delta^\star},\Phi_{u,v}\rangle/\|\Phi_{u,v}\|^2$ $\hat b_i\gets \mathbf{1}[D_i>0];\; w_i\gets |D_i|$ $\hat{\mathbf{m}}\gets \mathrm{ECC\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$ Transcoded-consistent, $r$ Unverified
 
 </div>
 

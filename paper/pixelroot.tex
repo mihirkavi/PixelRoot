@@ -1205,7 +1205,7 @@ onto other content resolves to a record describing different content.
 \REQUIRE ledger, record store, carrier key $k$, threshold $\tau$
 \STATE \textbf{if} $\exists$ valid $r$ with $\mathcal H(E')\in\{\mathcal H(E(I)),\mathcal H(I)\}$
        \textbf{return} \textsc{Camera-original}
-\STATE $(\{B_j\},\{c_j\})\gets \mathrm{CSPRNGselect}(\mathrm{SHA\text{-}256}(k),N_B,n_c,R)$
+\STATE $(\{B_j\},\{c_j\})\gets \mathrm{Select}(\mathrm{SHA\text{-}256}(k),N_B,n_c,R)$
 \STATE $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$
        \quad\COMMENT{block-grid resync, \S\ref{sec:geom}}
 \FORALL{coded bit $i$}
