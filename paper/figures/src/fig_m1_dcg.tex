@@ -1,0 +1,45 @@
+\documentclass[border=1pt]{standalone}
+\input{common}
+\usepackage[american]{circuitikz}
+\ctikzset{tripoles/mos style/arrows, transistors/arrow pos=end}
+\begin{document}
+\begin{circuitikz}[line width=0.6pt]
+\ctikzset{bipoles/length=0.9cm}
+% photodiode (cathode to the transfer gate)
+\draw (0,1.2) node[ground]{} to[photodiode, l_=PD] (0,3.0) -- (0.5,3.0);
+% TX: horizontal, gate up
+\node[nmos, rotate=-90, anchor=S] (tx) at (0.5,3.0) {};
+\node[above=0pt of tx.G] {TX};
+\draw (tx.D) -- (2.9,3.0) coordinate (fd);
+\fill (fd) circle (1.4pt);
+\node[red, anchor=north west, font=\footnotesize\bfseries, inner sep=1pt] at ($(fd)+(0.08,-0.06)$) {FD};
+% C_FD (small: high conversion gain)
+\draw (fd) to[C] (2.9,1.2) node[ground]{};
+\node[anchor=east, align=right] at (2.65,2.1) {$C_\mathrm{FD}$\\[-1pt]{\scriptsize alone: high gain}};
+% DCG switch, then RST to VDD
+\draw (fd) -- ++(0,0.95) coordinate (dcgs);
+\node[nmos, anchor=S] (dcg) at (dcgs) {};
+\coordinate (x) at (dcg.D);
+\fill (x) circle (1.4pt);
+\node[nmos, anchor=S] (rst) at ($(x)+(0,0.5)$) {};
+\draw (x) -- (rst.S);
+\node[left=0pt of rst.G] {RST};
+\draw[acc, <-] (dcg.G) -- ++(-0.35,0) node[left, align=right, font=\scriptsize, text=acc, inner sep=1pt]
+  {\textbf{DCG}: keyed\\gain-select bit};
+% C_DCG (added: low conversion gain)
+\draw (x) -- ++(1.0,0) coordinate (cx);
+\draw[amb] (cx) to[C] ++(0,-0.9) node[ground]{};
+\node[anchor=west, align=left, text=amb] at ($(cx)+(0.25,-0.45)$) {$C_\mathrm{DCG}$\\[-1pt]{\scriptsize added: low gain}};
+% SF + RS readout
+\node[nmos, anchor=G] (sf) at (5.9,3.0) {};
+\draw (fd) -- (sf.G);
+\node[anchor=west] at ($(sf.center)+(0.1,0)$) {SF};
+\node[nmos, anchor=D] (rs) at ($(sf.S)+(0,-0.25)$) {};
+\draw (sf.S) -- (rs.D);
+\node[anchor=west] at ($(rs.center)+(0.1,0)$) {RS};
+\draw (rs.S) -- ++(0,-0.3) node[below, font=\scriptsize, inner sep=1pt] {column bus};
+% VDD rail
+\draw (rst.D) -- ++(0,0.25) coordinate (vddL) -| (sf.D);
+\node[above, inner sep=1pt] at ($(vddL)!0.5!(sf.D |- vddL)$) {$V_\mathrm{DD}$};
+\end{circuitikz}
+\end{document}

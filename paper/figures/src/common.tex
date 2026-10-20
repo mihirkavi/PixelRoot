@@ -1,0 +1,21 @@
+% Shared preamble for the PixelRoot figures: Times text and math to match
+% IEEEtran; every figure is drawn at its printed size (no scaling in the paper).
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,backgrounds,decorations.pathreplacing,shapes.geometric}
+\definecolor{ink}{HTML}{1B2838}
+\definecolor{acc}{HTML}{1F5FBF}
+\definecolor{grn}{HTML}{1E7B3A}
+\definecolor{red}{HTML}{B3261E}
+\definecolor{amb}{HTML}{9A6B00}
+\definecolor{cu}{HTML}{B87333}
+\tikzset{
+  >={Stealth[length=1.6mm,width=1.2mm]},
+  every picture/.style={line width=0.6pt, font=\footnotesize, color=ink},
+  blk/.style={draw=ink, rounded corners=1.5pt, align=center, inner sep=2.5pt,
+    minimum height=9mm, fill=white},
+  note/.style={font=\scriptsize, align=left, text=ink!80},
+}

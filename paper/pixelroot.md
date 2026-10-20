@@ -8,7 +8,7 @@
 
 ## Abstract
 
-The realism of AI-generated “deepfake” imagery has outpaced society’s ability to tell synthetic media from camera-captured reality. Detectors generalize poorly to unseen generators, and provenance schemes that bind trust to *metadata* fail once the metadata is stripped. We present PixelRoot, which moves the root of trust into the *pixels* and onto a public blockchain. At capture, a CMOS sensor embeds a $128$-bit, Reed–Solomon-coded provenance payload through a keyed, low-frequency per-region gain modulation. Each sensor holds a signing key generated on-die and certified on the blockchain by its manufacturer; it signs a capture record that binds the payload to the frame’s hashes and to a robust content fingerprint, and the record is notarized on the same blockchain, which also records time-scoped revocation. We contribute a formal architecture and threat model with five security propositions; a measured robustness study on the Kodak images with real codecs, recovering the payload on $22$–$23/24$ images down to JPEG $Q20$ ($21/24$ at $Q10$) at $38$ dB PSNR with $0/1224$ false accepts; a device-identity evaluation showing that the in-pixel mark alone can be copied without any key ($78\%$ of trials) while the content-bound record rejects every cross-scene copy and large splice on held-out images ($0/180$) and lets $90\%$ of processed genuine copies verify, linking local edits back to the original; a tested registry contract ($47$ k gas per batch, $O(1)$ per image); a CMOS-manufacturing feasibility analysis of per-pixel gain; and a privacy-preserving notarization design with a phased adoption path toward a cross-OEM interoperability standard.
+AI can now generate photos and videos that people cannot tell from real recordings. Deepfake detectors fail on unseen generators, and provenance standards such as C2PA keep their proof mainly in file metadata, which is lost when a platform strips or re-encodes the file. We present PixelRoot, which keeps proof of origin where it cannot be stripped: in the pixels and on a public blockchain. At capture, the image sensor writes an error-corrected identifier into the image through a faint, keyed change in pixel gain that survives compression. The sensor also signs a capture record with a key that never leaves the chip; the record ties the identifier to the image’s hashes and a content fingerprint, and its hash is sealed on the blockchain, where manufacturers also certify and revoke sensor keys. A verifier can thus confirm an exact camera original, confirm that a re-compressed copy derives from a genuine capture, or fail safe to “unverified”. On the Kodak images with real codecs, the identifier survives JPEG compression down to quality $20$ on $22$–$23$ of $24$ images ($21$ at quality $10$) at $38$ dB PSNR, with no false accepts in $1{,}224$ trials. An identifier copied onto another image no longer matches the signed fingerprint, so every cross-scene copy and large splice is rejected ($0/180$), while $90\%$ of processed genuine copies verify. A tested smart contract seals each batch of captures for $47$k gas, and we show how sensor makers can build the required gain control.
 
 **Index terms:** media provenance, deepfakes, blockchain, CMOS image sensor, PRNU, digital watermarking, content authenticity, C2PA, image forensics, JPEG.
 
@@ -40,7 +40,7 @@ The two bindings are complementary: the hard binding gives cryptographic non-rep
 
 2.  **A formal architecture with a feasibility-grounded hardware ask** (§<a href="#sec:arch" data-reference-type="ref" data-reference="sec:arch">5</a>): a sensor-gain *feasibility spectrum* (global $\to$ per-column $\to$ per-region $\to$ per-pixel) that grounds the embedding in the low-frequency, per-column/per-region gain control that column-parallel sensors can realistically provide, plus the $128$-bit payload, keyed spread-spectrum carrier selection, error-correction, and a smart-contract notarization protocol.
 
-3.  **A CMOS-manufacturing feasibility analysis of per-pixel gain** (§<a href="#sec:mfg" data-reference-type="ref" data-reference="sec:mfg">5.2</a>): a survey-grounded argument that per-pixel intensity control is manufacturable—not a physics barrier—via floating-diffusion conversion-gain selection, coded-exposure pixels, and 3D-stacked per-pixel ADCs joined by Cu–Cu hybrid bonding, with *engineering schematics* (in the supplementary extended version), (Figs. <a href="#fig:m1" data-reference-type="ref" data-reference="fig:m1">[fig:m1]</a>–<a href="#fig:m3" data-reference-type="ref" data-reference="fig:m3">[fig:m3]</a>), an explicit cost/trade-off assessment and a concrete OEM “provenance-write” primitive; and the optional per-pixel tamper-localization layer this unlocks.
+3.  **A CMOS-manufacturing feasibility analysis of per-pixel gain** (§<a href="#sec:mfg" data-reference-type="ref" data-reference="sec:mfg">5.2</a>): a survey-grounded argument that per-pixel intensity control is manufacturable—not a physics barrier—via floating-diffusion conversion-gain selection, coded-exposure pixels, and 3D-stacked per-pixel ADCs joined by Cu–Cu hybrid bonding, with *engineering schematics* (in the supplementary extended version), (Figs. <a href="#fig:m1" data-reference-type="ref" data-reference="fig:m1">1</a>–<a href="#fig:m3" data-reference-type="ref" data-reference="fig:m3">3</a>), an explicit cost/trade-off assessment and a concrete OEM “provenance-write” primitive; and the optional per-pixel tamper-localization layer this unlocks.
 
 4.  **A device-identity layer on the ledger** (§<a href="#sec:identity" data-reference-type="ref" data-reference="sec:identity">5.7</a>): manufacturer-certified production lots of on-die sensor keys, time-scoped device and manufacturer revocation, chip-signed capture records bound to a content fingerprint, and a block anchor that brackets capture time from below—with a tested smart contract (§<a href="#sec:contract" data-reference-type="ref" data-reference="sec:contract">5.8</a>) and an end-to-end evaluation showing that the in-pixel mark alone is copyable and that the content-bound record stops identity transplant (§<a href="#sec:e6" data-reference-type="ref" data-reference="sec:e6">9.4</a>).
 
@@ -132,6 +132,8 @@ PixelRoot comprises a capture-time *embed-and-notarize* pipeline and a *verifica
 
 <div class="figure*">
 
+![image](fig_architecture.pdf)
+
 </div>
 
 ## Hardware feasibility: the gain-control spectrum
@@ -156,39 +158,36 @@ Because a reviewer (and an OEM) will ask *exactly how* a fab would build per-pix
 
 <div class="figure*">
 
-<embed src="fig_gain_spectrum.pdf" style="width:93.0%" />
+![image](fig_gain_spectrum.pdf)
 
 </div>
 
 #### (M1) Per-pixel conversion-gain selection (FD-capacitance)
 
-Conversion gain—the volts-per-electron set at the floating-diffusion node—is already made *switchable* per pixel in dual-/triple-conversion-gain (DCG/TCG) pixels by adding an in-pixel MOSFET that connects or isolates extra FD capacitance (J. Chen et al. 2025; Choi et al. 2020; Sahu 2008). Production mobile sensors switch among 2–3 discrete CG states per pixel (Samsung’s $16{:}4{:}1$ triple-CG sensor reaches $82.4$ dB single-exposure HDR at a $1.4\,\mu$m pitch (Park et al. 2022)). *The provenance change is small*: drive the existing DCG/TCG select line from the keyed PRNG rather than only from a scene-adaptive HDR controller, so each carrier pixel is exposed at a chosen CG state. This imprints the payload *in the analog photo-electron domain* (the strongest root) and reuses transistors that millions of sensors already ship; its limitation is quantization to a few discrete gain levels, which is ample for $1$–$2$ bits/pixel under PixelRoot’s spread-spectrum coding (Fig. <a href="#fig:m1" data-reference-type="ref" data-reference="fig:m1">[fig:m1]</a>).
+Conversion gain—the volts-per-electron set at the floating-diffusion node—is already made *switchable* per pixel in dual-/triple-conversion-gain (DCG/TCG) pixels by adding an in-pixel MOSFET that connects or isolates extra FD capacitance (J. Chen et al. 2025; Choi et al. 2020; Sahu 2008). Production mobile sensors switch among 2–3 discrete CG states per pixel (Samsung’s $16{:}4{:}1$ triple-CG sensor reaches $82.4$ dB single-exposure HDR at a $1.4\,\mu$m pitch (Park et al. 2022)). *The provenance change is small*: drive the existing DCG/TCG select line from the keyed PRNG rather than only from a scene-adaptive HDR controller, so each carrier pixel is exposed at a chosen CG state. This imprints the payload *in the analog photo-electron domain* (the strongest root) and reuses transistors that millions of sensors already ship; its limitation is quantization to a few discrete gain levels, which is ample for $1$–$2$ bits/pixel under PixelRoot’s spread-spectrum coding (Fig. <a href="#fig:m1" data-reference-type="ref" data-reference="fig:m1">1</a>).
 
-<div class="figure*">
-
-<embed src="fig_m1_dcg.pdf" style="width:82.0%" />
-
-</div>
+<figure id="fig:m1">
+<embed src="fig_m1_dcg.pdf" />
+<figcaption>M1: a <span class="math inline">4</span>T pixel with a dual-conversion-gain (DCG) transistor. A keyed gain-select bit on the DCG gate switches the extra capacitance <span class="math inline"><em>C</em><sub>DCG</sub></span> onto the floating diffusion (FD), toggling between high and low conversion gain to imprint an analog-domain chip.</figcaption>
+</figure>
 
 #### (M2) Per-pixel exposure/charge modulation (coded-exposure pixels)
 
-A second, demonstrated route adds a per-pixel switch plus a one-bit code memory (e.g. in-pixel SRAM) so each pixel’s integration can be gated independently—the basis of pixel-wise programmable exposure and coded-exposure imagers  (Zhang et al. 2024, 2019; Luo 2020; A. Yang et al. 2025). Modulating integration time is equivalent to modulating effective gain; a tiny keyed exposure delta on carrier pixels embeds the payload without any optical modulator. These designs have been fabricated in standard CMOS, confirming manufacturability; the cost is the extra in-pixel transistors/SRAM, which enlarge pixel pitch unless absorbed by stacking (M3) (Fig. <a href="#fig:m2" data-reference-type="ref" data-reference="fig:m2">[fig:m2]</a>).
+A second, demonstrated route adds a per-pixel switch plus a one-bit code memory (e.g. in-pixel SRAM) so each pixel’s integration can be gated independently—the basis of pixel-wise programmable exposure and coded-exposure imagers  (Zhang et al. 2024, 2019; Luo 2020; A. Yang et al. 2025). Modulating integration time is equivalent to modulating effective gain; a tiny keyed exposure delta on carrier pixels embeds the payload without any optical modulator. These designs have been fabricated in standard CMOS, confirming manufacturability; the cost is the extra in-pixel transistors/SRAM, which enlarge pixel pitch unless absorbed by stacking (M3) (Fig. <a href="#fig:m2" data-reference-type="ref" data-reference="fig:m2">2</a>).
 
-<div class="figure*">
-
-<embed src="fig_m2_coded.pdf" style="width:92.0%" />
-
-</div>
+<figure id="fig:m2">
+<embed src="fig_m2_coded.pdf" />
+<figcaption>M2: a coded-exposure pixel. (a) A <span class="math inline">1</span>-bit in-pixel SRAM drives the gate between the photodiode (PD) and the storage node (SN). (b) Each pixel’s keyed on/off code sets how long it integrates within the frame, and hence its effective gain, independently of its neighbors.</figcaption>
+</figure>
 
 #### (M3) Stacked per-pixel processing (3D integration + hybrid bonding)
 
-The decisive enabler is 3D stacking. Backside-illuminated (BSI) sensors put the photodiode on one wafer and move all circuitry to wafers bonded beneath it; with *Cu–Cu hybrid bonding* the two wafers are joined by per-pixel vertical copper interconnects with no bumps. Sony shipped the first hybrid-bonded BI-CIS in 2016 and has since driven the interconnect pitch below $2\,\mu$m  (Jiang et al. 2025; Kagawa et al. 2017); research bonders reach a $400$ nm pitch with $\sim\!10^{6}$ interconnects per mm$^2$ (imec 2024). This makes *digital pixel sensors* (DPS) practical: each pixel gets its own ADC and in-pixel memory on a stacked tier—e.g. a $3$-layer DPS with a 10-bit in-pixel SRAM and on-die ISP (Tsai et al. 2025; Goto et al. 2022; Udoy et al. 2024), and three-wafer sensors that place a DNN/ISP tier beneath the pixels (Nakamura et al. 2024). Once a per-pixel ADC, memory, and logic tier exist, *per-pixel gain is essentially free*: the stacked logic multiplies each pixel’s digitized value by a per-pixel factor read from the keyed code memory *inside the attested sensor die*, before any output leaves the chip. This is stronger than the ISP fallback (the modulation never leaves trusted silicon) though still a digital—not photo-electron—operation; combining M3 with M1 yields both a robust digital channel and an analog-domain root (Fig. <a href="#fig:m3" data-reference-type="ref" data-reference="fig:m3">[fig:m3]</a>).
+The decisive enabler is 3D stacking. Backside-illuminated (BSI) sensors put the photodiode on one wafer and move all circuitry to wafers bonded beneath it; with *Cu–Cu hybrid bonding* the two wafers are joined by per-pixel vertical copper interconnects with no bumps. Sony shipped the first hybrid-bonded BI-CIS in 2016 and has since driven the interconnect pitch below $2\,\mu$m  (Jiang et al. 2025; Kagawa et al. 2017); research bonders reach a $400$ nm pitch with $\sim\!10^{6}$ interconnects per mm$^2$ (imec 2024). This makes *digital pixel sensors* (DPS) practical: each pixel gets its own ADC and in-pixel memory on a stacked tier—e.g. a $3$-layer DPS with a 10-bit in-pixel SRAM and on-die ISP (Tsai et al. 2025; Goto et al. 2022; Udoy et al. 2024), and three-wafer sensors that place a DNN/ISP tier beneath the pixels (Nakamura et al. 2024). Once a per-pixel ADC, memory, and logic tier exist, *per-pixel gain is essentially free*: the stacked logic multiplies each pixel’s digitized value by a per-pixel factor read from the keyed code memory *inside the attested sensor die*, before any output leaves the chip. This is stronger than the ISP fallback (the modulation never leaves trusted silicon) though still a digital—not photo-electron—operation; combining M3 with M1 yields both a robust digital channel and an analog-domain root (Fig. <a href="#fig:m3" data-reference-type="ref" data-reference="fig:m3">3</a>).
 
-<div class="figure*">
-
-<embed src="fig_m3_stack.pdf" style="width:86.0%" />
-
-</div>
+<figure id="fig:m3">
+<embed src="fig_m3_stack.pdf" />
+<figcaption>M3: a <span class="math inline">3</span>-layer stacked BSI sensor joined by Cu–Cu hybrid bonding (pitch below <span class="math inline">2 <em>μ</em></span>m in production and <span class="math inline">0.4 <em>μ</em></span>m in research). A per-pixel ADC and SRAM tier and a logic tier (frame memory, ISP, keyed PRNG, provenance write) sit under each pixel with no fill-factor penalty.</figcaption>
+</figure>
 
 #### Cost and trade-offs
 
@@ -206,7 +205,7 @@ The payload $\mathbf{m}$ is a fixed-width record (PixelRoot v2: $128$ bits): $$
 
 <div class="figure*">
 
-<embed src="fig_datapath.pdf" style="width:96.0%" />
+![image](fig_datapath.pdf)
 
 </div>
 
@@ -235,8 +234,7 @@ Immediately after readout, the sensor forms and signs a *capture record* (§<a h
 
 <div class="algorithmic">
 
-carrier key $k$, amplitude $A$, repetition $R$, basis $\Phi_{u,v}$; on-die key $\mathit{sk}$ with certified $\mathit{pk}\in$ lot $\Lambda$ $\beta\gets$ (number, hash) of a recent block $\mathrm{ID}\gets\mathrm{readOTP}()$ $t\gets\mathrm{attestedClock}();\;(\phi,\lambda_{\mathrm{geo}})\gets\mathrm{gps}()$ $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda_{\mathrm{geo}})$ $\mathbf{b}\gets \mathrm{ECC\text{-}Encode}(\mathbf{m})$ $\mathrm{prng}\gets\mathrm{CSPRNG}(\mathrm{SHA\text{-}256}(k))$ draw $R$ distinct blocks $\{B_j\}$, chips $c_j\!\in\!\{\pm1\}$ via prng set per-region gain ramp on $B_j$: add $A\,\sigma_i c_j\,\Phi_{u,v}$ $I\gets \mathrm{expose\_and\_readout}()$; $E\gets\mathrm{encode}(I)$ $r\gets(\mathit{pk},\mu,\Lambda,\mathbf{m},\mathcal H(I),\mathcal H(E),F(I),\beta,c)$; $\psi\gets\mathrm{Sign}_{\mathit{sk}}(r)$ $h\gets \mathrm{SHA\text{-}256}(r\,\|\,\psi)$; enqueue $h$ for Merkle batch **on flush:** $\mathit{root}\gets\mathrm{Merkle}(\{h\});\;
-        \mathrm{register}(\mathit{root})$ **store** $E$ with $(r,\psi,\pi)$ in a C2PA manifest; publish $(r,\psi,\pi)$ to the record store when $E$ is published
+carrier key $k$, amplitude $A$, repetition $R$, basis $\Phi_{u,v}$; on-die key $\mathit{sk}$ with certified $\mathit{pk}\in$ lot $\Lambda$ $\beta\gets$ number and hash of a recent block $\mathrm{ID}\gets\mathrm{readOTP}()$ $t\gets\mathrm{attestedClock}();\;(\phi,\lambda_{\mathrm{geo}})\gets\mathrm{gps}()$ $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda_{\mathrm{geo}})$ $\mathbf{b}\gets \mathrm{RS\text{-}Encode}(\mathbf{m})$ $\mathrm{prng}\gets\mathrm{CSPRNG}(\mathrm{SHA\text{-}256}(k))$ $\sigma_i\gets 2b_i-1$; draw $R$ distinct blocks $B_j$ and chips $c_j\in\{\pm1\}$ from prng gain ramp on $B_j$: add $A\,\sigma_i c_j\,\Phi_{u,v}$ $I\gets \mathrm{expose\_and\_readout}()$; $E\gets\mathrm{encode}(I)$ $r\gets(\mathit{pk},\mu,\Lambda,\mathbf{m},\mathcal H(I),\mathcal H(E),F(I),\beta,c)$ $\psi\gets\mathrm{Sign}_{\mathit{sk}}(r)$; $c\gets c+1$ $h\gets \mathrm{SHA\text{-}256}(r\,\|\,\psi)$; enqueue $h$ for Merkle batch **on flush:** $\mathit{root}\gets\mathrm{Merkle}(\{h\})$; $\mathrm{register}(\mathit{root})$ **store** $E$ with $(r,\psi,\pi)$ in a C2PA manifest; publish $(r,\psi,\pi)$ to the record store when $E$ is published
 
 </div>
 
@@ -282,7 +280,7 @@ With identity carried by the signed record, the carrier key $k$ protects the rob
 
 ## Smart-contract registry
 
-On-chain state is intentionally minimal and holds only ledger facts: admitted manufacturers, certified lots of sensor keys, revocation times, and the block time at which each batch root was sealed. Every Merkle tree (lots and capture batches) uses the same domain-separated construction, $\mathrm{leaf}=\mathrm{SHA\text{-}256}(\texttt{0x00}\|x)$ and $\mathrm{node}=\mathrm{SHA\text{-}256}(\texttt{0x01}\|\min(a,b)\|\max(a,b))$, with an odd node promoted rather than duplicated; the prefix stops an internal node from being presented as a leaf, and promotion rules out the duplicate-last-node mutation. Batching $N$ captures under one root makes per-image gas $O(1)$ amortized, and inclusion is proven with a $\lceil\log_2 N\rceil$-length path. Sealing is deliberately permissionless—any device, app, or batcher may submit, so no party can censor a capture—and the submitter carries no trust: authenticity comes from the sensor signature inside each record, checked against the certified lots. Listing <a href="#lst:sol" data-reference-type="ref" data-reference="lst:sol">[lst:sol]</a> shows the notarization and verification calls; The full contract, an $18$-case test suite, and the measured gas (§<a href="#sec:e6" data-reference-type="ref" data-reference="sec:e6">9.4</a>) are released.
+On-chain state is intentionally minimal and holds only ledger facts: admitted manufacturers, certified lots of sensor keys, revocation times, and the block time at which each batch root was sealed. Every Merkle tree (lots and capture batches) uses the same domain-separated construction, $\mathrm{leaf}=\mathrm{SHA\text{-}256}(\texttt{0x00}\|x)$ and $\mathrm{node}=\mathrm{SHA\text{-}256}(\texttt{0x01}\|\min(a,b)\|\max(a,b))$, with an odd node promoted rather than duplicated; the prefix stops an internal node from being presented as a leaf, and promotion rules out the duplicate-last-node mutation. Batching $N$ captures under one root makes per-image gas $O(1)$ amortized, and inclusion is proven with a $\lceil\log_2 N\rceil$-length path. Sealing is deliberately permissionless—any device, app, or batcher may submit, so no party can censor a capture—and the submitter carries no trust: authenticity comes from the sensor signature inside each record, checked against the certified lots. Listing <a href="#lst:sol" data-reference-type="ref" data-reference="lst:sol">[lst:sol]</a> shows the notarization and verification calls. The full contract, an $18$-case test suite, and the measured gas (§<a href="#sec:e6" data-reference-type="ref" data-reference="sec:e6">9.4</a>) are released.
 
 ```
 // SPDX-License-Identifier: MIT
@@ -510,7 +508,7 @@ A verifier holds a questioned file (bytes $E'$, pixels $I'$), the public ledger,
 
 <div class="algorithmic">
 
-ledger, record store, carrier key $k$, threshold $\tau$ **if** $\exists$ valid $r$ with $\mathcal H(E')\in\{\mathcal H(E(I)),\mathcal H(I)\}$ **return** Camera-original $(\{B_j\},\{c_j\})\gets \mathrm{Select}(\mathrm{SHA\text{-}256}(k),N_B,n_c,R)$ $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$ $D_i\gets \sum_{j} c_j\,\langle I'_{B_j+\delta^\star},\Phi_{u,v}\rangle/\|\Phi_{u,v}\|^2$ $\hat b_i\gets \mathbf{1}[D_i>0];\; w_i\gets |D_i|$ $\hat{\mathbf{m}}\gets \mathrm{ECC\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$ Transcoded-consistent, $r$ Unverified
+ledger, record store, carrier key $k$, threshold $\tau$ Camera-original, $r$ $(\{B_j\},\{c_j\})\gets \mathrm{Select}(\mathrm{SHA\text{-}256}(k),N_B,n_c,R)$ $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$ $D_i\gets \sum_{j} c_j\,\langle I'_{B_j+\delta^\star},\Phi_{u,v}\rangle/\|\Phi_{u,v}\|^2$ $\hat b_i\gets \mathbf{1}[D_i>0]$; $w_i\gets |D_i|$ $\hat{\mathbf{m}}\gets \mathrm{RS\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$ Transcoded-consistent, $r$ Unverified
 
 </div>
 
@@ -766,7 +764,7 @@ Per-pixel tamper-localization on **24 real Kodak images** with **48 real splices
 
 <div class="figure*">
 
-<embed src="fig_results.pdf" style="width:92.0%" />
+![image](fig_results.pdf)
 
 </div>
 
@@ -782,7 +780,7 @@ We evaluate the full verification path of §<a href="#sec:identity" data-referen
 
 **Cross-scene forgeries** (Table <a href="#tab:e6attacks" data-reference-type="ref" data-reference="tab:e6attacks">[tab:e6attacks]</a>). The keyless copy attack estimates the mark from a JPEG $Q75$ copy of the source by the detector’s own public projection and high-pass and adds $1.5\times$ the estimate to another image; the forgery decodes the source’s payload in $61/78$ attempts ($78\%$), and $70/78$ with the original in hand. The content-bound record rejects all $156$ (CI upper bound $0.05$ per attack), and all $24$ splices covering $6$–$12\%$ of the frame, including the $21$ whose payload still decodes.
 
-**Local edits within one capture.** Smaller pasted patches are sometimes within $\tau$: $3/12$ at $64\times64$ px (about $1\%$ of the frame), $1/12$ at $96\times96$, $0/12$ at $128\times128$, and $2/12$ for a $128$-px patch near the border followed by an $8$-px shift (a whole foreign tile row followed by the same shift is rejected $12/12$, so a crop no longer hides content). An *adaptive* adversary who holds the original does better: after pasting a $96\times96$ foreign patch it re-imposes the original’s mean on every fingerprint cell, and $11/12$ such images are accepted. The pasted detail survives only below the cell size (about $5$ px here): its correlation with the donor is $0.52$, and it changes the patch by $17.8$ gray levels on average—visible on inspection (Fig. <a href="#fig:adaptive" data-reference-type="ref" data-reference="fig:adaptive">1</a>). These results are why PixelRoot defines a transcoded verdict as *derivation from a notarized capture*, returns the record (and, when published, the original file) for comparison, and reserves pixel-exact certification for V1 (§<a href="#sec:identity" data-reference-type="ref" data-reference="sec:identity">5.7</a>).
+**Local edits within one capture.** Smaller pasted patches are sometimes within $\tau$: $3/12$ at $64\times64$ px (about $1\%$ of the frame), $1/12$ at $96\times96$, $0/12$ at $128\times128$, and $2/12$ for a $128$-px patch near the border followed by an $8$-px shift (a whole foreign tile row followed by the same shift is rejected $12/12$, so a crop no longer hides content). An *adaptive* adversary who holds the original does better: after pasting a $96\times96$ foreign patch it re-imposes the original’s mean on every fingerprint cell, and $11/12$ such images are accepted. The pasted detail survives only below the cell size (about $5$ px here): its correlation with the donor is $0.52$, and it changes the patch by $17.8$ gray levels on average—visible on inspection (Fig. <a href="#fig:adaptive" data-reference-type="ref" data-reference="fig:adaptive">4</a>). These results are why PixelRoot defines a transcoded verdict as *derivation from a notarized capture*, returns the record (and, when published, the original file) for comparison, and reserves pixel-exact certification for V1 (§<a href="#sec:identity" data-reference-type="ref" data-reference="sec:identity">5.7</a>).
 
 **Ledger and record attacks.** All eleven record- and ledger-level cases in Table <a href="#tab:e6attacks" data-reference-type="ref" data-reference="tab:e6attacks">[tab:e6attacks]</a> behave as specified, including time-scoped revocation in both directions, an anchor block later than the seal, an anchor hash that is not the chain’s, and a burst of two captures sharing one payload (both resolve).
 
@@ -834,11 +832,11 @@ Burst: two records, one payload & — & $2/2$ (valid)
 </div>
 
 <figure id="fig:adaptive">
-<img src="fig_adaptive.png" />
-<figcaption>Adaptive local edit accepted as Transcoded-consistent (E6). Left: marked original. Centre: a <span class="math inline">96 × 96</span> patch from another photograph, pasted and then forced to the original’s fingerprint-cell means, after JPEG <span class="math inline"><em>Q</em>90</span>. Right: the donor. The edit is visible on inspection and appears in a comparison with the original that the record links to; only V1 certifies exact pixels.</figcaption>
+<embed src="fig_adaptive.pdf" />
+<figcaption>Adaptive local edit accepted as Transcoded-consistent (E6). (a) Marked original. (b) A <span class="math inline">96 × 96</span> patch (dashed) pasted from another photograph and forced to the original’s fingerprint-cell means, after JPEG <span class="math inline"><em>Q</em>90</span>. (c) The donor. The edit is visible on inspection and in a comparison with the original that the record links to; only V1 certifies exact pixels.</figcaption>
 </figure>
 
-**Scope and threats to validity.** These results validate the *algorithmic* core—carrier design, host-suppressed spread-spectrum detection, robustness to *real* JPEG/WebP/noise/blur/resize/photometric/crop attacks, false-accept behavior, and tamper localization—on *real public imagery* with *real codecs* and a *real Reed–Solomon* code, independent of silicon. They embed an *additive* luma perturbation, whereas a sensor gain change is *multiplicative*: the imprinted signal scales with scene brightness, weakening in dark regions and clipping at saturation. They do not yet model this, demosaicing from the Bayer/RAW domain, real per-column gain calibration error, lens/optical effects, or the analog photo-electron domain. The device-identity results (E6) use a software model of the sensor key and an executable model of the ledger; the contract is tested on a local EVM, not on a public network; the PRNU comparison uses real Kodak *content* with the textbook multiplicative sensor model (per-camera RAW datasets are access-gated). The full harness, datasets script, and figures are released for reproduction.
+**Threats to validity.** These results validate the *algorithmic* core—carrier design, host-suppressed spread-spectrum detection, robustness to *real* JPEG/WebP/noise/blur/resize/photometric/crop attacks, false-accept behavior, and tamper localization—on *real public imagery* with *real codecs* and a *real Reed–Solomon* code, independent of silicon. They embed an *additive* luma perturbation, whereas a sensor gain change is *multiplicative*: the imprinted signal scales with scene brightness, weakening in dark regions and clipping at saturation. They do not yet model this, demosaicing from the Bayer/RAW domain, real per-column gain calibration error, lens/optical effects, or the analog photo-electron domain. The device-identity results (E6) use a software model of the sensor key and an executable model of the ledger; the contract is tested on a local EVM, not on a public network; the PRNU comparison uses real Kodak *content* with the textbook multiplicative sensor model (per-camera RAW datasets are access-gated). The full harness, datasets script, and figures are released for reproduction.
 
 ## Remaining silicon- and codec-dependent validation
 

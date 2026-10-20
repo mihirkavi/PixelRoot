@@ -6,11 +6,11 @@ PixelRoot: Hardware-Anchored, Sensor-Level Media Provenance with Real-Time Block
 Authors:
 Mihir Kavishwar
 
-Abstract (plain text, 1,633 characters; arXiv limit 1,920):
+Abstract (plain text, 1,468 characters; arXiv limit 1,920):
 see arxiv_abstract.txt
 
 Comments:
-22 pages, 8 figures, 8 tables, 1 listing. Submitted to IEEE Transactions on Information Forensics and Security. Code and data scripts: https://github.com/mihirkavi/PixelRoot
+20 pages, 8 figures, 8 tables, 1 listing. Submitted to IEEE Transactions on Information Forensics and Security. Code and data scripts: https://github.com/mihirkavi/PixelRoot
 
 Primary category:   cs.CR (Cryptography and Security)
 Cross-lists:        cs.CV (Computer Vision and Pattern Recognition); eess.IV (Image and Video Processing)

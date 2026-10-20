@@ -27,8 +27,6 @@
 \usepackage{array}
 \usepackage{url}
 \usepackage{listings}
-\usepackage{tikz}
-\usetikzlibrary{shapes.geometric,arrows.meta,positioning,calc,fit,backgrounds}
 \usepackage[hidelinks]{hyperref}
 \hypersetup{pdftitle={PixelRoot: Hardware-Anchored, Sensor-Level Media Provenance with Real-Time Blockchain Notarization for Trustworthy Imaging},pdfauthor={Mihir Kavishwar},pdfkeywords={media provenance, deepfakes, blockchain, CMOS image sensor, digital watermarking, C2PA}}
 
@@ -38,6 +36,7 @@
 \newcommand{\pr}{\textup{\textsc{PixelRoot}}}
 
 % --- Lightweight theorem environments (IEEEtran-compatible) ---
+\renewcommand{\algorithmiccomment}[1]{\hfill$\triangleright$\,#1}
 \newtheorem{proposition}{Proposition}
 \newtheorem{theorem}{Theorem}
 \newtheorem{definition}{Definition}
@@ -64,28 +63,16 @@
   frame=single,
   framerule=0.3pt,
   rulecolor=\color{gray!50},
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  numbersep=5pt,
-  xleftmargin=14pt
+  numbers=none,
+  framesep=2.5pt,
+  xleftmargin=0pt,
+  aboveskip=2pt,
+  belowskip=0pt,
+  captionpos=b,
+  abovecaptionskip=6pt,
+  belowcaptionskip=0pt
 }
 
-% TikZ block styles for architecture / flow figures
-\tikzset{
-  stage/.style={rectangle, rounded corners=2pt, draw=black!70, thick,
-    fill=blue!6, align=center, minimum height=8mm, inner sep=3pt,
-    font=\scriptsize},
-  hw/.style={stage, fill=orange!12},
-  store/.style={stage, fill=green!10},
-  chain/.style={stage, fill=purple!10},
-  dec/.style={diamond, draw=black!70, thick, fill=yellow!18, align=center,
-    inner sep=1pt, aspect=2, font=\scriptsize},
-  term/.style={rectangle, rounded corners=6pt, draw=black!70, thick,
-    fill=red!8, align=center, font=\scriptsize, minimum height=7mm},
-  good/.style={rectangle, rounded corners=6pt, draw=black!70, thick,
-    fill=green!14, align=center, font=\scriptsize, minimum height=7mm},
-  flow/.style={-{Stealth[length=2mm]}, thick}
-}
 
 \begin{document}
 
@@ -124,27 +111,26 @@ may no longer be accessible.}\fi}
 
 %==============================================================
 \begin{abstract}
-The realism of AI-generated ``deepfake'' imagery has outpaced society's ability
-to tell synthetic media from camera-captured reality. Detectors generalize poorly
-to unseen generators, and provenance schemes that bind trust to \emph{metadata}
-fail once the metadata is stripped. We present \pr{}, which moves the root of
-trust into the \emph{pixels} and onto a public blockchain. At capture, a CMOS
-sensor embeds a $128$-bit, Reed--Solomon-coded provenance payload through a keyed,
-low-frequency per-region gain modulation. Each sensor holds a signing key
-generated on-die and certified on the blockchain by its manufacturer; it signs a
-capture record that binds the payload to the frame's hashes and to a robust
-content fingerprint, and the record is notarized on the same blockchain, which
-also records time-scoped revocation. We contribute a formal architecture and
-threat model with five security propositions; a measured
-robustness study on the Kodak images with real codecs, recovering the payload on $22$--$23/24$ images down to JPEG $Q20$ ($21/24$ at
-$Q10$) at $38$\,dB PSNR with $0/1224$ false accepts; a device-identity evaluation
-showing that the in-pixel mark alone can be copied without any key ($78\%$ of
-trials) while the content-bound record rejects every cross-scene copy and large
-splice on held-out images ($0/180$) and lets $90\%$ of processed genuine copies
-verify, linking local edits back to the original; a tested registry contract ($47$\,k gas per batch, $O(1)$
-per image); a CMOS-manufacturing
-feasibility analysis of per-pixel gain; and a privacy-preserving notarization design with a
-phased adoption path toward a cross-OEM interoperability standard.
+AI can now generate photos and videos that people cannot tell from real
+recordings. Deepfake detectors fail on unseen generators, and provenance
+standards such as C2PA keep their proof mainly in file metadata, which is lost
+when a platform strips or re-encodes the file. We present \pr{}, which keeps
+proof of origin where it cannot be stripped: in the pixels and on a public
+blockchain. At capture, the image sensor writes an error-corrected identifier
+into the image through a faint, keyed change in pixel gain that survives
+compression. The sensor also signs a capture record with a key that never leaves
+the chip; the record ties the identifier to the image's hashes and a content
+fingerprint, and its hash is sealed on the blockchain, where manufacturers also
+certify and revoke sensor keys. A verifier can thus confirm an exact camera
+original, confirm that a re-compressed copy derives from a genuine capture, or
+fail safe to ``unverified''. On the Kodak images with real codecs, the
+identifier survives JPEG compression down to quality $20$ on $22$--$23$ of $24$
+images ($21$ at quality $10$) at $38$\,dB PSNR, with no false accepts in
+$1{,}224$ trials. An identifier copied onto another image no longer matches the
+signed fingerprint, so every cross-scene copy and large splice is rejected
+($0/180$), while $90\%$ of processed genuine copies verify. A tested smart
+contract seals each batch of captures for $47$k gas, and we show how sensor
+makers can build the required gain control.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -592,47 +578,7 @@ consumes them.
 
 \begin{figure*}[t]
 \centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[node distance=5mm and 6.5mm]
-% --- capture pipeline (top) ---
-\node[hw] (sensor) {CMOS sensor\\OTP \textsf{ID} $+$ on-die $\mathit{sk}$};
-\node[stage, right=of sensor] (payload) {Payload $\mathbf{m}$\\\textsf{ID}$\|t\|$GPS};
-\node[stage, right=of payload] (rs) {RS encode\\$\mathbf{m}\!\to\!\mathbf{b}$};
-\node[stage, right=of rs] (sel) {Keyed PRNG\\select regions};
-\node[hw, right=of sel] (gain) {Per-region\\gain ramp};
-\node[hw, right=of gain] (read) {Expose \&\\readout $I$};
-\node[hw, right=of read] (hash) {Sign record $r$\\$h{=}$SHA-256$(r\|\psi)$};
-% key input
-\node[stage, above=7mm of sel, fill=gray!12] (key) {OEM carrier\\key $k$};
-% storage + chain
-\node[store, below=9mm of read] (storeimg) {Store $I$ $+$\\C2PA manifest};
-\node[chain, below=9mm of hash] (merkle) {Merkle batch\\$\to$ root};
-\node[chain, right=of merkle] (chain) {Public ledger\\(lots, revocation,\\sealed roots)};
-% arrows capture
-\foreach \a/\b in {sensor/payload,payload/rs,rs/sel,sel/gain,gain/read,read/hash}
-  \draw[flow] (\a) -- (\b);
-\draw[flow] (key) -- (sel);
-\draw[flow] (read) -- (storeimg);
-\draw[flow] (hash) -- (merkle);
-\draw[flow] (merkle) -- (chain);
-% --- verification (bottom) ---
-\node[stage, below=14mm of storeimg, fill=blue!4] (qimg) {Questioned\\file $(E',I')$};
-\node[dec, right=12mm of qimg] (v1) {V1\\file hash\\in record?};
-\node[dec, below=8mm of v1] (v2) {V2\\decode $\hat{\mathbf m}$;\\record \&\\$d(F){\le}\tau$?};
-\node[good, right=12mm of v1] (orig) {\textbf{Camera-original}\\(V1)};
-\node[good, right=12mm of v2, fill=green!8] (trans) {\textbf{Transcoded-}\\\textbf{consistent} (V2)};
-\node[term, below=7mm of trans] (unv) {\textbf{Unverified}\\(fail-safe)};
-\draw[flow] (qimg) -- (v1);
-\draw[flow] (qimg) |- (v2);
-\draw[flow] (v1) -- node[above,font=\tiny]{yes} (orig);
-\draw[flow] (v1) -- node[right,font=\tiny]{no} (v2);
-\draw[flow] (v2) -- node[above,font=\tiny]{yes} (trans);
-\draw[flow] (v2) -- node[right,font=\tiny]{no} (unv);
-% link chain to V1
-\draw[flow, dashed] (chain.south) |- ($(v1.east)+(1.6,-0.0)$) -- (v1.east);
-\draw[flow, dashed] (storeimg.south) -- (qimg.north);
-\end{tikzpicture}%
-}
+\includegraphics{fig_architecture.pdf}
 \caption{\pr{} architecture. \emph{Top:} the capture path emits a hard binding
 (the hash of a sensor-signed capture record, sealed on the public ledger) and a
 soft in-pixel binding (the keyed, error-corrected gain pattern carried inside
@@ -729,7 +675,7 @@ achievable; \pr{} can use any of them, and they can be combined.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.93\textwidth]{fig_gain_spectrum.pdf}
+\includegraphics{fig_gain_spectrum.pdf}
 \caption{The provenance-write gain-control spectrum. \pr{}'s robust channel is
 realizable \emph{today} at per-region granularity (column-parallel front-ends);
 per-pixel gain is a manufacturable upgrade via M1--M3, not a prerequisite.}
@@ -752,14 +698,15 @@ ship; its limitation is quantization to a few discrete gain levels, which is
 ample for $1$--$2$ bits/pixel under \pr{}'s spread-spectrum coding
 (Fig.~\ref{fig:m1}).
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-\includegraphics[width=0.82\textwidth]{fig_m1_dcg.pdf}
-\caption{M1: a $4$T pixel with a per-pixel dual-conversion-gain (DCG) transistor.
-A keyed GAIN-SELECT bit switches the extra FD capacitance $C_\mathrm{DCG}$
-in/out, toggling HIGH/LOW conversion gain to imprint an analog-domain chip.}
+\includegraphics{fig_m1_dcg.pdf}
+\caption{M1: a $4$T pixel with a dual-conversion-gain (DCG) transistor. A keyed
+gain-select bit on the DCG gate switches the extra capacitance $C_\mathrm{DCG}$
+onto the floating diffusion (FD), toggling between high and low conversion gain
+to imprint an analog-domain chip.}
 \label{fig:m1}
-\end{figure*}
+\end{figure}
 
 \paragraph{(M2) Per-pixel exposure/charge modulation (coded-exposure pixels)}
 A second, demonstrated route adds a per-pixel switch plus a one-bit code memory
@@ -772,14 +719,15 @@ modulator. These designs have been fabricated in standard CMOS, confirming
 manufacturability; the cost is the extra in-pixel transistors/SRAM, which
 enlarge pixel pitch unless absorbed by stacking (M3) (Fig.~\ref{fig:m2}).
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig_m2_coded.pdf}
-\caption{M2: a coded-exposure pixel. A $1$-bit in-pixel SRAM gates integration,
-so each pixel's keyed on/off code sets its effective gain independently of its
-neighbours (timing, right).}
+\includegraphics{fig_m2_coded.pdf}
+\caption{M2: a coded-exposure pixel. (a) A $1$-bit in-pixel SRAM drives the gate
+between the photodiode (PD) and the storage node (SN). (b) Each pixel's keyed
+on/off code sets how long it integrates within the frame, and hence its
+effective gain, independently of its neighbors.}
 \label{fig:m2}
-\end{figure*}
+\end{figure}
 
 \paragraph{(M3) Stacked per-pixel processing (3D integration + hybrid bonding)}
 The decisive enabler is 3D stacking. Backside-illuminated (BSI) sensors put the
@@ -802,15 +750,15 @@ silicon) though still a digital---not photo-electron---operation; combining M3
 with M1 yields both a robust digital channel and an analog-domain root
 (Fig.~\ref{fig:m3}).
 
-\begin{figure*}[t]
+\begin{figure}[t]
 \centering
-\includegraphics[width=0.86\textwidth]{fig_m3_stack.pdf}
+\includegraphics{fig_m3_stack.pdf}
 \caption{M3: a $3$-layer stacked BSI sensor joined by Cu--Cu hybrid bonding
-($\approx\!0.4\,\mu$m pitch, $\sim\!10^{6}$ interconnects/mm$^2$). A per-pixel ADC,
-SRAM, and a logic tier (frame memory, ISP, keyed PRNG/provenance-write) sit under
-each pixel with no fill-factor penalty.}
+(pitch below $2\,\mu$m in production and $0.4\,\mu$m in research). A per-pixel
+ADC and SRAM tier and a logic tier (frame memory, ISP, keyed PRNG, provenance
+write) sit under each pixel with no fill-factor penalty.}
 \label{fig:m3}
-\end{figure*}
+\end{figure}
 
 \paragraph{Cost and trade-offs} The honest costs are area, pixel pitch, yield,
 and power: extra in-pixel devices (M1/M2) compete with the photodiode for area
@@ -872,7 +820,7 @@ coarsened or replaced by a salted commitment disclosed only under subpoena
 \else
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.96\textwidth]{fig_datapath.pdf}
+\includegraphics{fig_datapath.pdf}
 \caption{The \pr{} provenance-write datapath at capture time. The keyed PRNG
 (seed $\mathcal H(k)$) selects carriers; the gain/exposure hardware
 applies the RS-coded payload as $\pm$chips; after readout the sensor signs a
@@ -989,28 +937,23 @@ queued in secure storage and submitted on reconnect, with the latency recorded.
 \begin{algorithmic}[1]
 \REQUIRE carrier key $k$, amplitude $A$, repetition $R$, basis $\Phi_{u,v}$;
          on-die key $\mathit{sk}$ with certified $\mathit{pk}\in$ lot $\Lambda$
-\STATE $\beta\gets$ (number, hash) of a recent block
-       \quad\COMMENT{capture-time lower bound}
-\STATE $\mathrm{ID}\gets\mathrm{readOTP}()$
-       \quad\COMMENT{48-bit pseudonymous handle}
+\STATE $\beta\gets$ number and hash of a recent block \COMMENT{time bound}
+\STATE $\mathrm{ID}\gets\mathrm{readOTP}()$ \COMMENT{48-bit pseudonymous handle}
 \STATE $t\gets\mathrm{attestedClock}();\;(\phi,\lambda_{\mathrm{geo}})\gets\mathrm{gps}()$
-\STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda_{\mathrm{geo}})$
-       \quad\COMMENT{$128$ bits}
-\STATE $\mathbf{b}\gets \mathrm{ECC\text{-}Encode}(\mathbf{m})$
-       \quad\COMMENT{RS, coded bits $b_1{\dots}b_{n_c}$}
+\STATE $\mathbf{m}\gets \mathrm{ID}\,\|\,t\,\|\,\mathrm{quant}(\phi,\lambda_{\mathrm{geo}})$ \COMMENT{$128$ bits}
+\STATE $\mathbf{b}\gets \mathrm{RS\text{-}Encode}(\mathbf{m})$ \COMMENT{coded bits $b_1\dots b_{n_c}$}
 \STATE $\mathrm{prng}\gets\mathrm{CSPRNG}(\mathrm{SHA\text{-}256}(k))$
-\FORALL{coded bit $b_i$, $\sigma_i\gets 2b_i{-}1$}
-   \STATE draw $R$ distinct blocks $\{B_j\}$, chips $c_j\!\in\!\{\pm1\}$ via prng
+\FORALL{coded bits $b_i$}
+   \STATE $\sigma_i\gets 2b_i-1$; draw $R$ distinct blocks $B_j$ and chips $c_j\in\{\pm1\}$ from prng
    \FORALL{$(B_j,c_j)$}
-     \STATE set per-region gain ramp on $B_j$: add $A\,\sigma_i c_j\,\Phi_{u,v}$
+     \STATE gain ramp on $B_j$: add $A\,\sigma_i c_j\,\Phi_{u,v}$
    \ENDFOR
 \ENDFOR
 \STATE $I\gets \mathrm{expose\_and\_readout}()$;\; $E\gets\mathrm{encode}(I)$
-\STATE $r\gets(\mathit{pk},\mu,\Lambda,\mathbf{m},\mathcal H(I),\mathcal H(E),F(I),\beta,c)$;\;
-       $\psi\gets\mathrm{Sign}_{\mathit{sk}}(r)$
+\STATE $r\gets(\mathit{pk},\mu,\Lambda,\mathbf{m},\mathcal H(I),\mathcal H(E),F(I),\beta,c)$
+\STATE $\psi\gets\mathrm{Sign}_{\mathit{sk}}(r)$;\; $c\gets c+1$
 \STATE $h\gets \mathrm{SHA\text{-}256}(r\,\|\,\psi)$;\; enqueue $h$ for Merkle batch
-\STATE \textbf{on flush:} $\mathit{root}\gets\mathrm{Merkle}(\{h\});\;
-        \mathrm{register}(\mathit{root})$
+\STATE \textbf{on flush:} $\mathit{root}\gets\mathrm{Merkle}(\{h\})$;\; $\mathrm{register}(\mathit{root})$
 \STATE \textbf{store} $E$ with $(r,\psi,\pi)$ in a C2PA manifest; publish
        $(r,\psi,\pi)$ to the record store when $E$ is published
 \end{algorithmic}
@@ -1156,16 +1099,17 @@ Sealing is deliberately permissionless---any device, app, or batcher may submit,
 so no party can censor a capture---and the submitter carries no trust:
 authenticity comes from the sensor signature inside each record, checked against
 the certified lots. \ifshort\else Listing~\ref{lst:sol} shows the notarization and
-verification calls; \fi The full contract, an $18$-case test suite, and the measured
+verification calls. \fi The full contract, an $18$-case test suite, and the measured
 gas (\S\ref{sec:e6}) are released.
 
 \ifshort\else
-\lstinputlisting[style=solidity,caption={\pr{}Registry (v2): permissionless
-batch sealing and the verification calls (excerpt).},label={lst:sol},
-linerange=@listing-begin-@listing-end,rangeprefix=//\ ,includerangemarker=false]{contracts/src/PixelRootRegistry.sol}
+\lstinputlisting[style=solidity,float=t,caption={\pr{}Registry (v2) excerpt:
+permissionless batch sealing, the time-scoped sensor check, and the one-call
+capture check (comments and getters omitted).},label={lst:sol},
+linerange={117-122,154-169,175-190}]{contracts/src/PixelRootRegistry.sol}
 \fi
 
-\noindent A capture is \emph{notarized} once \texttt{register} mines. A verifier
+A capture is \emph{notarized} once \texttt{register} mines. A verifier
 later calls \texttt{verifyCapture} (a view call, no gas) with the batch root, the
 record hash and its path, and the sensor's manufacturer, lot root, key hash and
 path; it learns whether the record is sealed, at what time and in which block,
@@ -1203,16 +1147,16 @@ onto other content resolves to a record describing different content.
 \label{alg:verify}
 \begin{algorithmic}[1]
 \REQUIRE ledger, record store, carrier key $k$, threshold $\tau$
-\STATE \textbf{if} $\exists$ valid $r$ with $\mathcal H(E')\in\{\mathcal H(E(I)),\mathcal H(I)\}$
-       \textbf{return} \textsc{Camera-original}
+\IF{a valid $r$ has $\mathcal H(E)=\mathcal H(E')$ or $\mathcal H(I)=\mathcal H(E')$}
+  \RETURN \textsc{Camera-original}, $r$
+\ENDIF
 \STATE $(\{B_j\},\{c_j\})\gets \mathrm{Select}(\mathrm{SHA\text{-}256}(k),N_B,n_c,R)$
-\STATE $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$
-       \quad\COMMENT{block-grid resync, \S\ref{sec:geom}}
+\STATE $\delta^\star\gets \arg\max_{\delta}\sum_i |D_i(\delta)|$ \COMMENT{grid resync}
 \FORALL{coded bit $i$}
   \STATE $D_i\gets \sum_{j} c_j\,\langle I'_{B_j+\delta^\star},\Phi_{u,v}\rangle/\|\Phi_{u,v}\|^2$
-  \STATE $\hat b_i\gets \mathbf{1}[D_i>0];\; w_i\gets |D_i|$ \COMMENT{soft conf.}
+  \STATE $\hat b_i\gets \mathbf{1}[D_i>0]$;\; $w_i\gets |D_i|$ \COMMENT{soft confidence}
 \ENDFOR
-\STATE $\hat{\mathbf{m}}\gets \mathrm{ECC\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$
+\STATE $\hat{\mathbf{m}}\gets \mathrm{RS\text{-}Decode}(\hat{\mathbf{b}},\mathbf{w})$
 \FORALL{$r\in\mathrm{store.lookup}(\hat{\mathbf{m}})$}
   \IF{$r$ valid \textbf{and} $d(F(r),F(I'_{\delta^\star}))\le\tau$}
     \RETURN \textsc{Transcoded-consistent}, $r$
@@ -1222,7 +1166,7 @@ onto other content resolves to a record describing different content.
 \end{algorithmic}
 \end{algorithm}
 
-\noindent Media is accepted at the strongest level the evidence supports:
+Media is accepted at the strongest level the evidence supports:
 \textsc{Camera-original} (the exact file a certified sensor committed),
 \textsc{Transcoded-consistent} (derived from a notarized capture: it carries a
 payload whose sensor-signed record describes the same scene; the verifier returns
@@ -1808,7 +1752,7 @@ Block TPR / FPR            & $0.914/0.037$ & $0.927/0.104$ \\
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig_results.pdf}
+\includegraphics{fig_results.pdf}
 \caption{Measured results on real public images. (a) In-pixel channel raw BER vs.\
 real-JPEG quality on Kodak (nearly flat through $Q10$, cliff at $Q5$; RS recovers
 the payload on $21$--$23/24$ images through $Q10$). (b) Amplitude operating curve at JPEG~$Q40$ over all $24$
@@ -1970,16 +1914,17 @@ Burst: two records, one payload          & --- & $2/2$ (valid) \\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{fig_adaptive.png}
+\includegraphics{fig_adaptive.pdf}
 \caption{Adaptive local edit accepted as \textsc{Transcoded-consistent} (E6).
-Left: marked original. Centre: a $96\times96$ patch from another photograph,
-pasted and then forced to the original's fingerprint-cell means, after JPEG~$Q90$.
-Right: the donor. The edit is visible on inspection and appears in a comparison
-with the original that the record links to; only V1 certifies exact pixels.}
+(a) Marked original. (b) A $96\times96$ patch (dashed) pasted from another
+photograph and forced to the original's fingerprint-cell means, after
+JPEG~$Q90$. (c) The donor. The edit is visible on inspection and in a
+comparison with the original that the record links to; only V1 certifies exact
+pixels.}
 \label{fig:adaptive}
 \end{figure}
 
-\noindent\textbf{Scope and threats to validity.} These results validate the
+\noindent\textbf{Threats to validity.} These results validate the
 \emph{algorithmic} core---carrier design, host-suppressed spread-spectrum
 detection, robustness to \emph{real} JPEG/WebP/noise/blur/resize/photometric/crop
 attacks, false-accept behavior, and tamper localization---on \emph{real public

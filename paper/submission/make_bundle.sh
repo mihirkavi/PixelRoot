@@ -30,7 +30,7 @@ mkdir -p "$OUT"
 stage_sources() {   # $1 = destination directory
   mkdir -p "$1/figures" "$1/contracts/src"
   cp "$PAPER/pixelroot.tex" "$PAPER/pixelroot_tifs.tex" "$PAPER/references.bib" "$1/"
-  cp "$PAPER/figures/"*.pdf "$PAPER/figures/"*.png "$1/figures/"
+  cp "$PAPER/figures/"*.pdf "$1/figures/"
   cp "$PAPER/contracts/src/PixelRootRegistry.sol" "$1/contracts/src/"
 }
 
