@@ -4,9 +4,12 @@ Validates C7 (Prop. 3), C10 (timing), C11 (notarization O(1) amortization).
 
 Outputs: results/e5_crypto.txt
 """
-import os, time, hashlib, math
+import os, time, hashlib, json
 from math import comb
 import numpy as np
+
+import ledger
+import pixelroot as pr
 
 OUT = os.path.join(os.path.dirname(__file__), "results"); os.makedirs(OUT, exist_ok=True)
 
@@ -27,42 +30,27 @@ def bench_sha256():
     return res
 
 def bench_seed_select():
-    """Seed derivation + keyed carrier-selection time (128 bits x R=25 over 32400
-    blocks for a 1080p frame), pure-Python reference."""
-    key = b"PIXELROOT-OEM-KEY-v2"
-    payload = np.random.RandomState(1).randint(0, 256, 16, dtype=np.uint8).tobytes()
+    """Carrier-layout generation as deployed in pixelroot.keyed_plan (key-only
+    seed, permutation of all blocks, antipodal chips) for 384 RS-coded bits over
+    a 1080p frame (32,400 blocks, R = 84)."""
     n_blocks = (1920 // 8) * (1080 // 8)
+    R = n_blocks // 384
     REP = 200
     t0 = time.perf_counter()
     for _ in range(REP):
-        seed = int.from_bytes(hashlib.sha256(key + payload).digest()[:4], "big")
-        rng = np.random.RandomState(seed)
-        sel = rng.permutation(n_blocks)[:3200]
-        chips = rng.choice(np.array([-1, 1]), size=3200)
+        pr.keyed_plan("PIXELROOT-OEM-KEY-v2", 384, R, n_blocks)
     dt = (time.perf_counter() - t0) / REP * 1000
     return dt, n_blocks
-
-def merkle_root(leaves):
-    """Binary Merkle with sorted-pair SHA-256 (matches registry.sol verifyInclusion)."""
-    level = list(leaves)
-    while len(level) > 1:
-        nxt = []
-        for i in range(0, len(level), 2):
-            a = level[i]
-            b = level[i + 1] if i + 1 < len(level) else level[i]
-            lo, hi = (a, b) if a <= b else (b, a)
-            nxt.append(hashlib.sha256(lo + hi).digest())
-        level = nxt
-    return level[0]
 
 def bench_merkle():
     rows = []
     for N in [1, 100, 10_000]:
         leaves = [hashlib.sha256(f"img{i}".encode()).digest() for i in range(N)]
         t0 = time.perf_counter()
-        root = merkle_root(leaves)
+        root = ledger.merkle_root(leaves)
         dt = (time.perf_counter() - t0) * 1000
-        path_len = max(0, math.ceil(math.log2(N))) if N > 1 else 0
+        path_len = len(ledger.merkle_proof(leaves, 0))
+        assert ledger.verify(root, leaves[0], ledger.merkle_proof(leaves, 0))
         proof_bytes = 32 * path_len
         rows.append((N, dt, path_len, proof_bytes))
     return rows
@@ -82,16 +70,17 @@ def rs_false_accept_bound(n_s=48, k=16, p=0.5):
         prob += comb(n_s, j) * (qbyte ** j) * ((1 - qbyte) ** (n_s - j))
     return t, prob
 
-def gas_estimate(batch):
-    """Analytic EVM gas for the register() path (1 zero->nonzero SSTORE + event +
-    base tx + calldata), amortized over a Merkle batch. verifyInclusion is a view
-    call (0 on-chain gas)."""
-    base_tx = 21000
-    sstore_zero_to_nonzero = 20000
-    log_event = 375 + 3 * 375 + 256  # LOG + topics + data (approx)
-    calldata = 4 * 16 + 68 * 32      # selector + ~2 words nonzero calldata (approx)
-    per_tx = base_tx + sstore_zero_to_nonzero + log_event + calldata
-    return per_tx, per_tx / batch
+GAS_REPORT = os.path.join(OUT, "gas_report.json")
+
+
+def measured_gas():
+    """Gas measured by the Hardhat test suite (contracts/test/registry.test.js)
+    on PixelRootRegistry v2; None if `npm test` has not been run."""
+    if not os.path.exists(GAS_REPORT):
+        return None
+    with open(GAS_REPORT) as f:
+        return json.load(f)
+
 
 def main():
     sha = bench_sha256()
@@ -105,17 +94,23 @@ def main():
     L.append("[C10] SHA-256 commitment timing (mean of 20 runs):")
     for k, v in sha.items():
         L.append(f"   {k:<34} {v:.2f} ms")
-    L.append(f"   seed derivation + carrier selection (128b x R=25, {nblk} blocks): {seed_dt:.3f} ms")
+    L.append(f"   carrier layout (384 coded bits x R=84, {nblk} blocks, keyed_plan): {seed_dt:.3f} ms")
     L.append("")
-    L.append("[C11] Merkle batching (sorted-pair SHA-256, matches registry.sol):")
+    L.append("[C11] Merkle batching (domain-separated sorted-pair SHA-256; ledger.py == PixelRootRegistry.sol):")
     L.append(f"   {'N leaves':<12}{'build (ms)':<14}{'path len':<12}{'proof bytes'}")
     for N, dt, pl, pb in merkle:
         L.append(f"   {N:<12}{dt:<14.3f}{pl:<12}{pb}")
-    L.append("   On-chain gas (analytic EVM):")
-    for b in [1, 100, 10000]:
-        per_tx, per_img = gas_estimate(b)
-        L.append(f"     batch={b:<6} per-tx={per_tx} gas   amortized/image={per_img:.2f} gas")
-    L.append("   (verifyInclusion is a view call: 0 on-chain gas; proof verified off-chain)")
+    gas = measured_gas()
+    if gas is None:
+        L.append("   On-chain gas: run `npm test` in contracts/ to measure (writes results/gas_report.json)")
+    else:
+        L.append(f"   On-chain gas (measured, Hardhat EVM, {gas['evm']}):")
+        for b in [1, 100, 10000]:
+            per_tx = gas["register"]
+            L.append(f"     batch={b:<6} per-tx={per_tx} gas   amortized/image={per_tx / b:.2f} gas")
+        L.append(f"     registerLot={gas['registerLot']}  revokeDevice={gas['revokeDevice']}"
+                 f"  verifyCapture (eth_call)={gas['verifyCapture']}")
+    L.append("   (verification paths are view calls: no on-chain gas is paid to verify)")
     L.append("")
     L.append("[C7] RS(48,16) soft false-accept bound (Prop. 3), per-bit p=1/2:")
     L.append(f"   corrects t={t} byte errors; P[random read decodes to a claimed payload]")

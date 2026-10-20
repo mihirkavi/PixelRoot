@@ -33,11 +33,11 @@ Contrast 1.1          0.0181      22/24
 Gamma 0.9             0.0157      23/24
 Gamma 1.1             0.0174      22/24
 Crop 1%               0.0171      23/24
-Crop 2%               0.1117      20/24
+Crop 2%               0.0193      23/24
 Crop 3%               0.0195      23/24
-Rotate 1deg [lim]     0.5036      0/24
-Rotate 2deg [lim]     0.5013      0/24
-ResizedCrop 3% [lim]  0.4898      0/24
+Rotate 1deg [lim]     0.4964      0/24
+Rotate 2deg [lim]     0.4920      0/24
+ResizedCrop 3% [lim]  0.4880      0/24
 JPEG70+Resize0.75     0.0258      22/24
 JPEG50+Noise5         0.0166      23/24
 Resize0.75+JPEG40     0.0267      22/24

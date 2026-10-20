@@ -1,0 +1,79 @@
+=== E6: device identity + content binding on REAL images (Kodak) ===
+images=24 sizes=[(512, 768), (768, 512)] A=4.0 RS(48,16) sensors=8 (P-256, on-die)  lot+batch sealed on ledger
+fingerprint: 8x8 tiles over the interior (margin 32 px), 16x16 cells per tile, 8x8 DCT incl. DC
+calibration images=12 (even indices); all results below are on the 12 held-out images
+
+(1) Fingerprint distance (max per-tile relative L2)
+    calibration: genuine under benign suite max 0.143   25-35% splices min 0.821   -> tau=0.482
+    held-out:    genuine max 0.197 (p99 0.105)   different images min 1.085 (median 2.552)
+
+(2) End-to-end verdicts (CO = Camera-original, TC = Transcoded-consistent, U = Unverified)
+    Condition                   CO   TC    U
+    Camera JPEG (exact file)    12    0    0
+    JPEG Q95                     0   11    1
+    JPEG Q90                     0   11    1
+    JPEG Q80                     0   11    1
+    JPEG Q70                     0   11    1
+    JPEG Q60                     0   11    1
+    JPEG Q50                     0   11    1
+    JPEG Q40                     0   11    1
+    JPEG Q30                     0   11    1
+    JPEG Q20                     0   11    1
+    JPEG Q10                     0   10    2
+    WebP q80                     0   11    1
+    WebP q60                     0   10    2
+    Noise s2                     0   11    1
+    Noise s5                     0   11    1
+    Noise s10                    0   11    1
+    Noise s20                    0   11    1
+    Blur r0.5                    0   11    1
+    Blur r1.0                    0   11    1
+    Resize 0.5x                  0    9    3
+    Resize 0.75x                 0   11    1
+    Resize 1.5x                  0   11    1
+    Brightness 0.9               0   11    1
+    Brightness 1.1               0   10    2
+    Contrast 0.9                 0   11    1
+    Contrast 1.1                 0   11    1
+    Gamma 0.9                    0   11    1
+    Gamma 1.1                    0   11    1
+    Crop 1%                      0   11    1
+    Crop 2%                      0   11    1
+    Crop 3%                      0   11    1
+    JPEG70+Resize0.75            0   11    1
+    JPEG50+Noise5                0   11    1
+    Resize0.75+JPEG40            0   11    1
+    Unmarked originals           0    0   12
+    processed genuine copies verified: 358/396 [95% CI 0.87-0.93]
+    reasons for Unverified genuine verdicts: {'no payload': 38}
+
+(3) Cross-scene copy attacks (A's mark onto a different image B)
+    keyless        watermark decodes A's payload=61/78  end-to-end accepted=0/78 [95% CI 0.00-0.05]
+    with-original  watermark decodes A's payload=70/78  end-to-end accepted=0/78 [95% CI 0.00-0.05]
+
+(4) Local edits of a genuine capture (accepted = verified as Transcoded-consistent)
+    Splice 25-35% side, JPEG Q90               payload decodes=21/24  accepted=0/24 [95% CI 0.00-0.14]
+    Patch 64x64 px, JPEG Q90                   payload decodes=11/12  accepted=3/12 [95% CI 0.09-0.53]
+    Patch 96x96 px, JPEG Q90                   payload decodes=11/12  accepted=1/12 [95% CI 0.01-0.35]
+    Patch 128x128 px, JPEG Q90                 payload decodes=11/12  accepted=0/12 [95% CI 0.00-0.24]
+    Shift+splice: top tile row                 payload decodes=8/12  accepted=0/12 [95% CI 0.00-0.24]
+    Shift+splice: 128 px patch, corner         payload decodes=11/12  accepted=2/12 [95% CI 0.05-0.45]
+    Adaptive: 96 px patch + band projection    payload decodes=11/12  accepted=11/12 [95% CI 0.65-0.99]
+    adaptive patches: donor-detail correlation 0.52, mean |change| inside patch 17.8 gray levels
+
+(5) Cryptographic / ledger attacks
+    PASS  genuine record                                       accepted
+    PASS  record edited to another image's fingerprint         rejected (bad signature)
+    PASS  record with altered file hash                        rejected (bad signature)
+    PASS  uncertified sensor key (claims a real lot)           rejected (sensor not valid at seal time)
+    PASS  genuine signature on a forged record                 rejected (bad signature)
+    PASS  revoked sensor, sealed before revocation             accepted
+    PASS  revoked sensor, sealed after revocation              rejected (sensor not valid at seal time)
+    PASS  anchor block later than seal (time inconsistency)    rejected (anchor after seal)
+    PASS  anchor hash not the chain's (forged early anchor)    rejected (anchor hash not on chain)
+    PASS  record not notarized                                 rejected (not notarized)
+    PASS  burst: two records share one payload; both resolve   first Transcoded-consistent, second Transcoded-consistent
+
+(6) Cost per capture
+    record size (canonical JSON incl. signature + lot proof): 17769 B
+    chip signing (incl. fingerprint): 9.0 ms   ECDSA P-256 verify: 0.152 ms   full verify of a file: 4.2 ms

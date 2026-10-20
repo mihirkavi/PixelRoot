@@ -1,22 +1,23 @@
 === E5: crypto micro-benchmarks, Merkle batching, RS false-accept bound ===
-Platform: Python 3.9.6 hashlib (OpenSSL SHA-NI if available)
+Platform: Python 3.13.16 hashlib (OpenSSL SHA-NI if available)
 
 [C10] SHA-256 commitment timing (mean of 20 runs):
-   5.9 MB frame                       2.64 ms
-   6 MP RGB (2832x2122x3=18MB)        8.50 ms
-   1080p RGB (6.2MB)                  2.92 ms
-   seed derivation + carrier selection (128b x R=25, 32400 blocks): 0.430 ms
+   5.9 MB frame                       4.00 ms
+   6 MP RGB (2832x2122x3=18MB)        12.46 ms
+   1080p RGB (6.2MB)                  4.21 ms
+   carrier layout (384 coded bits x R=84, 32400 blocks, keyed_plan): 1.699 ms
 
-[C11] Merkle batching (sorted-pair SHA-256, matches registry.sol):
+[C11] Merkle batching (domain-separated sorted-pair SHA-256; ledger.py == PixelRootRegistry.sol):
    N leaves    build (ms)    path len    proof bytes
-   1           0.002         0           0
-   100         0.059         7           224
-   10000       5.814         14          448
-   On-chain gas (analytic EVM):
-     batch=1      per-tx=44996 gas   amortized/image=44996.00 gas
-     batch=100    per-tx=44996 gas   amortized/image=449.96 gas
-     batch=10000  per-tx=44996 gas   amortized/image=4.50 gas
-   (verifyInclusion is a view call: 0 on-chain gas; proof verified off-chain)
+   1           0.016         0           0
+   100         0.171         7           224
+   10000       17.269        14          448
+   On-chain gas (measured, Hardhat EVM, solc 0.8.24, optimizer 200 runs, Hardhat network):
+     batch=1      per-tx=47016 gas   amortized/image=47016.00 gas
+     batch=100    per-tx=47016 gas   amortized/image=470.16 gas
+     batch=10000  per-tx=47016 gas   amortized/image=4.70 gas
+     registerLot=51626  revokeDevice=65859  verifyCapture (eth_call)=72237
+   (verification paths are view calls: no on-chain gas is paid to verify)
 
 [C7] RS(48,16) soft false-accept bound (Prop. 3), per-bit p=1/2:
    corrects t=16 byte errors; P[random read decodes to a claimed payload]

@@ -25,7 +25,7 @@ Pillow), plus realistic tamper masks.
 
 | ID | Dataset | Content | Use | Source |
 |----|---------|---------|-----|--------|
-| D1 | Kodak True Color (24) | 768×512 natural photos | imperceptibility, robustness, security, localization host | r0k.us/graphics/kodak |
+| D1 | Kodak True Color (24) | 768×512 natural photos | imperceptibility, robustness, security, localization host, device identity | r0k.us/graphics/kodak (fallback: public GitHub mirror, verified to reproduce E1 byte for byte; see `fetch_data.sh`) |
 | D2 | (optional) Columbia/CASIA masks | tamper shapes | realistic localization masks | forensics datasets |
 | D3 | (optional) Dresden/VISION | multi-camera | PRNU cross-camera ID | gated; see E4 |
 
@@ -48,6 +48,7 @@ it gives reproducible, license-clean natural-image content.
 | C10 | Crypto micro-bench: SHA-256 over 6 MP ≈ 3 ms; seed/sig in µs | JS-only; verify cross-impl on real frame | Time SHA-256 on real 6 MP frame; seed/selection | `e5_crypto.py` | ms/op |
 | C11 | Notarization O(1) amortized via Merkle batching | Need real Merkle build + path-length + gas estimate | Build Merkle over N∈{1,10²,10⁴}; per-image cost; gas model | `e5_crypto.py` | bytes, path len, gas est |
 | C12 | PRNU sensor fingerprint is a real baseline PixelRoot improves on | We claim PixelRoot is *active* vs PRNU *passive*; should show PRNU detection curve for context | PRNU residual fingerprint + NCC/PCE detection (best-effort w/ available data) | `e4_prnu.py` | NCC/PCE, ROC |
+| C13 | Device identity + content binding: sensor-signed records, on-chain lots/revocation, and a content fingerprint stop identity transplant | The in-pixel mark alone is copyable without the key (keyless estimate from one shared JPEG) | Full verifier on real images: fingerprint calibration on 12 images, evaluation on 12 held-out; copy (keyless and with original), coarse-structure transplant, splices, record/ledger attacks | `e6_device_identity.py`, `contracts/test`, `tests/` | verdict counts, accept rates, fingerprint margins, ms/op, gas |
 | C-MFG | Per-pixel gain is manufacturable (M1/M2/M3) | Engineering claim; needs schematic-level grounding | Engineering diagrams + sourced process narrative | `figures/`, `MANUFACTURING.md` | n/a (qualitative) |
 
 Claims **C5 (hard-binding soundness)** and the threat-catalogue reductions are
@@ -75,7 +76,11 @@ python3 e1_robustness.py   # C1, C2, C3  -> results/e1_*.txt, results/e1_curve.c
 python3 e2_security.py     # C4, C6      -> results/e2_*.txt
 python3 e3_localization.py # C9          -> results/e3_*.txt, results/e3_roc.csv
 python3 e4_prnu.py         # C12         -> results/e4_*.txt
-python3 e5_crypto.py       # C7,C10,C11  -> results/e5_*.txt
+(cd ../contracts && npm ci && npm test)  # contract tests; writes results/gas_report.json
+python3 e5_crypto.py       # C7,C10,C11  -> results/e5_*.txt (reads gas_report.json)
+python3 e6_device_identity.py  # C13     -> results/e6_*.txt
+python3 -m pytest -q tests # unit tests for ledger.py and device_identity.py
+python3 collect_results.py # -> results/ALL_RESULTS.txt
 python3 make_figures.py    # engineering diagrams + result plots -> figures/
 ```
 
@@ -90,14 +95,15 @@ All on **24 real Kodak images** with **real libjpeg/WebP** and a **real RS(48,16
 | Claim | Result | Verdict vs. paper |
 |-------|--------|-------------------|
 | C1 imperceptibility | PSNR 38.2 dB, SSIM 0.942 @ A=4 (≈41 dB @ A=3) | **corrected** (was 40.2 dB synthetic) |
-| C2 robustness | payload recovered 23/24 through JPEG Q10, WebP, noise σ≤20, blur, resize, photometric, crop 1–3%; raw BER ≈1.6% | **corrected & strengthened** (real data; was "0% / 24-of-24 synthetic") |
+| C2 robustness | payload recovered 22–23/24 through JPEG Q95→Q20 (21/24 at Q10), 21–23/24 under WebP, noise σ≤20, light blur, resize 0.75–1.5×, photometric, crop 1–3% (23/24 each with the corrected resync search); weaker at blur σ=1.0 (19/24) and 0.5× resize (16/24); raw BER ≈1.6% | **corrected & strengthened** (real data; was "0% / 24-of-24 synthetic") |
 | C2 limits | rotation ±1–2° and resized-crop → BER ≈0.5 (need explicit geo-sync); JPEG Q5 fails | **new, honest limitation** |
 | C3 operating curve | genuine cliff: 0/24 @ A=0.5 → 23/24 @ A=4 (JPEG Q40) | confirmed |
-| C4 security | wrong-key BER 0.4996, 0/1200 FA; forgery 0/24; copy-attack 0/17 pass as new identity | confirmed on real data |
+| C4 security | wrong-key BER 0.4996, 0/1200 FA; forgery 0/24. **Copy attack succeeds at the watermark level**: A's payload decodes from B in 15/17 (E2, with original) and 61/78 keyless from a shared JPEG (E6) | **corrected**: the in-pixel mark alone does not prevent identity transplant; see C13 |
+| C13 device identity | held-out: 0/78 keyless and 0/78 with-original copies accepted, 0/60 transplants, 0/24 splices, 9/9 record/ledger attacks handled; genuine 11/12 under the benign suite; fingerprint genuine max 0.082 vs τ 0.286 vs splice min 0.48 | **new** |
 | C7 RS false-accept bound | ≤ 1.8×10⁻⁶⁵ (matches 0 empirical) | confirmed |
 | C9 localization | ROC-AUC 0.974, pixel-F1 0.74, IoU 0.59, TPR/FPR 0.914/0.037; AUC 0.954 @ JPEG Q90 | **corrected** (was TPR 0.986/FPR 0.022 single synthetic splice) |
 | C10 SHA-256 | 2.64 ms / 5.9 MB frame | confirmed (~3 ms claim) |
-| C11 notarization | Merkle 10⁴ leaves → 14-deep, 448 B proofs, 5.8 ms; ≈45k gas/tx → 4.5 gas/img @ batch 10⁴ | confirmed (O(1) amortized) |
+| C11 notarization | Merkle 10⁴ leaves → 14-deep, 448 B proofs; **measured** 46,605 gas/`register` → 4.66 gas/img @ batch 10⁴; `registerLot` 51,355, `revokeDevice` 65,419 | confirmed (O(1) amortized); domain-separated Merkle now identical on- and off-chain |
 | C12 PRNU baseline | accurate clean; genuine–impostor margin shrinks +0.019→+0.004 and PCE −18% under JPEG | confirmed (motivates active mark) |
 | C-MFG | engineering schematics + sourced 0.4 µm hybrid-bond / 3-layer DPS narrative | see `MANUFACTURING.md`, `figures/` |
 

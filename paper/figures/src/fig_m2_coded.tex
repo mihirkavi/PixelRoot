@@ -1,0 +1,49 @@
+\documentclass[border=1pt]{standalone}
+\input{common}
+\usepackage[american]{circuitikz}
+\ctikzset{tripoles/mos style/arrows, transistors/arrow pos=end}
+\begin{document}
+\begin{circuitikz}[line width=0.6pt]
+\ctikzset{bipoles/length=0.9cm}
+% ---------------- (a) pixel schematic
+\draw (0,0) node[ground]{} to[photodiode, l_=PD] (0,1.6) -- (1.0,1.6);
+\node[nmos, rotate=90, anchor=D] (g) at (1.0,1.6) {};
+\draw (g.S) -- (3.0,1.6) coordinate (sn);
+\fill (sn) circle (1.4pt);
+\node[red, anchor=south, font=\footnotesize\bfseries, inner sep=2pt] at (sn) {SN};
+\draw (sn) to[C, l={$C_\mathrm{S}$}] (3.0,0) node[ground]{};
+\draw (sn) -- (4.0,1.6);
+\node[blk, anchor=west, minimum height=8mm] (ro) at (4.0,1.6) {SF + RS\\readout};
+\draw[->] (ro.east) -- ++(0.45,0) node[right, font=\scriptsize, align=left, inner sep=1pt] {column\\bus};
+% GATE driven by the in-pixel code memory
+\node[blk, fill=acc!8, draw=acc, anchor=north, minimum height=7mm] (sram) at ($(g.G)+(0,-0.6)$) {1-bit SRAM: $b_i(t)$};
+\draw[acc, ->] (sram.north) -- (g.G);
+\node[anchor=west, inner sep=1pt] at ($(g.G)+(0.1,-0.22)$) {GATE};
+\node[font=\bfseries, anchor=north west] at (-0.6,2.5) {(a)};
+% ---------------- (b) timing (generated coordinates)
+\begin{scope}[yshift=-1.25cm]
+\node[font=\bfseries, anchor=north west] at (-0.6,0.35) {(b)};
+\node[anchor=east, text=ink!55, font=\scriptsize\bfseries, inner sep=1pt] at (1.40,-0.330) {global shutter};
+\draw[ink!55, line width=0.9pt, line join=round] (1.450,-0.450) -- (1.600,-0.450) -- (1.600,-0.150) -- (2.020,-0.150) -- (2.020,-0.150) -- (2.440,-0.150) -- (2.440,-0.150) -- (2.860,-0.150) -- (2.860,-0.150) -- (3.280,-0.150) -- (3.280,-0.150) -- (3.700,-0.150) -- (3.700,-0.150) -- (4.120,-0.150) -- (4.120,-0.150) -- (4.540,-0.150) -- (4.540,-0.150) -- (4.960,-0.150) -- (4.960,-0.150) -- (5.380,-0.150) -- (5.380,-0.150) -- (5.800,-0.150) -- (5.800,-0.450) -- (5.950,-0.450);
+\node[anchor=east, text=acc, font=\scriptsize\bfseries, inner sep=1pt] at (1.40,-0.950) {pixel A};
+\draw[acc, line width=0.9pt, line join=round] (1.450,-1.070) -- (1.600,-1.070) -- (1.600,-0.770) -- (2.020,-0.770) -- (2.020,-1.070) -- (2.440,-1.070) -- (2.440,-0.770) -- (2.860,-0.770) -- (2.860,-0.770) -- (3.280,-0.770) -- (3.280,-1.070) -- (3.700,-1.070) -- (3.700,-0.770) -- (4.120,-0.770) -- (4.120,-1.070) -- (4.540,-1.070) -- (4.540,-0.770) -- (4.960,-0.770) -- (4.960,-0.770) -- (5.380,-0.770) -- (5.380,-1.070) -- (5.800,-1.070) -- (5.800,-1.070) -- (5.950,-1.070);
+\node[anchor=west, text=acc, font=\scriptsize, inner sep=1pt] at (6.00,-0.950) {$b=1011010110$};
+\node[anchor=east, text=grn, font=\scriptsize\bfseries, inner sep=1pt] at (1.40,-1.570) {pixel B};
+\draw[grn, line width=0.9pt, line join=round] (1.450,-1.690) -- (1.600,-1.690) -- (1.600,-1.690) -- (2.020,-1.690) -- (2.020,-1.390) -- (2.440,-1.390) -- (2.440,-1.390) -- (2.860,-1.390) -- (2.860,-1.690) -- (3.280,-1.690) -- (3.280,-1.390) -- (3.700,-1.390) -- (3.700,-1.390) -- (4.120,-1.390) -- (4.120,-1.390) -- (4.540,-1.390) -- (4.540,-1.690) -- (4.960,-1.690) -- (4.960,-1.690) -- (5.380,-1.690) -- (5.380,-1.390) -- (5.800,-1.390) -- (5.800,-1.690) -- (5.950,-1.690);
+\node[anchor=west, text=grn, font=\scriptsize, inner sep=1pt] at (6.00,-1.570) {$b=0110111001$};
+\draw[decorate, decoration={brace, amplitude=3pt}] (1.6,0.0) -- node[above=2pt, font=\scriptsize] {exposure window of one frame} (5.800,0.0);
+\draw[ink!25, line width=0.3pt, densely dotted] (1.600,-0.05) -- (1.600,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (2.020,-0.05) -- (2.020,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (2.440,-0.05) -- (2.440,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (2.860,-0.05) -- (2.860,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (3.280,-0.05) -- (3.280,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (3.700,-0.05) -- (3.700,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (4.120,-0.05) -- (4.120,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (4.540,-0.05) -- (4.540,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (4.960,-0.05) -- (4.960,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (5.380,-0.05) -- (5.380,-1.85);
+\draw[ink!25, line width=0.3pt, densely dotted] (5.800,-0.05) -- (5.800,-1.85);
+\draw[->] (1.4500000000000002,-1.95) -- (6.100,-1.95) node[right, inner sep=1pt] {$t$};
+\end{scope}
+\end{circuitikz}
+\end{document}

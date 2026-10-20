@@ -1,0 +1,16 @@
+{
+  "name": "pixelroot-contracts",
+  "private": true,
+  "description": "PixelRoot on-chain registry: device identity, revocation and capture notarization",
+  "scripts": {
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "chai": "^4.5.0",
+    "ethers": "^6.13.4",
+    "hardhat": "^2.22.17",
+    "solc": "^0.8.24"
+  }
+}

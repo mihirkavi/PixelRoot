@@ -146,22 +146,23 @@ def extract_y(y, plan, payload_bits, offset=(0, 0), suppress=True):
     conf = float(np.sum(np.abs(acc)))
     return bits, conf
 
-def extract_resync(y, plan, payload_bits, max_off=8):
-    """Coarse-to-fine block-grid offset search (max confidence). Coarse stride-4
-    pass over +/-max_off, then a +/-3 refine around the best coarse offset."""
-    def best_over(offs_y, offs_x, best):
-        for oy in offs_y:
-            for ox in offs_x:
-                bits, conf = extract_y(y, plan, payload_bits, (oy, ox))
-                if best is None or conf > best[1]:
-                    best = (bits, conf, (oy, ox))
-        return best
-    coarse = list(range(-max_off, max_off + 1, 4))
-    best = best_over(coarse, coarse, None)
+def extract_resync(y, plan, payload_bits, max_off=8, y_stride=4):
+    """Block-grid offset search (max confidence). The (0,2) carrier is constant
+    down each column, so the confidence peak is broad vertically (a few px) but
+    only one pixel wide horizontally: search every horizontal offset on a
+    vertical stride, then refine vertically around the best. (An earlier
+    stride-4 search in both axes could step over the horizontal peak.)"""
+    best = None
+    for oy in range(-max_off, max_off + 1, y_stride):
+        for ox in range(-max_off, max_off + 1):
+            bits, conf = extract_y(y, plan, payload_bits, (oy, ox))
+            if best is None or conf > best[1]:
+                best = (bits, conf, (oy, ox))
     cy, cx = best[2]
-    fine_y = range(max(-max_off, cy - 3), min(max_off, cy + 3) + 1)
-    fine_x = range(max(-max_off, cx - 3), min(max_off, cx + 3) + 1)
-    best = best_over(fine_y, fine_x, best)
+    for oy in range(max(-max_off, cy - y_stride + 1), min(max_off, cy + y_stride - 1) + 1):
+        bits, conf = extract_y(y, plan, payload_bits, (oy, cx))
+        if conf > best[1]:
+            best = (bits, conf, (oy, cx))
     return best
 
 # ----------------------------- metrics -----------------------------------
