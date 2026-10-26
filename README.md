@@ -21,10 +21,10 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/license-MPL%202.0-111111?style=flat-square"></a>
-  <img alt="Status: research prototype" src="https://img.shields.io/badge/status-research%20prototype-6b6b6b?style=flat-square">
-  <img alt="React 19, Express 5, Python research code" src="https://img.shields.io/badge/React%20%C2%B7%20Express%20%C2%B7%20Python-111111?style=flat-square">
-  <img alt="Ledger: simulated" src="https://img.shields.io/badge/ledger-simulated-6b6b6b?style=flat-square">
+  <a href="LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/license-MPL%202.0-0d3b3c?style=flat-square"></a>
+  <img alt="Status: research prototype" src="https://img.shields.io/badge/status-research%20prototype-0d7c86?style=flat-square">
+  <img alt="React 19, Express 5, Python research code" src="https://img.shields.io/badge/React%20%C2%B7%20Express%20%C2%B7%20Python-162126?style=flat-square">
+  <img alt="Ledger: simulated" src="https://img.shields.io/badge/ledger-simulated-b3653b?style=flat-square">
 </p>
 
 <p align="center">
@@ -40,15 +40,18 @@ AI can now make photos and videos that people cannot tell from real recordings. 
 <table>
   <tr>
     <td width="33%" valign="top">
-      <h3>🔬 Proof in the pixels</h3>
+      <sub><code>01</code></sub>
+      <h3>Proof in the pixels</h3>
       An identifier hidden in pixel gain is designed to survive compression and metadata stripping, so the proof travels with the image.
     </td>
     <td width="33%" valign="top">
-      <h3>🔐 Rooted in hardware</h3>
+      <sub><code>02</code></sub>
+      <h3>Rooted in hardware</h3>
       In the proposed design, each sensor signs its captures with its own key, and makers certify or revoke keys on a public ledger.
     </td>
     <td width="33%" valign="top">
-      <h3>🧾 Verify, or fail safe</h3>
+      <sub><code>03</code></sub>
+      <h3>Verify, or fail safe</h3>
       A verifier confirms an exact original, confirms a re-compressed copy, or says "unverified". It never guesses.
     </td>
   </tr>
