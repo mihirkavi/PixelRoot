@@ -1,0 +1,90 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>PixelRoot banner</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* PixelRoot identity: the forensic figure. Colors and fonts from the console (client/src/styles.css, client/index.html). */
+:root{
+  --bg:#f5f1e8; --ink:#162126; --muted:#52606b; --deep:#0d3b3c; --teal:#0d7c86; --copper:#b3653b;
+  --line:rgba(22,33,38,.09); --panel:#fffbf5; --rule:rgba(13,59,60,.22);
+  --r:#d9a99a; --g:#a9cbb9; --b:#a5bed3;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0b1d1e; --ink:#efe9dd; --muted:#9fb0b4; --deep:#5fc4cc; --teal:#37aab4; --copper:#e59a68;
+  --line:rgba(239,233,221,.06); --panel:#102a2b; --rule:rgba(95,196,204,.28);
+  --r:#6b3e33; --g:#2f5a49; --b:#2e4a63;
+}}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1600px;height:600px;overflow:hidden}
+body{font-family:'Space Grotesk',sans-serif;color:var(--ink);background:var(--bg);position:relative;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:42px 42px}
+.left{position:absolute;left:96px;top:0;bottom:0;width:760px;display:flex;flex-direction:column;justify-content:center}
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:34px}
+.brand b{font-weight:700;font-size:30px;letter-spacing:-.01em}
+.mono{font-family:'IBM Plex Mono';letter-spacing:.08em;text-transform:uppercase}
+.eyebrow{font-size:15px;color:var(--muted);margin-bottom:18px}
+.eyebrow span{color:var(--copper)}
+h1{font-weight:700;font-size:94px;line-height:.98;letter-spacing:-.045em}
+h1 em{font-style:normal;color:var(--teal)}
+h1 em b{color:var(--copper)}
+p{margin-top:26px;font-size:25px;line-height:1.42;color:var(--muted);max-width:680px;font-weight:500}
+.steps{display:flex;align-items:center;gap:12px;margin-top:34px;font-size:15px}
+.steps span{padding:8px 13px;border:1.5px solid var(--rule);color:var(--ink);background:var(--panel)}
+.steps i{font-style:normal;color:var(--muted)}
+.steps span:last-child{border-color:var(--copper);color:var(--copper)}
+/* figure */
+.fig{position:absolute;right:96px;top:70px;width:640px;height:460px}
+.photo{position:absolute;left:0;top:40px;width:330px;height:250px;border:1.5px solid var(--rule);overflow:hidden;
+  background:linear-gradient(180deg,#e9c7a1 0%,#d99b74 38%,#8a6a5a 39%,#4f6b6a 60%,#2c4a4b 100%)}
+.photo::after{content:"";position:absolute;left:190px;top:46px;width:60px;height:60px;border-radius:50%;background:#f4dcb8;opacity:.9}
+.photo .sel{position:absolute;left:110px;top:118px;width:44px;height:44px;border:2px solid var(--copper);z-index:2}
+.loupe{position:absolute;left:300px;top:0;width:340px;height:340px;border-radius:50%;border:2.5px solid var(--deep);overflow:hidden;background:var(--panel);
+  box-shadow:0 0 0 10px var(--bg),0 0 0 11.5px var(--rule)}
+.grid{position:absolute;inset:-6px;display:grid;grid-template-columns:repeat(9,1fr);gap:3px;padding:3px}
+.grid div{position:relative}
+.grid .R{background:var(--r)} .grid .G{background:var(--g)} .grid .B{background:var(--b)}
+.grid div.k::after{content:"";position:absolute;inset:30%;background:var(--copper)}
+.grid div.k0::after{content:"";position:absolute;inset:38%;border:2px solid var(--copper)}
+svg.lines{position:absolute;inset:0;overflow:visible}
+.cap{position:absolute;font-size:13px;color:var(--muted)}
+.cap b{color:var(--ink);font-weight:600}
+</style></head>
+<body>
+<div class="left">
+  <div class="brand">
+    <svg width="42" height="42" viewBox="0 0 100 100" aria-hidden="true">
+      <path d="M8 8H92V62H80V20H20V80H64V92H8Z" fill="var(--deep)"/>
+      <rect x="68" y="68" width="11" height="11" fill="var(--deep)"/><rect x="81" y="68" width="11" height="11" fill="var(--copper)"/><rect x="68" y="81" width="11" height="11" fill="var(--deep)"/>
+    </svg>
+    <b>PixelRoot</b>
+  </div>
+  <div class="eyebrow mono"><span>●</span> Research prototype · MPL-2.0</div>
+  <h1>Proof of origin,<br><em>in the pixel<b>s</b>.</em></h1>
+  <p>Research on sensor-level image provenance, plus a console to register images and verify them.</p>
+  <div class="steps mono"><span>Capture</span><i>→</i><span>Sign</span><i>→</i><span>Register</span><i>→</i><span>Verify</span></div>
+</div>
+<div class="fig">
+  <div class="photo"><div class="sel"></div></div>
+  <svg class="lines" aria-hidden="true">
+    <path d="M154 160L306 132M154 202L318 262" stroke="var(--copper)" stroke-width="1.5" stroke-dasharray="4 5" fill="none"/>
+  </svg>
+  <div class="loupe"><div class="grid" id="g"></div></div>
+  <div class="cap mono" style="left:0;top:8px"><b>Fig. 1</b> · synthetic image</div>
+  <div class="cap mono" style="left:300px;top:366px;width:340px;text-align:center"><b>Bayer mosaic</b> · R G G B</div>
+  <div class="cap mono" style="left:0;top:306px;width:330px;line-height:1.7">
+    <span style="display:inline-block;width:12px;height:12px;background:var(--copper);vertical-align:-1px"></span> ID bit 1 &nbsp;
+    <span style="display:inline-block;width:12px;height:12px;border:2px solid var(--copper);vertical-align:-1px"></span> ID bit 0<br>
+    In-pixel ID (illustrative)<br>Simulated in software only
+  </div>
+</div>
+<script>
+  const g=document.getElementById('g'); const bits=[1,0,1,1,0,0,1,0,1,1,0,1];
+  let n=0;
+  for(let y=0;y<9;y++)for(let x=0;x<9;x++){
+    const d=document.createElement('div');
+    d.className=(y%2===0?(x%2===0?'R':'G'):(x%2===0?'G':'B'));
+    if((x*7+y*3)%8===2&&n<bits.length){d.classList.add(bits[n++]?'k':'k0');}
+    g.appendChild(d);
+  }
+</script>
+</body></html>
