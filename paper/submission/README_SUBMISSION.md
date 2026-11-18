@@ -109,3 +109,13 @@ cover letter and conflict-of-interest statement are standalone (`.tex`/`.txt`).
 - References: the entries an earlier pass could not verify (SynthID-Image,
   Video Seal, the steganalysis/averaging paper, the C2PA security analysis) were
   checked against arXiv and IACR ePrint listings.
+
+## Zenodo
+
+v1 was published on Zenodo on 17 Nov 2026: record 24329305,
+DOI [10.5281/zenodo.24329305](https://doi.org/10.5281/zenodo.24329305). It is the same
+full-version PDF as arXiv v1 (`dist/pixelroot_full.pdf`, no IEEE notice), listed as a
+preprint under CC BY 4.0, with a link to this repository. The record can't be deleted. For the
+TIFS-notice or accepted versions, add a **new version** of the record; it gets its own DOI,
+and the concept DOI points to the latest version. Once arXiv assigns the ID, add it to the
+record as a related identifier.
