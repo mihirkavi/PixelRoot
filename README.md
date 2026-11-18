@@ -21,6 +21,7 @@
 </p>
 
 <p align="center">
+  <a href="https://doi.org/10.5281/zenodo.24329305"><img alt="DOI 10.5281/zenodo.24329305" src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.24329305-1682d4?style=flat-square"></a>
   <a href="LICENSE"><img alt="License: MPL 2.0" src="https://img.shields.io/badge/license-MPL%202.0-0d3b3c?style=flat-square"></a>
   <img alt="Status: research prototype" src="https://img.shields.io/badge/status-research%20prototype-0d7c86?style=flat-square">
   <img alt="React 19, Express 5, Python research code" src="https://img.shields.io/badge/React%20%C2%B7%20Express%20%C2%B7%20Python-162126?style=flat-square">
@@ -132,6 +133,21 @@ Open the app at <http://localhost:5173> (the API runs on <http://localhost:5000>
 ## The research
 
 The [`paper/`](paper) folder holds a research paper on the full design, *PixelRoot: Hardware-Anchored, Sensor-Level Media Provenance with Real-Time Blockchain Notarization for Trustworthy Imaging* ([PDF](paper/pixelroot.pdf) · [Markdown](paper/pixelroot.md)), with the code and data behind every number.
+
+The preprint is archived on Zenodo with a permanent DOI: [10.5281/zenodo.24329305](https://doi.org/10.5281/zenodo.24329305) (v1, CC BY 4.0). To cite it:
+
+```bibtex
+@misc{kavishwar2026pixelroot,
+  author    = {Kavishwar, Mihir},
+  title     = {PixelRoot: Hardware-Anchored, Sensor-Level Media Provenance with Real-Time Blockchain Notarization for Trustworthy Imaging},
+  year      = {2026},
+  publisher = {Zenodo},
+  version   = {v1},
+  doi       = {10.5281/zenodo.24329305},
+  url       = {https://doi.org/10.5281/zenodo.24329305},
+  note      = {Preprint}
+}
+```
 
 <p align="center">
   <img alt="Four research plots: in-pixel bit error rate versus JPEG quality, the embedding amplitude operating curve, a tamper-localization ROC curve and a passive PRNU baseline" src="paper/experiments/figures/fig_results.png" width="100%">
